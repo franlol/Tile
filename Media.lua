@@ -15,7 +15,6 @@ local FONTS = {
 
 -- Texturas que trae el propio addon (carpeta Media)
 local DARK = "Interface\\AddOns\\MendFrames\\Media\\Dark"
-ns.TEX_DARK = DARK
 
 local TEXTURES = {
     { "MendFrames · Oscura", DARK },

@@ -192,7 +192,6 @@ ns.indicatorDefaults = {
     typeIconPos = { point = "CENTER", x = 0, y = 0 },
     borderInside = false,    -- borde del marco: por dentro (true) o por fuera
     ranks = {},              -- [clave de hechizo] = { [id] = true } IDs elegidos (vacío = todos)
-    exact = {},              -- (antiguo, se lee por compatibilidad)
 }
 
 local function Ind(t)
@@ -240,30 +239,8 @@ function ns.DeepCopy(t)
     return o
 end
 
+-- Completa un indicador con los valores por defecto que le falten
 function ns.FixIndicator(ind)
-    -- antiguo: una fuente y un tamaño para los dos textos, y solo el punto
-    if ind.timerText == nil and (ind.fontSize or ind.font or ind.timerPoint or ind.stacksPoint) then
-        local f, sz = ind.font or FONT, ind.fontSize or 9
-        ind.timerText = { font = f, size = sz, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
-            point = ind.timerPoint or "CENTER", x = 0, y = 0 }
-        ind.stacksText = { font = f, size = sz, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
-            point = ind.stacksPoint or "BOTTOMRIGHT", x = 0, y = 0 }
-    end
-    ind.font, ind.fontSize, ind.timerPoint, ind.stacksPoint = nil, nil, nil, nil
-    -- antiguo indicador integrado «Disipable»: ahora es un indicador de auras
-    -- normal que vigila los debuffs que el juego dice que puedo disipar
-    if ind.kind == "dispel" then
-        ind.kind, ind.watch = "aura", "dispellable"
-        ind.mine, ind.others, ind.mode = false, false, "present"
-        ind.spells = ind.spells or {}
-    end
-    -- el debuff de banda por listas de instancia pasa a ser el debuff de jefe
-    if ind.kind == "raiddebuff" and ind.name == "Debuff de banda" then ind.name = "Debuff de jefe" end
-    -- opciones que el juego no deja hacer con sus auras nativas
-    for _, k in ipairs({ "hl", "spellStyles", "warnAt", "warnColor", "showBelow", "blacklist",
-        "excludeClaimed", "nameLetters", "unknownType" }) do
-        ind[k] = nil
-    end
     ns.CopyDefaults(ns.indicatorDefaults, ind)
     return ind
 end
@@ -301,75 +278,19 @@ function ns.NewProfile()
     local p = ns.DeepCopy(ns.profileDefaults)
     local _, class = UnitClass("player")
     p.indicators = ns.DefaultIndicators(class)
-    p.restIndicator = true
     return p
 end
 
+-- Completa un perfil (y sus indicadores) con los valores por defecto que le falten
 function ns.FixProfile(p)
     local inds = p.indicators
     p.indicators = nil
-    -- antiguo "Color" único -> color de barra + color de fondo
-    local b = p.bars
-    if b and b.colorMode and b.healthColor == nil then
-        if b.colorMode == "dark" then
-            b.healthColor, b.bgColor = "custom", "class"
-            b.customColor = C(0.18, 0.18, 0.18)
-        elseif b.colorMode == "custom" then
-            b.healthColor, b.bgColor = "custom", "dark"
-        else
-            b.healthColor, b.bgColor = "class", "dark"
-        end
-        b.colorMode = nil
-    end
-    -- textura del fondo sin elegir (antes "igual que la barra"): la de la barra
-    if b and (b.bgTex == nil or b.bgTex == "") and b.healthTex then
-        b.bgTex = b.healthTex
-    end
-    -- antiguo fondo "barra oscurecida" -> mismas opciones que la barra + brillo
-    if b and b.bgColor == "dark" then
-        if b.healthColor == "custom" and b.customColor then
-            local cc = b.customColor
-            b.bgColor, b.bgCustom = "custom", C(cc.r * 0.25, cc.g * 0.25, cc.b * 0.25)
-        else
-            b.bgColor = b.healthColor or "class"
-            b.bgBrightness = 0.25
-        end
-    end
-    -- curación entrante y escudos usaban la textura de la vida
-    if b and b.healthTex then
-        if b.healPredTex == nil then b.healPredTex = b.healthTex end
-        if b.absorbTex == nil then b.absorbTex = b.healthTex end
-    end
     ns.CopyDefaults(ns.profileDefaults, p)
     if type(inds) ~= "table" then
         local _, class = UnitClass("player")
         inds = ns.DefaultIndicators(class)
-        p.restIndicator = true
-    end
-    -- debuffs elegidos por hechizo en aliados: el juego no deja hacerlo con sus
-    -- auras nativas, así que esos indicadores se quitan
-    local removed = {}
-    for i = #inds, 1, -1 do
-        local ind = inds[i]
-        if ind.kind == "aura" and ind.auraType == "HARMFUL" and (ind.watch or "spells") == "spells" then
-            table.insert(removed, 1, tostring(ind.name))
-            table.remove(inds, i)
-        else
-            ind.auraType = nil
-        end
-    end
-    if #removed > 0 then
-        ns.removedIndicators = ns.removedIndicators or {}
-        for _, n in ipairs(removed) do table.insert(ns.removedIndicators, n) end
     end
     for _, ind in ipairs(inds) do ns.FixIndicator(ind) end
-    -- perfiles de antes: «Bebiendo / comiendo» pasa de texto a indicador (una vez)
-    if not p.restIndicator then
-        table.insert(inds, ns.FixIndicator(ns.RestIndicator()))
-        p.restIndicator = true
-    end
-    if p.texts and p.texts.status then p.texts.status.showRest, p.texts.status.restColor = nil, nil end
-    if p.bars then p.bars.auraTooltip = nil end
     p.indicators = inds
     return p
 end

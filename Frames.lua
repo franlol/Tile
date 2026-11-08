@@ -37,7 +37,6 @@ local function SetBarValue(bar, v, smooth)
         bar:SetValue(v)
     end
 end
-ns.SetBarValue = SetBarValue
 
 
 -------------------------------------------------------------------------------
@@ -871,7 +870,6 @@ function ns.ApplyProfile()
         ns.UpdateAllButtons()
     end)
 end
-ns.ApplyLayout = ns.ApplyProfile
 
 function ns.SetLocked(locked)
     if not locked and InCombatLockdown() then

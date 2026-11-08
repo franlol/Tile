@@ -184,39 +184,11 @@ function ns.AddSpellKey(byID, _, key, value, rankID)
     end
 end
 
--- Rangos de jugador de un hechizo: { { rank = 1, id = 139 }, ... }
--- Solo cuentan los IDs que el juego marca con un rango ("Rank N"); las
--- versiones de PNJ u objetos con el mismo nombre no tienen rango y se ignoran.
-local GetSubtext = (C_Spell and C_Spell.GetSpellSubtext) or GetSpellSubtext
-function ns.SpellRanks(key)
-    local out, seen = {}, {}
-    if not GetSubtext then return out end
-    for _, id in ipairs(ns.KeyIDs(key)) do
-        local sub = GetSubtext(id)
-        local n = type(sub) == "string" and tonumber(sub:match("(%d+)"))
-        if n and not seen[n] then
-            seen[n] = true
-            out[#out + 1] = { rank = n, id = id }
-        end
-    end
-    table.sort(out, function(a, b) return a.rank < b.rank end)
-    return out
-end
-
 -- IDs elegidos a mano para un hechizo de un indicador ({ [id] = true }),
 -- o nil si no hay ninguno (= todos los IDs del hechizo)
 function ns.KeyRank(cfg, key)
     local r = cfg.ranks and cfg.ranks[key]
-    if type(r) == "number" then r = { [r] = true } cfg.ranks[key] = r end   -- formato anterior
     if type(r) == "table" and next(r) then return r end
-    -- compatibilidad con el antiguo botón "ID"
-    if cfg.exact and cfg.exact[key] and type(key) == "number" then return { [key] = true } end
-end
-
--- Texto del rango de un ID ("Rank 3"), si el juego lo tiene
-function ns.SpellSubtext(id)
-    local sub = GetSubtext and GetSubtext(id)
-    if type(sub) == "string" and sub ~= "" then return sub end
 end
 
 -- Cuando el índice encuentra IDs nuevos: los indicadores se rehacen con ellos
@@ -381,36 +353,13 @@ function ns.HideBlizzard()
 end
 
 -------------------------------------------------------------------------------
--- Carga de la base de datos (con migración desde la 0.1)
+-- Carga de la base de datos
 -------------------------------------------------------------------------------
 local function LoadDB()
-    local old = MendFramesDB
-    if type(old) == "table" and not old.version then
-        local db = { hideBlizzard = old.layout and old.layout.hideBlizzard }
-        local p = ns.NewProfile()
-        for _, k in ipairs({ "width", "height", "spacing", "groupSpacing", "orientation", "groupBy",
-            "scale", "showSolo", "showParty", "showPlayer" }) do
-            if old.layout and old.layout[k] ~= nil then p.layout[k] = old.layout[k] end
-        end
-        if old.pets then
-            for k, v in pairs(old.pets) do if p.pets[k] ~= nil then p.pets[k] = v end end
-        end
-        if old.pos then p.pos = old.pos end
-        db.profiles = { Default = p }
-        MendFramesDB = db
-    end
     MendFramesDB = CopyDefaults(ns.dbDefaults, MendFramesDB)
     ns.db = MendFramesDB
-    if not next(ns.db.profiles) then
-        ns.db.profiles.Default = ns.NewProfile()
-    end
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
-    end
-    -- datos de versiones anteriores que ya no se usan: listas de debuffs de
-    -- banda por instancia y diagnósticos
-    for _, k in ipairs({ "raid", "diag", "auraDiag", "indicatorAudit", "probe", "nativeDispelError" }) do
-        ns.db[k] = nil
     end
     for _, p in pairs(ns.db.profiles) do ns.FixProfile(p) end
 end
@@ -419,7 +368,6 @@ end
 -- Eventos
 -------------------------------------------------------------------------------
 local ev = CreateFrame("Frame")
-ns.eventFrame = ev
 ev:RegisterEvent("ADDON_LOADED")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -439,11 +387,6 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         ns.CreateFrames()
         ns.HideBlizzard()
         ns.Print("cargado. Escribe |cffffff00/mf|r para abrir las opciones.")
-        if ns.removedIndicators then
-            ns.Print("indicadores quitados (el juego no deja elegir debuffs por hechizo en aliados): "
-                .. table.concat(ns.removedIndicators, ", "))
-            ns.removedIndicators = nil
-        end
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -475,8 +418,6 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.SetLocked(true)
     elseif msg == "unlock" or msg == "mover" or msg == "desbloquear" then
         ns.SetLocked(false)
-    elseif msg == "demo" or msg == "muestra" then
-        ns.ToggleDemo()
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "estado" or msg == "status" then

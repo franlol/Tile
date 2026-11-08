@@ -821,7 +821,6 @@ local function BuildIndicators(p)
                 if type(pick) ~= "table" then pick = {} s.ranks[self.key] = pick end
                 pick[self.spellID] = (not pick[self.spellID]) or nil
                 if not next(pick) then s.ranks[self.key] = nil end
-                s.exact[self.key] = nil
                 IndChanged()
             end)
             subPool[n] = sr
@@ -853,7 +852,7 @@ local function BuildIndicators(p)
             r.del = UI.Confirm(UI.Button(r, "x", 16, 16, function()
                 local s = Sel()
                 local key = table.remove(s[field], i)
-                if key ~= nil then s.exact[key] = nil s.ranks[key] = nil end
+                if key ~= nil then s.ranks[key] = nil end
                 IndChanged()
             end), "?")
             r.del:SetPoint("LEFT", 290, 0)

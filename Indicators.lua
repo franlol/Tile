@@ -76,7 +76,6 @@ ns.IndicatorUnitMeasure = UnitMeasure
 local function Missing(cfg)
     return cfg.kind == "aura" and cfg.watch == "spells" and cfg.mode == "missing" and not UnitMeasure(cfg)
 end
-ns.IndicatorMissing = Missing
 
 -- Enseña debuffs con tipo (magia, veneno...): su color puede salir del tipo
 local function Typed(cfg)
@@ -734,7 +733,6 @@ local function HideWidget(w)
     if w.tex and w.tex.SetDesaturated then w.tex:SetDesaturated(false) end
     w:Hide()
 end
-ns.HideWidget = HideWidget
 
 -- Crea/reutiliza los widgets y contenedores de todos los indicadores de un
 -- botón. Se llama fuera de combate (al aplicar el perfil).
@@ -1002,12 +1000,10 @@ end
 
 -------------------------------------------------------------------------------
 -- Datos falsos para el modo prueba y la muestra de opciones
--- ns.preview = { cfg = indicador }: enseñarlo en más marcos mientras se edita
 -------------------------------------------------------------------------------
 function ns.TestAuras(b, i, all)
     if not b.ind then return end
     local now = GetTime()
-    local pv = ns.preview
     for _, c in ipairs(ns.compiled) do
         local cfg, w = c.cfg, b.ind[c.index]
         if w then
@@ -1032,7 +1028,7 @@ function ns.TestAuras(b, i, all)
             HideWidget(w)
             -- all: la muestra de Indicadores enseña el indicador que se edita
             -- (b.previewOnly) o, si no, todos a la vez
-            local focus = all or (pv and pv.cfg == cfg)
+            local focus = all
             local skip = (b.previewOnly and c.index ~= b.previewOnly)
                 or (cfg.kind == "aura" and Typed(cfg) and not kind)
             if skip then
