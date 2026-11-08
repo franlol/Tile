@@ -1104,6 +1104,155 @@ local function BuildIndicators(p)
         function() local s = Sel() return s and s.width end,
         function(v) local s = Sel() s.width, s.height = v, v IndChanged() end)
 
+    ---------------------------------------------------------------------------
+    -- Muestra del marco con el indicador: se ve dónde queda y se puede
+    -- arrastrar. Al soltarlo se elige el punto de anclaje más cercano
+    -- (de los 9) y el desplazamiento X/Y exacto, así cabe cualquier sitio.
+    ---------------------------------------------------------------------------
+    local SAMPLE_W, SAMPLE_H = 340, 96
+    local posSample = CreateFrame("Frame", nil, c)
+    posSample:SetSize(SAMPLE_W, SAMPLE_H + 22)
+    local psBg = posSample:CreateTexture(nil, "BACKGROUND")
+    psBg:SetPoint("TOPLEFT")
+    psBg:SetPoint("TOPRIGHT")
+    psBg:SetHeight(SAMPLE_H)
+    psBg:SetColorTexture(0.03, 0.03, 0.04, 1)
+    local psHint = UI.Label(posSample, "Arrastra el indicador para colocarlo donde quieras.")
+    psHint:SetPoint("BOTTOMLEFT", 0, 2)
+    psHint:SetTextColor(0.65, 0.65, 0.65)
+
+    local unit = CreateFrame("Frame", nil, posSample, "BackdropTemplate")
+    UI.Backdrop(unit, { 0.12, 0.12, 0.14, 1 }, { 0, 0, 0, 1 })
+    local _, myClass = UnitClass("player")
+    local cc = (myClass and RAID_CLASS_COLORS[myClass]) or { r = 0.3, g = 0.8, b = 0.3 }
+    local uHealth = unit:CreateTexture(nil, "BORDER")
+    uHealth:SetPoint("TOPLEFT", 1, -1)
+    uHealth:SetPoint("BOTTOMLEFT", 1, 1)
+    uHealth:SetColorTexture(cc.r * 0.85, cc.g * 0.85, cc.b * 0.85, 1)
+    local uName = UI.Label(unit, UnitName("player") or "Jugador")
+    uName:SetPoint("CENTER")
+
+    -- el resto de indicadores del perfil, en tenue, como referencia
+    local ghosts = {}
+    local function Ghost(i)
+        local g = ghosts[i]
+        if not g then
+            g = unit:CreateTexture(nil, "ARTWORK")
+            g:SetColorTexture(1, 1, 1, 0.18)
+            ghosts[i] = g
+        end
+        return g
+    end
+
+    -- el indicador elegido
+    local el = CreateFrame("Button", nil, unit, "BackdropTemplate")
+    el:SetFrameLevel(unit:GetFrameLevel() + 5)
+    el:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+    el:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+    el.tex = el:CreateTexture(nil, "ARTWORK")
+    el.tex:SetPoint("TOPLEFT", 1, -1)
+    el.tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    el.text = el:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    el.text:SetPoint("CENTER")
+    el:SetMovable(true)
+    el:RegisterForDrag("LeftButton")
+    el:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(1, 1, 1, 1) end)
+    el:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1) end)
+
+    local function PX(f, pt)
+        if pt:find("LEFT") then return f:GetLeft() end
+        if pt:find("RIGHT") then return f:GetRight() end
+        return (f:GetLeft() + f:GetRight()) / 2
+    end
+    local function PY(f, pt)
+        if pt:find("TOP") then return f:GetTop() end
+        if pt:find("BOTTOM") then return f:GetBottom() end
+        return (f:GetTop() + f:GetBottom()) / 2
+    end
+    local function Round(v) return math.floor(v + 0.5) end
+    local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+
+    el:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    el:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local s = Sel()
+        if not s then return end
+        -- tercio del marco en el que cae el centro -> punto de anclaje
+        local cx = (self:GetLeft() + self:GetRight()) / 2
+        local cy = (self:GetTop() + self:GetBottom()) / 2
+        local fx = (cx - unit:GetLeft()) / unit:GetWidth()
+        local fy = (cy - unit:GetBottom()) / unit:GetHeight()
+        local v = fy > 2 / 3 and "TOP" or (fy < 1 / 3 and "BOTTOM" or "")
+        local h = fx < 1 / 3 and "LEFT" or (fx > 2 / 3 and "RIGHT" or "")
+        local pt = v .. h
+        if pt == "" then pt = "CENTER" end
+        s.point = pt
+        s.x = Clamp(Round(PX(self, pt) - PX(unit, pt)), -80, 80)
+        s.y = Clamp(Round(PY(self, pt) - PY(unit, pt)), -60, 60)
+        IndChanged()
+    end)
+
+    posSample.Refresh = function()
+        local s = Sel()
+        if not s or s.kind == "dispel" then return end
+        local L = ns.EP().layout
+        local W, H = L.width, L.height
+        -- ampliado para que se vea bien, con sitio alrededor para lo que quede fuera
+        local z = math.min(3, (SAMPLE_W - 80) / W, (SAMPLE_H - 24) / H)
+        unit:SetScale(z)
+        unit:SetSize(W, H)
+        unit:ClearAllPoints()
+        unit:SetPoint("CENTER", psBg, "CENTER", 0, 0)
+        uHealth:SetWidth(math.max(1, (W - 2) * 0.7))
+
+        local n = 0
+        for i, ind in ipairs(Inds()) do
+            if i ~= selInd and ind.kind ~= "dispel" and ind.enabled ~= false then
+                n = n + 1
+                local g = Ghost(n)
+                local gt = EffType(ind)
+                if gt == "text" then
+                    g:SetSize(math.max(10, (ind.fontSize or 10) * 2.5), (ind.fontSize or 10) + 2)
+                else
+                    g:SetSize(ind.width or 10, ind.height or 10)
+                end
+                g:ClearAllPoints()
+                g:SetPoint(ind.point or "CENTER", unit, ind.point or "CENTER", ind.x or 0, ind.y or 0)
+                g:Show()
+            end
+        end
+        for i = n + 1, #ghosts do ghosts[i]:Hide() end
+
+        local t = EffType(s)
+        if t == "text" then
+            el:SetSize(math.max(10, s.fontSize * 2.5), s.fontSize + 2)
+        else
+            el:SetSize(math.max(2, s.width), math.max(2, s.height))
+        end
+        el:ClearAllPoints()
+        el:SetPoint(s.point, unit, s.point, s.x, s.y)
+        el.text:SetText("")
+        if t == "icon" or t == "icons" then
+            local icon = 134400
+            if s.spells and s.spells[1] then
+                local _, ic = ns.SpellKeyInfo(s.spells[1])
+                icon = ic or icon
+            end
+            el.tex:SetTexture(icon)
+            el.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            el.tex:SetVertexColor(1, 1, 1, 1)
+        elseif t == "text" then
+            el.tex:SetTexCoord(0, 1, 0, 1)
+            el.tex:SetColorTexture(0, 0, 0, 0)
+            el.text:SetText("12")
+        else
+            el.tex:SetTexCoord(0, 1, 0, 1)
+            local col = s.color or { r = 1, g = 1, b = 1 }
+            el.tex:SetColorTexture(col.r or 1, col.g or 1, col.b or 1, 1)
+        end
+    end
+    table.insert(UI.widgets, posSample)
+
     local st = UI.Stack(c, 4, -4, {
         UI.Header(c, "Indicador"),
         nameW,
@@ -1149,6 +1298,7 @@ local function BuildIndicators(p)
         W(blackW, function() return K() == "debuffs" end),
 
         W(UI.Header(c, "Posición y tamaño"), notDispel),
+        W(posSample, notDispel),
         W(UI.Dropdown(c, "Punto de anclaje", UI.POINTS, IB("point")), notDispel),
         W(UI.Attach(UI.Slider(c, "Desplazamiento X", -80, 80, 1, nil, IB("x"))), notDispel),
         W(UI.Attach(UI.Slider(c, "Desplazamiento Y", -60, 60, 1, nil, IB("y"))), notDispel),
