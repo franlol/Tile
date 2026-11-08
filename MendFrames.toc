@@ -1,0 +1,18 @@
+## Interface: 16001
+## Title: MendFrames
+## Notes: Marcos de banda para sanadores: indicadores tipo Cell, debuffs de banda por instancia, perfiles por tamaño de grupo.
+## Author: franlol
+## Version: 0.2.0
+## IconTexture: Interface\Icons\Spell_Nature_Rejuvenation
+## SavedVariables: MendFramesDB
+
+Core.lua
+Defaults.lua
+Catalog.lua
+Media.lua
+Glow.lua
+RaidDebuffs.lua
+Indicators.lua
+Frames.lua
+Options\Widgets.lua
+Options\Options.lua
