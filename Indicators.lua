@@ -112,7 +112,7 @@ local function TickTimer(w, e, now)
     local cfg = e.cfg
     if w.timerText and (cfg.timer or w.wtype == "text") then w.timerText:SetText(FormatTime(remain)) end
     if w.bar then w.bar:SetValue(remain / e.dur) end
-    if w.drainOn then w.drain:SetValue(remain / e.dur) end
+    if w.drainOn then w.drain:SetValue(1 - remain / e.dur) end
     local warn = cfg.warnAt > 0 and remain <= cfg.warnAt
     if warn ~= e.warned then
         e.warned = warn
@@ -307,7 +307,8 @@ local function WidgetType(cfg)
 end
 
 -- Estilo del barrido: el reloj de siempre (normal, al revés o con borde),
--- una sombra que se vacía en vertical u horizontal, o una barra fina abajo
+-- una sombra que se llena en vertical u horizontal, o una barra fina abajo
+-- que crece (las tres muestran el tiempo que ya ha pasado)
 local function SetupSweep(w, cfg)
     local cd, d = w.cd, w.drain
     if not cd then return end
@@ -542,18 +543,23 @@ local function ApplyDrain(w, unit, aura)
     local d = w.drain
     if not d then return end
     if not w.drainOn then d:Hide() return end
-    -- duración secreta (en combate): la barra se vacía sola
+    -- duración secreta (en combate): la barra avanza sola con el tiempo
+    -- transcurrido (si el cliente no admite el sentido, muestra el que queda)
     if unit and GetAuraDuration and d.SetTimerDuration and aura.auraInstanceID then
         local ok = pcall(function()
             local obj = GetAuraDuration(unit, aura.auraInstanceID)
             if not obj then error("sin duración") end
-            d:SetTimerDuration(obj)
+            local dir = Enum and Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.ElapsedTime
+            local interp = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.Immediate
+            if not (dir and pcall(d.SetTimerDuration, d, obj, interp or 0, dir)) then
+                d:SetTimerDuration(obj)
+            end
         end)
         if ok then d:Show() return end
     end
     local dur, exp = aura.duration, aura.expirationTime
     if not AnyS(dur, exp) and dur and exp and dur > 0 then
-        d:SetValue(math.max(0, (exp - GetTime()) / dur))
+        d:SetValue(math.min(1, math.max(0, 1 - (exp - GetTime()) / dur)))
         d:Show()
     else
         d:Hide() -- sin duración (aura permanente)
