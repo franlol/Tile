@@ -789,7 +789,7 @@ end
 -- Indicadores
 -------------------------------------------------------------------------------
 local selInd = 1
-local KIND_LABEL = { aura = "", raiddebuff = "banda", debuffs = "debuffs", dispel = "disipar" }
+local KIND_LABEL = { aura = "", raiddebuff = "banda", debuffs = "debuffs" }
 local TYPE_LABEL = { icon = "icono", icons = "iconos", square = "cuadrado", bar = "barra", text = "texto",
     border = "borde", overlay = "tinte" }
 
@@ -947,7 +947,9 @@ local function BuildIndicators(p)
     local function K() local s = Sel() return s and s.kind end
     local function T() local s = Sel() return s and EffType(s) end
     local function isAura() return K() == "aura" end
-    local function notDispel() return K() ~= "dispel" end
+    -- borde del marco / tinte sobre la vida: cubren el marco entero (sin posición ni tamaño)
+    local function frameT() local t = T() return t == "border" or t == "overlay" end
+    local function notDispel() return not frameT() end
     local function iconLike() local t = T() return t == "icon" or t == "icons" end
     local function rect() local t = T() return t == "square" or t == "bar" end
     local function iconsT() return T() == "icons" end
@@ -957,8 +959,12 @@ local function BuildIndicators(p)
     -- barra que mide escudos o curación entrante: no vigila auras ni tiene tiempo
     local function unitBar() return isAura() and ns.IndicatorUnitMeasure(Sel()) end
     local function watchAuras() return isAura() and not unitBar() end
+    -- vigila los hechizos de su lista (no «los que puedo disipar»)
+    local function listWatch() return watchAuras() and Sel().watch ~= "dispellable" end
+    local function dispWatch() return watchAuras() and Sel().watch == "dispellable" end
     local function timed()
         if T() == "bar" and (Sel().barMeasure or "time") ~= "time" then return false end
+        if frameT() then return false end
         return notDispel() and not isMissing()
     end
     local function hasText() return timed() end
@@ -1325,7 +1331,8 @@ local function BuildIndicators(p)
 
         local s = Sel()
         local strip = s and s.type == "bar" and ns.STRIP_SIDE[s.span]
-        local w = same and s and s.kind ~= "dispel" and not strip and pb.ind and pb.ind[selInd]
+        local whole = s and (s.type == "border" or s.type == "overlay")
+        local w = same and s and not whole and not strip and pb.ind and pb.ind[selInd]
         handle:ClearAllPoints()
         if w then
             handle:SetAllPoints(w)
@@ -1341,17 +1348,21 @@ local function BuildIndicators(p)
 
     -- colores por tipo (comunes a todos los indicadores del perfil)
     local function DispelSwatches()
-        local function typed() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end
+        local function typed()
+            if K() == "raiddebuff" or K() == "debuffs" then return true end
+            local s = Sel()
+            return isAura() and (s.watch == "dispellable" or s.auraType == "HARMFUL") and (frameT() or iconLike())
+        end
         local function on() return Sel().dispelColor end
         local list = {}
         for _, d in ipairs({
             { "Magic", "Magia" }, { "Curse", "Maldición" }, { "Disease", "Enfermedad" }, { "Poison", "Veneno" },
-            { "none", "Sin tipo (solo en «Disipar»)" },
+            { "none", "Sin tipo (borde y tinte)" },
         }) do
             list[#list + 1] = WE(UI.Attach(UI.Swatch(c, d[2], function() return ns.EP().dispelColors[d[1]] end,
-                IndChanged)), function() return typed() and (d[1] ~= "none" or K() == "dispel") end, on)
+                IndChanged)), function() return typed() and (d[1] ~= "none" or frameT()) end, on)
         end
-        list[#list + 1] = WE(UI.Attach(UI.Note(c, "Estos colores son los mismos para todos los indicadores del perfil.", 340)),
+        list[#list + 1] = WE(UI.Attach(UI.Note(c, "Son los mismos para todos los indicadores del perfil. Si el juego oculta el tipo del debuff (puede pasar en combate o en instancias), el icono queda con borde negro y el borde o el tinte usan «Sin tipo».", 340)),
             typed, on)
         return list
     end
@@ -1363,6 +1374,7 @@ local function BuildIndicators(p)
         W(UI.Dropdown(c, "Tipo", {
             { "square", "Cuadrado de color" }, { "icon", "Icono" }, { "icons", "Varios iconos" },
             { "bar", "Barra" }, { "text", "Texto" },
+            { "border", "Borde del marco" }, { "overlay", "Tinte sobre la vida" },
         }, IB("type")), isAura),
         W(UI.Attach(UI.Dropdown(c, "Qué mide", {
             { "time", "Tiempo restante del aura" },
@@ -1384,11 +1396,14 @@ local function BuildIndicators(p)
         W(UI.Attach(customW), function() return isAura() and T() == "text" and Sel().textShow == "custom" end),
         W(UI.Attach(UI.Slider(c, "Máximo de letras", 0, 20, 1, function(v) return v == 0 and "todas" or tostring(v) end,
             IB("nameLetters"))), function() return isAura() and T() == "text" and Sel().textShow == "name" end),
-        W(UI.Dropdown(c, "Tipo", { { "border", "Borde de color" }, { "overlay", "Tinte sobre la vida" } },
-            IB("type")), function() return K() == "dispel" end),
 
         W(UI.Header(c, "Qué vigila"), watchAuras),
-        W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), watchAuras),
+        W(UI.Dropdown(c, "Vigila", {
+            { "spells", "Los hechizos de su lista" },
+            { "dispellable", "Los debuffs que puedo disipar" },
+        }, IB("watch")), watchAuras),
+        W(UI.Attach(UI.Note(c, "El juego decide cuáles puedes disipar tú (según tu clase y talentos).", 340)), dispWatch),
+        W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), listWatch),
         W(UI.Dropdown(c, "De quién", { { "mine", "Solo las mías" }, { "others", "Solo las de los demás" }, { "any", "De cualquiera" } },
             function()
                 local s = Sel()
@@ -1400,11 +1415,11 @@ local function BuildIndicators(p)
                 s.mine = v == "mine"
                 s.others = v == "others"
                 IndChanged()
-            end), watchAuras),
-        W(UI.Dropdown(c, "Mostrar cuando", { { "present", "Lo tiene" }, { "missing", "Le falta" } }, IB("mode")), watchAuras),
+            end), listWatch),
+        W(UI.Dropdown(c, "Mostrar cuando", { { "present", "Lo tiene" }, { "missing", "Le falta" } }, IB("mode")), listWatch),
         W(UI.Check(c, "Solo fuera de combate", IB("onlyOOC")), watchAuras),
-        W(UI.Note(c, "Hechizos (por ID o nombre; vale cualquier rango). Sin hechizos = todas las auras de ese tipo. El orden decide cuál se ve primero.", 340), watchAuras),
-        W(spellsW, watchAuras),
+        W(UI.Note(c, "Hechizos (por ID o nombre; vale cualquier rango). Sin hechizos = todas las auras de ese tipo. El orden decide cuál se ve primero.", 340), listWatch),
+        W(spellsW, listWatch),
 
         W(UI.Header(c, "Qué vigila"), function() return K() == "raiddebuff" end),
         W(UI.Note(c, "Muestra el debuff de mayor prioridad de la lista de la instancia (pestaña Debuffs de banda).", 340),
@@ -1412,16 +1427,16 @@ local function BuildIndicators(p)
         W(UI.Slider(c, "Mostrar solo si quedan menos de (s)", 0, 30, 1,
             function(v) return v == 0 and "siempre" or (v .. " s") end, IB("showBelow")), function() return isAura() and not isMissing() end),
 
-        W(UI.Header(c, "Qué vigila"), function() return K() == "debuffs" or K() == "dispel" end),
+        W(UI.Header(c, "Qué vigila"), function() return K() == "debuffs" end),
         W(UI.Check(c, "Solo los que yo puedo disipar", IB("onlyDispellable")),
-            function() return K() == "debuffs" or K() == "dispel" end),
+            function() return K() == "debuffs" end),
         W(UI.Check(c, "No repetir los que ya muestra otro indicador", IB("excludeClaimed")),
             function() return K() == "debuffs" end),
         W(UI.Note(c, "Ignorar estos debuffs (lista negra):", 340), function() return K() == "debuffs" end),
         W(blackW, function() return K() == "debuffs" end),
 
-        W(UI.Header(c, "Posición y tamaño"), notDispel),
-        W(posSample, notDispel),
+        UI.Header(c, "Posición y tamaño"),
+        posSample,
         PositionBlock(c, Sel, IndChanged, { showIf = function()
             return notDispel() and not (T() == "bar" and ns.STRIP_SIDE[Sel().span])
         end }),
@@ -1442,21 +1457,32 @@ local function BuildIndicators(p)
         W(UI.Dropdown(c, "Orientación de la barra", { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
             IB("barOrient")), function() return T() == "bar" end),
         W(UI.Attach(UI.Check(c, "Vaciar al revés", IB("barReverse"))), function() return T() == "bar" end),
-        W(UI.Slider(c, "Grosor del borde", 1, 6, 1, nil, IB("width")),
-            function() return K() == "dispel" and T() == "border" end),
-        W(UI.Slider(c, "Intensidad del tinte", 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")),
-            function() return K() == "dispel" and T() == "overlay" end),
+
         W(UI.Slider(c, "Máximo de iconos", 1, 8, 1, nil, IB("max")), iconsT),
         W(UI.Dropdown(c, "Crecen hacia", { { "LEFT", "Izquierda" }, { "RIGHT", "Derecha" }, { "UP", "Arriba" }, { "DOWN", "Abajo" } },
             IB("grow")), iconsT),
         W(UI.Slider(c, "Espacio entre iconos", 0, 10, 1, nil, IB("spacing")), iconsT),
 
+        W(UI.Header(c, "Borde del marco"), function() return T() == "border" end),
+        W(UI.Slider(c, "Grosor", 1, 6, 1, nil, IB("width")), function() return T() == "border" end),
+        W(UI.Check(c, "Por dentro del marco", IB("borderInside")), function() return T() == "border" end),
+        W(UI.Header(c, "Tinte sobre la vida"), function() return T() == "overlay" end),
+        W(UI.Dropdown(c, "Forma", {
+            { "up", "Degradado de abajo arriba" },
+            { "down", "Degradado de arriba abajo" },
+            { "solid", "Liso" },
+        }, IB("tintShape")), function() return T() == "overlay" end),
+        W(UI.Slider(c, "Intensidad", 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")), function() return T() == "overlay" end),
+
         UI.Header(c, "Aspecto"),
-        W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")),
-            function() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end),
+        W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")), function()
+            if K() == "raiddebuff" or K() == "debuffs" then return true end
+            local s = Sel()
+            return isAura() and (s.watch == "dispellable" or s.auraType == "HARMFUL") and (frameT() or iconLike())
+        end),
         DispelSwatches(),
         WE(UI.Attach(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true)),
-            function() return colored() or K() == "dispel" end,
+            function() return colored() or frameT() end,
             function() return colored() or not Sel().dispelColor end),
         W(UI.Check(c, "Borde negro", IB("showBorder")),
             function() local t = T() return notDispel() and t ~= "text" end),

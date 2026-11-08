@@ -183,6 +183,7 @@ ns.indicatorDefaults = {
     auraType = "HELPFUL",   -- HELPFUL | HARMFUL
     mine = true,            -- solo las mías
     mode = "present",       -- present | missing
+    watch = "spells",       -- spells (la lista; vacía = todas) | dispellable (los que el juego dice que puedo disipar)
     onlyOOC = false,        -- solo fuera de combate
     spells = {},
     point = "TOPRIGHT",
@@ -220,7 +221,9 @@ ns.indicatorDefaults = {
     barMeasure = "time",
     barMaxStacks = 5,
     span = "none",          -- none | width | height
-    overlayAlpha = 0.6,      -- intensidad del tinte (Disipable)
+    overlayAlpha = 0.6,      -- intensidad del tinte
+    tintShape = "up",        -- tinte: up (degradado de abajo arriba) | down (de arriba abajo) | solid (liso)
+    borderInside = false,    -- borde del marco: por dentro (true) o por fuera
     showBelow = 0,           -- solo mostrar si quedan menos de N s (0 = siempre)
     blacklist = {},          -- Debuffs: hechizos que no se muestran
     hl = ns.STYLE_DEFAULTS,  -- resaltado del indicador (se copia)
@@ -242,8 +245,8 @@ function ns.BuiltinIndicators()
             point = "BOTTOMLEFT", x = 2, y = 5, width = 12, height = 12, max = 3, grow = "RIGHT",
             timer = false, stacks = true, auraType = "HARMFUL", mine = false,
             onlyDispellable = false, excludeClaimed = true, dispelColor = true },
-        Ind { name = "Disipable (borde)", kind = "dispel", type = "border",
-            width = 2, onlyDispellable = true, auraType = "HARMFUL", mine = false, dispelColor = true },
+        Ind { name = "Disipable (borde)", kind = "aura", watch = "dispellable", type = "border",
+            width = 2, auraType = "HARMFUL", mine = false, others = false, dispelColor = true },
         ns.RestIndicator(),
     }
 end
@@ -285,6 +288,13 @@ function ns.FixIndicator(ind)
             point = ind.stacksPoint or "BOTTOMRIGHT", x = 0, y = 0 }
     end
     ind.font, ind.fontSize, ind.timerPoint, ind.stacksPoint = nil, nil, nil, nil
+    -- antiguo indicador integrado «Disipable»: ahora es un indicador de auras
+    -- normal que vigila los debuffs que el juego dice que puedo disipar
+    if ind.kind == "dispel" then
+        ind.kind, ind.watch = "aura", "dispellable"
+        ind.auraType, ind.mine, ind.others, ind.mode = "HARMFUL", false, false, "present"
+        ind.spells = ind.spells or {}
+    end
     ns.CopyDefaults(ns.indicatorDefaults, ind)
     return ind
 end

@@ -35,7 +35,7 @@ end
 -------------------------------------------------------------------------------
 ns.compiled = {}
 
-local ORDER = { raiddebuff = 1, aura = 2, debuffs = 3, dispel = 4 }
+local ORDER = { raiddebuff = 1, aura = 2, debuffs = 3 }
 
 function ns.CompileIndicators()
     wipe(ns.compiled)
@@ -51,7 +51,12 @@ function ns.CompileIndicators()
                     ns.AddSpellKey(c.blackID, c.blackName, key, true, ns.KeyRank(cfg, key))
                 end
             end
-            if cfg.kind == "aura" then
+            if cfg.kind == "aura" and cfg.watch == "dispellable" then
+                -- el juego filtra los debuffs que puedo disipar (HARMFUL|RAID)
+                c.filter = "HARMFUL|RAID"
+                c.any = true
+                c.dispellable = true
+            elseif cfg.kind == "aura" then
                 c.filter = (cfg.auraType == "HARMFUL" and "HARMFUL" or "HELPFUL")
                     .. ((cfg.mine and not cfg.others) and "|PLAYER" or "")
                 c.others = cfg.others
@@ -317,10 +322,17 @@ creators.overlay = function(parent)
 end
 
 -- Tinte de "Disipable": degradado del color con la intensidad elegida
-local function SetOverlayColor(w, r, g, b, alpha)
-    if w.tex.SetGradient and CreateColor then
+-- Tinte sobre la vida: liso, o degradado de abajo arriba / de arriba abajo
+local function SetOverlayColor(w, r, g, b, alpha, shape)
+    shape = shape or "up"
+    if shape ~= "solid" and w.tex.SetGradient and CreateColor then
         w.tex:SetVertexColor(1, 1, 1, 1)
-        w.tex:SetGradient("VERTICAL", CreateColor(r, g, b, 0), CreateColor(r, g, b, alpha))
+        local clear, full = CreateColor(r, g, b, 0), CreateColor(r, g, b, alpha)
+        if shape == "down" then
+            w.tex:SetGradient("VERTICAL", full, clear)
+        else
+            w.tex:SetGradient("VERTICAL", clear, full)
+        end
     else
         w.tex:SetVertexColor(r, g, b, alpha)
     end
@@ -329,7 +341,6 @@ end
 local function WidgetType(cfg)
     if cfg.kind == "raiddebuff" then return "icon" end
     if cfg.kind == "debuffs" then return "icons" end
-    if cfg.kind == "dispel" then return cfg.type == "overlay" and "overlay" or "border" end
     return cfg.type
 end
 
@@ -485,8 +496,13 @@ local function LayoutWidget(w, cfg, b)
     local t = w.wtype
     if t == "border" then
         local th = math.max(1, cfg.width or 2)
-        w:SetPoint("TOPLEFT", b, "TOPLEFT", -th + 1, th - 1)
-        w:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", th - 1, -th + 1)
+        if cfg.borderInside then
+            w:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+            w:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 0, 0)
+        else
+            w:SetPoint("TOPLEFT", b, "TOPLEFT", -th + 1, th - 1)
+            w:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", th - 1, -th + 1)
+        end
         w:SetBackdrop({ edgeFile = FLAT, edgeSize = th })
         return
     elseif t == "overlay" then
@@ -741,7 +757,13 @@ function ns.ShowMissing(w, cfg)
     if w.drain then w.drain:Hide() end
     if w.count then w.count:SetText("") end
     if w.SetMainColor then w:SetMainColor(cfg.color) end
-    if w.wtype == "icon" then
+    if w.wtype == "border" then
+        local c = cfg.color
+        w:SetBackdropBorderColor(c.r, c.g, c.b, 1)
+    elseif w.wtype == "overlay" then
+        local c = cfg.color
+        SetOverlayColor(w, c.r, c.g, c.b, cfg.overlayAlpha or 0.6, cfg.tintShape)
+    elseif w.wtype == "icon" then
         local key = cfg.spells[1]
         local _, icon = ns.SpellKeyInfo(key)
         w.tex:SetTexture(icon or 134400)
@@ -852,7 +874,7 @@ local claimed, matches = {}, {}
 local matchPool, tmpList, tmpStyles = {}, {}, {}
 local function SortMatches(a, b) return a.order < b.order end
 
-local function ShowDispel(b, w, found, cfg, unit)
+local function ShowDispel(b, w, found, cfg, unit, style)
     local r, g, bl
     if cfg.dispelColor then
         local t = R(found.dispelName)
@@ -862,12 +884,12 @@ local function ShowDispel(b, w, found, cfg, unit)
         r, g, bl = cfg.color.r, cfg.color.g, cfg.color.b
     end
     if w.wtype == "overlay" then
-        SetOverlayColor(w, r, g, bl, cfg.overlayAlpha or 0.6)
+        SetOverlayColor(w, r, g, bl, cfg.overlayAlpha or 0.6, cfg.tintShape)
     else
         w:SetBackdropBorderColor(r, g, bl, 1)
     end
     w:Show()
-    ns.ApplyHighlight(b, w, cfg.hl, Ident(found), unit)
+    ns.ApplyHighlight(b, w, style or cfg.hl, Ident(found), unit)
 end
 
 -------------------------------------------------------------------------------
@@ -949,7 +971,7 @@ function ns.UpdateAuras(b)
                         m.aura, m.order = a, order
                         matches[n] = m
                         local id = a.auraInstanceID
-                        if cfg.auraType == "HARMFUL" and id and not S(id) then claimed[id] = true end
+                        if cfg.auraType == "HARMFUL" and not c.dispellable and id and not S(id) then claimed[id] = true end
                     end
                 end
                 if #matches == 0 then
@@ -963,6 +985,9 @@ function ns.UpdateAuras(b)
                             styles[i] = StyleFor(cfg, (not c.any) and cfg.spells[m.order] or nil)
                         end
                         ShowIcons(b, w, unit, list, cfg, styles)
+                    elseif w.wtype == "border" or w.wtype == "overlay" then
+                        local m = matches[1]
+                        ShowDispel(b, w, m.aura, cfg, unit, StyleFor(cfg, (not c.any) and cfg.spells[m.order] or nil))
                     else
                         local m = matches[1]
                         if w.tex and w.tex.SetDesaturated then w.tex:SetDesaturated(false) end
@@ -1007,12 +1032,6 @@ function ns.UpdateAuras(b)
             end
             ShowIcons(b, w, unit, list, cfg)
 
-        elseif c.kind == "dispel" then
-            local found
-            for _, a in ipairs(GetList(unit, cfg.onlyDispellable and "HARMFUL|RAID" or "HARMFUL")) do
-                if cfg.onlyDispellable or R(a.dispelName) then found = a break end
-            end
-            if found then ShowDispel(b, w, found, cfg, unit) else HideWidget(w) end
         end
     end
 end
@@ -1060,6 +1079,11 @@ function ns.TestAuras(b, i, all)
                             styles[n] = StyleFor(cfg, key)
                         end
                         ShowIcons(b, w, nil, list, cfg, styles)
+                    elseif w.wtype == "border" or w.wtype == "overlay" then
+                        -- en pocos marcos, para que no tape todo el modo prueba
+                        if i % 6 == 4 or focus then
+                            ShowDispel(b, w, Fake(first, 1, "Magic"), cfg, nil, StyleFor(cfg, first))
+                        end
                     else
                         if w.tex and w.tex.SetDesaturated then w.tex:SetDesaturated(false) end
                         ns.ShowAura(w, nil, Fake(first, 1), cfg)
@@ -1083,10 +1107,6 @@ function ns.TestAuras(b, i, all)
                 for k = 1, math.min(cfg.max, n) do list[k] = Fake(nil, k, k == 1 and "Poison" or nil) end
                 for k, a in ipairs(list) do a.icon = (k == 1) and 136016 or 136207 end
                 ShowIcons(b, w, nil, list, cfg)
-            elseif c.kind == "dispel" then
-                if i % 6 == 4 or (focus and i % 3 == 1) then
-                    ShowDispel(b, w, { dispelName = "Magic" }, cfg)
-                end
             end
         end
     end
