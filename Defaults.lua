@@ -78,6 +78,7 @@ ns.profileDefaults = {
         customColor = C(0.2, 0.75, 0.3),
         bgColor = "class",            -- fondo: mismas opciones que la barra: class | custom | gradient
         bgCustom = C(0.15, 0.15, 0.15),
+        smooth = false,               -- la barra de vida se llena/vacía con animación
         healthBrightness = 1,         -- 0.1..1: oscurece el color de la barra
         bgBrightness = 0.25,          -- 0.1..1: oscurece el color del fondo
         bgAlpha = 0.75,

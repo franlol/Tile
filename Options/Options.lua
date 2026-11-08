@@ -222,6 +222,7 @@ local function BuildBars(p)
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
         UI.Dropdown(c, "Textura de la vida", ns.TextureList, PB("bars.healthTex")),
+        UI.Check(c, "Llenado y vaciado suave", PB("bars.smooth")),
         UI.Attach(UI.Dropdown(c, "Color de la barra", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },

@@ -22,6 +22,58 @@ local function V(v)
 end
 
 -------------------------------------------------------------------------------
+-- Llenado suave de barras
+-- Nativo: el motor moderno anima SetValue(valor, interpolación), también con
+-- valores secretos. Si no existe, se anima a mano (solo con valores legibles).
+-------------------------------------------------------------------------------
+local NATIVE_SMOOTH = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
+local tweens = {}   -- [barra] = valor objetivo
+
+local tweenFrame = CreateFrame("Frame")
+tweenFrame:Hide()
+tweenFrame:SetScript("OnUpdate", function(self, elapsed)
+    local k = math.min(1, elapsed * 10)
+    for bar, target in pairs(tweens) do
+        local cur = bar:GetValue()
+        if S(cur) or not cur then
+            bar:SetValue(target)
+            tweens[bar] = nil
+        else
+            local _, max = bar:GetMinMaxValues()
+            local nv = cur + (target - cur) * k
+            if S(max) or math.abs(target - nv) <= math.max(1, (max or 1) * 0.002) then
+                nv = target
+                tweens[bar] = nil
+            end
+            bar:SetValue(nv)
+        end
+    end
+    if not next(tweens) then self:Hide() end
+end)
+
+local function SetBarValue(bar, v, smooth)
+    if not smooth then
+        tweens[bar] = nil
+        bar:SetValue(v)
+        return
+    end
+    if NATIVE_SMOOTH and pcall(bar.SetValue, bar, v, NATIVE_SMOOTH) then
+        tweens[bar] = nil
+        return
+    end
+    local cur = bar:GetValue()
+    if S(v) or S(cur) then
+        -- valor oculto por el juego: sin animación
+        tweens[bar] = nil
+        bar:SetValue(v)
+        return
+    end
+    tweens[bar] = v
+    tweenFrame:Show()
+end
+ns.SetBarValue = SetBarValue
+
+-------------------------------------------------------------------------------
 -- Tamaño de las mascotas: el de los jugadores o el suyo propio
 function ns.PetSize()
     local P = ns.P
@@ -273,7 +325,9 @@ function ns.UpdateHealth(b)
     local B = ns.P.bars
     local max, cur = UnitHealthMax(u), UnitHealth(u)
     b.health:SetMinMaxValues(0, V(max))
-    b.health:SetValue(V(cur))
+    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
+    SetBarValue(b.health, V(cur), B.smooth and b.lastHealthUnit == u)
+    b.lastHealthUnit = u
     if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
 
     if B.showHealPred and UnitGetIncomingHeals then
