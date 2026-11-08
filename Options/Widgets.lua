@@ -480,33 +480,83 @@ end
 -- showIf: el control se quita (para opciones de otro tipo de indicador)
 -- enableIf: el control se queda en su sitio y se desactiva (sub-opciones)
 -- fill: los controles se estiran al ancho del contenido (ventana redimensionable)
+-- Cada título abre una tarjeta (caja con fondo) que envuelve sus controles
+-- hasta el siguiente título; todas las tarjetas de una columna, mismo ancho.
+UI.CARD_PAD = 10
+
+local function Card(header, content)
+    local card = header.card
+    if not card then
+        card = CreateFrame("Frame", nil, content, "BackdropTemplate")
+        UI.Backdrop(card, { 0.095, 0.095, 0.118, 1 }, { 0.19, 0.19, 0.235, 1 })
+        header.card = card
+    end
+    -- debajo de los controles (que están un nivel por encima del contenido)
+    card:SetFrameLevel(content:GetFrameLevel())
+    return card
+end
+
 function UI.Stack(content, x, y, list, gap, fill)
     local st = { content = content, x = x, y = y, list = list, gap = gap or UI.GAP, fill = fill }
     function st:Layout()
+        local PAD = UI.CARD_PAD
         local yy = self.y
         local first = true
         local afterHeader = false
+        local card, cardTop
+
+        -- ancho de las tarjetas: el del control más ancho de la columna
+        local maxW = UI.W
+        if not self.fill then
+            for _, w in ipairs(self.list) do
+                if not w.isHeader and (not w.showIf or w.showIf()) then maxW = math.max(maxW, w:GetWidth()) end
+            end
+        end
+        local function CloseCard()
+            if not card then return end
+            local bottom = yy + self.gap -- borde inferior del último control
+            card:SetHeight(cardTop - bottom + PAD)
+            yy = bottom - PAD - self.gap
+            card = nil
+        end
+
         for _, w in ipairs(self.list) do
             local visible = not w.showIf or w.showIf()
             w:SetShown(visible)
+            if w.card then w.card:SetShown(visible) end
             if visible and w.enableIf then UI.SetEnabled(w, w.enableIf() and true or false) end
             if visible then
-                -- hueco extra antes de cada título de sección (salvo el primero)
-                if w.isHeader and not first then yy = yy - UI.SECTION_GAP end
+                if w.isHeader then
+                    CloseCard()
+                    -- hueco extra entre tarjetas (salvo antes de la primera)
+                    if not first then yy = yy - UI.SECTION_GAP end
+                    card = Card(w, self.content)
+                    cardTop = yy
+                    card:ClearAllPoints()
+                    card:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
+                    yy = yy - 4
+                end
                 -- unido al anterior: casi sin hueco (nunca pegado a un título:
                 -- si el control del que depende está oculto, va como uno normal)
                 if w.attached and not first and not afterHeader then yy = yy + self.gap - UI.ATTACH_GAP end
                 first = false
                 afterHeader = w.isHeader and true or false
+                local inset = card and PAD or 0
                 w:ClearAllPoints()
-                w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
+                w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x + inset, yy)
                 if self.fill and not w.fixedWidth then
-                    w:SetWidth(math.max(UI.W, self.content:GetWidth() - self.x - 16))
+                    w:SetWidth(math.max(UI.W, self.content:GetWidth() - self.x - 16 - 2 * inset))
                     if w.OnWidth then w.OnWidth(w:GetWidth()) end
+                elseif w.isHeader then
+                    w:SetWidth(maxW) -- la línea del título cruza toda la tarjeta
+                end
+                if card and w.isHeader then
+                    card:SetWidth((self.fill and w:GetWidth() or maxW) + 2 * PAD)
                 end
                 yy = yy - w:GetHeight() - self.gap
             end
         end
+        CloseCard()
         self.bottom = yy
         return yy
     end

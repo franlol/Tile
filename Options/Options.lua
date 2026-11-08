@@ -549,7 +549,7 @@ local function BuildSide()
     end
 
     -- aviso si este cliente no tiene el efecto elegido
-    local fallbackNote = UI.Note(c, "", 260)
+    local fallbackNote = UI.Note(c, "", 230)
     fallbackNote.text:SetTextColor(1, 0.55, 0.3)
     fallbackNote.Refresh = function()
         local g = sideCtx and V("glow")
