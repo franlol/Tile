@@ -196,30 +196,26 @@ local function HealthPct(b, testPct)
 end
 
 -- Color de la barra de vida y de su fondo (la vida que falta)
+-- Color para un modo (class | custom | gradient). El brillo solo oscurece el
+-- color de clase y el degradado; un color elegido a mano se ve tal cual.
+-- Si el juego oculta la vida, el degradado usa el color de clase.
+local function ModeColor(mode, custom, brightness, cr, cg, cb, pct)
+    if mode == "custom" then return custom.r, custom.g, custom.b end
+    local r, g, bl = cr, cg, cb
+    if mode == "gradient" and pct then r, g, bl = Gradient(pct) end
+    local k = brightness or 1
+    return r * k, g * k, bl * k
+end
+
+-- Color de la barra de vida y de su fondo (la vida que falta): mismas opciones
 function ns.UpdateBarColor(b, testClass, testPct)
     local B = ns.P.bars
     local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
-    local r, g, bl = cr, cg, cb
-    if B.healthColor == "custom" then
-        r, g, bl = B.customColor.r, B.customColor.g, B.customColor.b
-    elseif B.healthColor == "gradient" then
-        local pct = HealthPct(b, testPct)
-        if pct then r, g, bl = Gradient(pct) end   -- si está oculta: color de clase
-    end
-    -- el brillo solo oscurece el color de clase y el degradado; un color
-    -- elegido a mano se ve tal cual
-    local hb = (B.healthColor == "custom") and 1 or (B.healthBrightness or 1)
-    b.health:SetStatusBarColor(r * hb, g * hb, bl * hb)
-    local br, bg2, bb
-    if B.bgColor == "class" then
-        br, bg2, bb = cr, cg, cb
-    elseif B.bgColor == "custom" then
-        br, bg2, bb = B.bgCustom.r, B.bgCustom.g, B.bgCustom.b
-    else
-        br, bg2, bb = r * 0.25, g * 0.25, bl * 0.25
-    end
-    local bk = (B.bgColor == "custom") and 1 or (B.bgBrightness or 1)
-    b.health.bg:SetVertexColor(br * bk, bg2 * bk, bb * bk, B.bgAlpha)
+    local pct
+    if B.healthColor == "gradient" or B.bgColor == "gradient" then pct = HealthPct(b, testPct) end
+    b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
+    local r, g, bl = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
+    b.health.bg:SetVertexColor(r, g, bl, B.bgAlpha)
 end
 
 function ns.UpdateColors(b, testClass, testPct)
@@ -271,7 +267,7 @@ function ns.UpdateHealth(b)
     local max, cur = UnitHealthMax(u), UnitHealth(u)
     b.health:SetMinMaxValues(0, V(max))
     b.health:SetValue(V(cur))
-    if B.healthColor == "gradient" then ns.UpdateBarColor(b) end
+    if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
 
     if B.showHealPred and UnitGetIncomingHeals then
         b.pred:SetMinMaxValues(0, V(max))

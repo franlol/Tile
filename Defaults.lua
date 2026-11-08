@@ -74,10 +74,10 @@ ns.profileDefaults = {
         powerTex = FLAT,
         healthColor = "class",        -- barra: class | custom | gradient
         customColor = C(0.2, 0.75, 0.3),
-        bgColor = "dark",             -- fondo: dark (barra oscurecida) | class | custom
+        bgColor = "class",            -- fondo: mismas opciones que la barra: class | custom | gradient
         bgCustom = C(0.15, 0.15, 0.15),
         healthBrightness = 1,         -- 0.1..1: oscurece el color de la barra
-        bgBrightness = 1,             -- 0.1..1: oscurece el color del fondo
+        bgBrightness = 0.25,          -- 0.1..1: oscurece el color del fondo
         bgAlpha = 0.75,
         borderColor = C(0, 0, 0, 1),
         showPower = true,
@@ -294,6 +294,16 @@ function ns.FixProfile(p)
             b.healthColor, b.bgColor = "class", "dark"
         end
         b.colorMode = nil
+    end
+    -- antiguo fondo "barra oscurecida" -> mismas opciones que la barra + brillo
+    if b and b.bgColor == "dark" then
+        if b.healthColor == "custom" and b.customColor then
+            local cc = b.customColor
+            b.bgColor, b.bgCustom = "custom", C(cc.r * 0.25, cc.g * 0.25, cc.b * 0.25)
+        else
+            b.bgColor = b.healthColor or "class"
+            b.bgBrightness = 0.25
+        end
     end
     ns.CopyDefaults(ns.profileDefaults, p)
     if type(inds) ~= "table" then

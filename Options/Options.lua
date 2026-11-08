@@ -227,9 +227,9 @@ local function BuildBars(p)
         E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
             function() return ns.EP().bars.healthColor ~= "custom" end),
         UI.Dropdown(c, "Color del fondo (vida que falta)", {
-            { "dark", "Color de la barra, oscurecido" },
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
+            { "gradient", "Degradado según la vida" },
         }, PB("bars.bgColor")),
         bgSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness"))),
