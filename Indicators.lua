@@ -691,8 +691,8 @@ local function LayoutWidget(w, cfg, b)
     w:SetSize(cfg.width, cfg.height)
     -- span a whole side of the frame (like the threat line)
     if t == "bar" and (cfg.span == "width" or cfg.span == "height") then
-        local L = ns.P.layout
-        local fw, fh = L.width, L.height
+        local LY = ns.P.layout
+        local fw, fh = LY.width, LY.height
         if b.isPet then fw, fh = ns.PetSize() end
         if cfg.span == "width" then w:SetWidth(math.max(1, fw - 2)) else w:SetHeight(math.max(1, fh - 2)) end
     end

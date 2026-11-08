@@ -194,8 +194,8 @@ ns.AnchorHealth = AnchorHealth
 
 function ns.LayoutButton(b, isPet)
     local P = ns.P
-    local L, B, T, E = P.layout, P.bars, P.texts, P.elements
-    local w = isPet and (ns.PetSize()) or L.width
+    local LY, B, T, E = P.layout, P.bars, P.texts, P.elements
+    local w = isPet and (ns.PetSize()) or LY.width
 
     b.isPet = isPet
     b.bg:SetColorTexture(B.borderColor.r, B.borderColor.g, B.borderColor.b, B.borderColor.a or 1)
@@ -760,31 +760,31 @@ end
 
 local function SetHeaderLayout(h, isPet)
     local P = ns.P
-    local L = P.layout
-    local w, hh = L.width, L.height
+    local LY = P.layout
+    local w, hh = LY.width, LY.height
     if isPet then w, hh = ns.PetSize() end
     h:SetAttribute("mf-width", w)
     h:SetAttribute("mf-height", hh)
 
     h:SetAttribute("showRaid", true)
-    h:SetAttribute("showParty", L.showParty)
-    h:SetAttribute("showPlayer", L.showPlayer)
-    h:SetAttribute("showSolo", L.showSolo)
+    h:SetAttribute("showParty", LY.showParty)
+    h:SetAttribute("showPlayer", LY.showPlayer)
+    h:SetAttribute("showSolo", LY.showSolo)
 
-    if L.orientation == "horizontal" then
+    if LY.orientation == "horizontal" then
         h:SetAttribute("point", "LEFT")
-        h:SetAttribute("xOffset", L.spacing)
+        h:SetAttribute("xOffset", LY.spacing)
         h:SetAttribute("yOffset", 0)
         h:SetAttribute("columnAnchorPoint", "TOP")
     else
         h:SetAttribute("point", "TOP")
         h:SetAttribute("xOffset", 0)
-        h:SetAttribute("yOffset", -L.spacing)
+        h:SetAttribute("yOffset", -LY.spacing)
         h:SetAttribute("columnAnchorPoint", "LEFT")
     end
-    h:SetAttribute("columnSpacing", L.groupSpacing)
+    h:SetAttribute("columnSpacing", LY.groupSpacing)
     h:SetAttribute("maxColumns", 8)
-    h:SetAttribute("sortMethod", L.sortByName and "NAME" or "INDEX")
+    h:SetAttribute("sortMethod", LY.sortByName and "NAME" or "INDEX")
     h:SetAttribute("groupFilter", GroupFilter())
 
     if isPet then
@@ -793,7 +793,7 @@ local function SetHeaderLayout(h, isPet)
         h:SetAttribute("useOwnerUnit", false)
     else
         h:SetAttribute("unitsPerColumn", 5)
-        local go = GROUP_ORDERS[L.groupBy] or GROUP_ORDERS.GROUP
+        local go = GROUP_ORDERS[LY.groupBy] or GROUP_ORDERS.GROUP
         h:SetAttribute("groupBy", go[1])
         h:SetAttribute("groupingOrder", go[2])
     end
@@ -1088,18 +1088,18 @@ function ns.FillPreviewButton(b, only)
 end
 
 local function PositionGrid(list, parent, w, h, perGroup, ox, oy)
-    local L = ns.P.layout
+    local LY = ns.P.layout
     ox, oy = ox or 0, oy or 0
     for idx, b in ipairs(list) do
         local n = idx - 1
         local g, p = math.floor(n / perGroup), n % perGroup
         local x, y
-        if L.orientation == "horizontal" then
-            x = p * (w + L.spacing)
-            y = -g * (h + L.groupSpacing)
+        if LY.orientation == "horizontal" then
+            x = p * (w + LY.spacing)
+            y = -g * (h + LY.groupSpacing)
         else
-            x = g * (w + L.groupSpacing)
-            y = -p * (h + L.spacing)
+            x = g * (w + LY.groupSpacing)
+            y = -p * (h + LY.spacing)
         end
         b:SetSize(w, h)
         b:ClearAllPoints()
@@ -1109,7 +1109,7 @@ end
 
 function ns.LayoutTest()
     local P = ns.P
-    local L = P.layout
+    local LY = P.layout
     local size = ns.testSize or "raid20"
     local count = ns.SIZE_TEST[size] or 20
     local petCount = TEST_PETS[size] or 5
@@ -1117,15 +1117,15 @@ function ns.LayoutTest()
     -- same as the Blizzard header: filters by group, by "show myself" and by
     -- "show in party", and sorts by "group by" and the name
     local anyGroup = false
-    for g = 1, 8 do if L.groups[g] then anyGroup = true end end
-    local hideAll = size == "party" and not L.showParty
+    for g = 1, 8 do if LY.groups[g] then anyGroup = true end end
+    local hideAll = size == "party" and not LY.showParty
     local order = {}
-    local go = GROUP_ORDERS[L.groupBy] or GROUP_ORDERS.GROUP
+    local go = GROUP_ORDERS[LY.groupBy] or GROUP_ORDERS.GROUP
     local n = 0
     for key in go[2]:gmatch("[^,]+") do n = n + 1 order[key] = n end
     local function SortKey(i)
-        if L.groupBy == "ROLE" then return order[TEST_ROLE[TestClass(i)] or "DAMAGER"] or 99 end
-        if L.groupBy == "CLASS" then return order[TestClass(i)] or 99 end
+        if LY.groupBy == "ROLE" then return order[TEST_ROLE[TestClass(i)] or "DAMAGER"] or 99 end
+        if LY.groupBy == "CLASS" then return order[TestClass(i)] or 99 end
         return math.ceil(i / 5)
     end
 
@@ -1135,8 +1135,8 @@ function ns.LayoutTest()
         if b.isPet then
             if i <= petCount and not hideAll then pets[#pets + 1] = b else b:Hide() end
         elseif i <= count and not hideAll
-            and (not anyGroup or L.groups[math.ceil(i / 5)])
-            and (i ~= 1 or L.showPlayer) then
+            and (not anyGroup or LY.groups[math.ceil(i / 5)])
+            and (i ~= 1 or LY.showPlayer) then
             main[#main + 1] = b
         else
             b:Hide()
@@ -1145,7 +1145,7 @@ function ns.LayoutTest()
     table.sort(main, function(x, y)
         local kx, ky = SortKey(x.testIndex), SortKey(y.testIndex)
         if kx ~= ky then return kx < ky end
-        if L.sortByName then
+        if LY.sortByName then
             local nx, ny = TestName(x.testIndex), TestName(y.testIndex)
             if nx ~= ny then return nx < ny end
         end
@@ -1161,14 +1161,14 @@ function ns.LayoutTest()
         ns.LayoutButton(b, true)
         FillTest(b)
     end
-    PositionGrid(main, ns.anchor, L.width, L.height, 5)
+    PositionGrid(main, ns.anchor, LY.width, LY.height, 5)
     if P.pets.attach then
         local groups = math.ceil(#main / 5)
         local ox, oy = 0, 0
-        if L.orientation == "horizontal" then
-            oy = -groups * (L.height + L.groupSpacing)
+        if LY.orientation == "horizontal" then
+            oy = -groups * (LY.height + LY.groupSpacing)
         else
-            ox = groups * (L.width + L.groupSpacing)
+            ox = groups * (LY.width + LY.groupSpacing)
         end
         local pw, ph = ns.PetSize()
         PositionGrid(pets, ns.anchor, pw, ph, P.pets.perColumn, ox, oy)
