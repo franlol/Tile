@@ -575,6 +575,28 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.Print("Tipo de debuff aunque esté oculto: GetAuraDispelTypeColor "
             .. (A.GetAuraDispelTypeColor and "|cff55ff55sí|r" or "|cffff5555no|r")
             .. "  C_CurveUtil: " .. (C_CurveUtil and "|cff55ff55sí|r" or "|cffff5555no|r"))
+        -- listas internas del juego: tipos de debuff y tipos de curva
+        if Enum then
+            local names = {}
+            for name in pairs(Enum) do
+                local l = name:lower()
+                if l:find("dispel") or l:find("curvetype") then names[#names + 1] = name end
+            end
+            table.sort(names)
+            for _, name in ipairs(names) do
+                local parts = {}
+                for k, v in pairs(Enum[name]) do parts[#parts + 1] = k .. "=" .. tostring(v) end
+                table.sort(parts)
+                ns.Print("Enum." .. name .. ": " .. table.concat(parts, ", "))
+            end
+            if #names == 0 then ns.Print("Enum: ninguna lista de tipos de debuff ni de curvas") end
+        end
+        if C_CurveUtil then
+            local fns = {}
+            for k in pairs(C_CurveUtil) do fns[#fns + 1] = k end
+            table.sort(fns)
+            ns.Print("C_CurveUtil: " .. table.concat(fns, ", "))
+        end
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then
