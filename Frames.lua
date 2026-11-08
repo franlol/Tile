@@ -29,7 +29,16 @@ end
 local NATIVE_SMOOTH = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ns.hasNativeSmooth = NATIVE_SMOOTH ~= nil
 
+-- diagnóstico (/mf suave): cuenta las veces que se fija la barra vigilada
+local diag
+
 local function SetBarValue(bar, v, smooth)
+    if diag and bar == diag.bar then
+        diag.calls = diag.calls + 1
+        if smooth then diag.smooth = diag.smooth + 1 end
+        local ev = diag.event or "otro"
+        diag.byEvent[ev] = (diag.byEvent[ev] or 0) + 1
+    end
     if smooth and NATIVE_SMOOTH then
         bar:SetValue(v, NATIVE_SMOOTH)
     else
@@ -37,6 +46,44 @@ local function SetBarValue(bar, v, smooth)
     end
 end
 ns.SetBarValue = SetBarValue
+
+-- /mf suave: prueba la animación nativa en tu propio marco y cuenta durante 5 s
+-- cuántas veces se fija tu barra de vida y por qué
+function ns.DiagnoseSmooth()
+    local pb
+    for _, b in ipairs(ns.buttons) do
+        if b.unit and R(UnitIsUnit(b.unit, "player")) then pb = b break end
+    end
+    ns.Print(("animación nativa en este cliente: %s | opción vida: %s | opción maná: %s"):format(
+        NATIVE_SMOOTH and "sí" or "NO", tostring(ns.P.bars.smooth), tostring(ns.P.bars.powerSmooth)))
+    if not pb then
+        ns.Print("no encuentro tu marco: activa 'Mostrar estando solo' o entra en un grupo.")
+        return
+    end
+    if NATIVE_SMOOTH then
+        -- 1) vaciar al momento y volver a llenar con la animación nativa
+        local _, max = pb.health:GetMinMaxValues()
+        if not S(max) then
+            pb.health:SetValue(0)
+            C_Timer.After(0.4, function()
+                pb.health:SetValue(max, NATIVE_SMOOTH)
+                ns.Print("prueba 1: ¿se ha rellenado tu barra de vida con animación?")
+            end)
+        end
+    end
+    -- 2) contar durante 5 segundos
+    diag = { bar = pb.health, calls = 0, smooth = 0, byEvent = {} }
+    C_Timer.After(5, function()
+        local parts = {}
+        for ev, n in pairs(diag.byEvent) do parts[#parts + 1] = ev .. "=" .. n end
+        ns.Print(("prueba 2: barra de vida fijada %d veces en 5 s (%d con animación). Por evento: %s"):format(
+            diag.calls, diag.smooth, #parts > 0 and table.concat(parts, ", ") or "ninguno"))
+        diag = nil
+    end)
+end
+
+-- el evento que está en curso, para el recuento del diagnóstico
+function ns.DiagEvent(ev) if diag then diag.event = ev end end
 
 -------------------------------------------------------------------------------
 -- Tamaño de las mascotas: el de los jugadores o el suyo propio
@@ -468,6 +515,7 @@ end
 local auraDirty = {}
 
 local function OnButtonEvent(b, event)
+    ns.DiagEvent(event)
     if event == "UNIT_AURA" then
         auraDirty[b] = true
     elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH"
@@ -735,6 +783,7 @@ for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "RAID_TARGE
 end
 gev:SetScript("OnEvent", function(_, event)
     if not ns.header then return end
+    ns.DiagEvent("global:" .. event)
     if event == "PLAYER_TARGET_CHANGED" then
         for _, b in ipairs(ns.buttons) do if b.unit then ns.UpdateTarget(b) end end
     elseif event == "RAID_TARGET_UPDATE" then

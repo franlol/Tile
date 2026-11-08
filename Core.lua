@@ -550,6 +550,8 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.SetLocked(false)
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
+    elseif msg == "suave" or msg == "smooth" then
+        ns.DiagnoseSmooth()
     elseif msg == "brillos" or msg == "glows" then
         ns.Glow.Diagnose()
     elseif msg == "estado" or msg == "status" then
