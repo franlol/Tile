@@ -285,16 +285,12 @@ local function HealthText(b, u, cur, max)
     if not ok then fs:SetText("") end
 end
 
-function ns.UpdateHealth(b)
+-- Curación entrante y escudos. Van aparte de la vida: así sus cambios no
+-- vuelven a fijar la barra de vida (y no cortan su animación).
+function ns.UpdatePrediction(b, max)
     local u = b.unit
     local B = ns.P.bars
-    local max, cur = UnitHealthMax(u), UnitHealth(u)
-    b.health:SetMinMaxValues(0, V(max))
-    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
-    SetBarValue(b.health, V(cur), B.smooth and b.lastHealthUnit == u)
-    b.lastHealthUnit = u
-    if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
-
+    max = max or UnitHealthMax(u)
     if B.showHealPred and UnitGetIncomingHeals then
         b.pred:SetMinMaxValues(0, V(max))
         b.pred:SetValue(V(UnitGetIncomingHeals(u)))
@@ -309,6 +305,18 @@ function ns.UpdateHealth(b)
     else
         b.absorb:Hide()
     end
+end
+
+function ns.UpdateHealth(b)
+    local u = b.unit
+    local B = ns.P.bars
+    local max, cur = UnitHealthMax(u), UnitHealth(u)
+    b.health:SetMinMaxValues(0, V(max))
+    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
+    SetBarValue(b.health, V(cur), B.smooth and b.lastHealthUnit == u)
+    b.lastHealthUnit = u
+    if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
+    ns.UpdatePrediction(b, max)
 
     local text
     if R(UnitIsConnected(u)) == false then
@@ -462,9 +470,12 @@ local auraDirty = {}
 local function OnButtonEvent(b, event)
     if event == "UNIT_AURA" then
         auraDirty[b] = true
-    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" or event == "UNIT_HEAL_PREDICTION"
-        or event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH"
+        or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
         ns.UpdateHealth(b)
+    elseif event == "UNIT_HEAL_PREDICTION" or event == "UNIT_ABSORB_AMOUNT_CHANGED" then
+        -- solo sus barras: no tocar la de vida (cortaría su animación)
+        ns.UpdatePrediction(b)
     elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
         ns.UpdatePower(b)
     elseif event == "UNIT_NAME_UPDATE" then
