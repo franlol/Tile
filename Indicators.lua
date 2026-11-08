@@ -1051,7 +1051,7 @@ function ns.TestAuras(b, i, all)
                         ns.ApplyHighlight(b, w, cfg.hl)
                     end
                 elseif (i + c.index) % 3 ~= 0 or (focus and i % 2 == 1) then
-                    local first = (focus and pv.key ~= nil) and pv.key or cfg.spells[1]
+                    local first = (focus and pv and pv.cfg == cfg and pv.key ~= nil) and pv.key or cfg.spells[1]
                     if w.wtype == "icons" then
                         local list, styles = {}, {}
                         for n = 1, math.min(cfg.max, math.max(1, #cfg.spells)) do
