@@ -1020,7 +1020,7 @@ end
 -- ns.preview = { cfg = indicador, key = hechizo } o { raid = { inst, key } }
 -- para enseñar en varios marcos lo que se está editando en opciones
 -------------------------------------------------------------------------------
-function ns.TestAuras(b, i)
+function ns.TestAuras(b, i, all)
     if not b.ind then return end
     local now = GetTime()
     local pv = ns.preview
@@ -1035,7 +1035,8 @@ function ns.TestAuras(b, i)
                     spellId = key ~= nil and ns.KeyIDs(key)[1] or nil }   -- para el tooltip
             end
             HideWidget(w)
-            local focus = pv and pv.cfg == cfg
+            -- all: la muestra de Indicadores enseña todos a la vez
+            local focus = all or (pv and pv.cfg == cfg)
             if c.kind == "aura" and UnitMeasure(cfg) then
                 w.bar:SetMinMaxValues(0, 100)
                 w.bar:SetValue((i % 3 == 0 or focus) and (15 + (i * 13) % 40) or 0)
@@ -1075,6 +1076,7 @@ function ns.TestAuras(b, i)
             elseif c.kind == "debuffs" then
                 local n = i % 3
                 if focus and n == 0 then n = 1 end
+                if all then n = cfg.max end
                 local list = {}
                 for k = 1, math.min(cfg.max, n) do list[k] = Fake(nil, k, k == 1 and "Poison" or nil) end
                 for k, a in ipairs(list) do a.icon = (k == 1) and 136016 or 136207 end

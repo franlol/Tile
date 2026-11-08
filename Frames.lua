@@ -1009,7 +1009,17 @@ local function FillTest(b)
     b.ready:SetShown(E.ready.show and not b.isPet)
     b.ready:SetTexture(READY_TEX[rstate])
 
-    ns.TestAuras(b, i)
+    ns.TestAuras(b, i, b.previewAll)
+end
+
+-- Marco suelto con datos de prueba y todos los indicadores a la vez
+-- (la muestra de la pestaña Indicadores)
+function ns.FillPreviewButton(b)
+    b.testIndex = 1
+    b.previewAll = true
+    ns.LayoutButton(b, false)
+    FillTest(b)
+    b:SetAlpha(1)
 end
 
 local function PositionGrid(list, parent, w, h, perGroup, ox, oy)

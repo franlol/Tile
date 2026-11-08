@@ -1235,11 +1235,12 @@ local function BuildIndicators(p)
         function(v) local s = Sel() s.width, s.height = v, v IndChanged() end)
 
     ---------------------------------------------------------------------------
-    -- Muestra del marco con el indicador: se ve dónde queda y se puede
-    -- arrastrar. Al soltarlo se elige el punto de anclaje más cercano
-    -- (de los 9) y el desplazamiento X/Y exacto, así cabe cualquier sitio.
+    -- Muestra del marco: es un marco de verdad (el mismo código que el modo
+    -- prueba) con todos los indicadores del perfil a la vez y todas sus
+    -- opciones. El indicador elegido se puede arrastrar: al soltarlo se elige
+    -- el punto de anclaje más cercano (de los 9) y el desplazamiento X/Y exacto.
     ---------------------------------------------------------------------------
-    local SAMPLE_W, SAMPLE_H = 340, 96
+    local SAMPLE_W, SAMPLE_H = 340, 110
     local posSample = CreateFrame("Frame", nil, c)
     posSample:SetSize(SAMPLE_W, SAMPLE_H + 22)
     local psBg = posSample:CreateTexture(nil, "BACKGROUND")
@@ -1249,51 +1250,20 @@ local function BuildIndicators(p)
     psBg:SetColorTexture(0.03, 0.03, 0.04, 1)
     local psHint = UI.Label(posSample, "Arrastra el indicador para colocarlo donde quieras.")
     psHint:SetPoint("BOTTOMLEFT", 0, 2)
+    psHint:SetWidth(SAMPLE_W)
     psHint:SetTextColor(0.65, 0.65, 0.65)
 
-    local unit = CreateFrame("Frame", nil, posSample, "BackdropTemplate")
-    UI.Backdrop(unit, { 0.12, 0.12, 0.14, 1 }, { 0, 0, 0, 1 })
-    local _, myClass = UnitClass("player")
-    local cc = (myClass and RAID_CLASS_COLORS[myClass]) or { r = 0.3, g = 0.8, b = 0.3 }
-    local uHealth = unit:CreateTexture(nil, "BORDER")
-    uHealth:SetPoint("TOPLEFT", 1, -1)
-    uHealth:SetPoint("BOTTOMLEFT", 1, 1)
-    uHealth:SetColorTexture(cc.r * 0.85, cc.g * 0.85, cc.b * 0.85, 1)
-    local uName = UI.Label(unit, ns.UnitDisplayName("player") or "Jugador")
-    uName:SetPoint("CENTER")
+    local pb = CreateFrame("Frame", nil, posSample)
+    ns.BuildVisuals(pb)
 
-    -- el resto de indicadores del perfil, en tenue, como referencia
-    local ghosts = {}
-    local function Ghost(i)
-        local g = ghosts[i]
-        if not g then
-            g = unit:CreateTexture(nil, "ARTWORK")
-            g:SetColorTexture(1, 1, 1, 0.18)
-            ghosts[i] = g
-        end
-        return g
-    end
-
-    -- el indicador elegido
-    local el = CreateFrame("Button", nil, unit, "BackdropTemplate")
-    el:SetFrameLevel(unit:GetFrameLevel() + 5)
-    el:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    el.tex = el:CreateTexture(nil, "ARTWORK")
-    el.tex:SetPoint("TOPLEFT", 1, -1)
-    el.tex:SetPoint("BOTTOMRIGHT", -1, 1)
-    el.text = el:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    el.text:SetPoint("CENTER")
-    el:SetMovable(true)
-    el:RegisterForDrag("LeftButton")
-    -- al pasar el ratón, un brillo suave indica que se puede arrastrar
-    el.hl = el:CreateTexture(nil, "HIGHLIGHT")
-    el.hl:SetAllPoints()
-    el.hl:SetColorTexture(1, 1, 1, 0.25)
-    local function PaintBorder()
-        local s = Sel()
-        local show = s and EffType(s) ~= "text" and s.showBorder ~= false
-        el:SetBackdropBorderColor(0, 0, 0, show and 1 or 0)
-    end
+    -- asa invisible encima del indicador elegido (para arrastrarlo)
+    local handle = CreateFrame("Button", nil, pb)
+    handle:SetFrameLevel(pb:GetFrameLevel() + 400)
+    handle.hl = handle:CreateTexture(nil, "HIGHLIGHT")
+    handle.hl:SetAllPoints()
+    handle.hl:SetColorTexture(1, 1, 1, 0.25)
+    handle:SetMovable(true)
+    handle:RegisterForDrag("LeftButton")
 
     local function PX(f, pt)
         if pt:find("LEFT") then return f:GetLeft() end
@@ -1308,86 +1278,51 @@ local function BuildIndicators(p)
     local function Round(v) return math.floor(v + 0.5) end
     local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
-    el:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    el:SetScript("OnDragStop", function(self)
+    handle:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    handle:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         local s = Sel()
         if not s then return end
         -- tercio del marco en el que cae el centro -> punto de anclaje
         local cx = (self:GetLeft() + self:GetRight()) / 2
         local cy = (self:GetTop() + self:GetBottom()) / 2
-        local fx = (cx - unit:GetLeft()) / unit:GetWidth()
-        local fy = (cy - unit:GetBottom()) / unit:GetHeight()
+        local fx = (cx - pb:GetLeft()) / pb:GetWidth()
+        local fy = (cy - pb:GetBottom()) / pb:GetHeight()
         local v = fy > 2 / 3 and "TOP" or (fy < 1 / 3 and "BOTTOM" or "")
         local h = fx < 1 / 3 and "LEFT" or (fx > 2 / 3 and "RIGHT" or "")
         local pt = v .. h
         if pt == "" then pt = "CENTER" end
         s.point = pt
-        s.x = Clamp(Round(PX(self, pt) - PX(unit, pt)), -80, 80)
-        s.y = Clamp(Round(PY(self, pt) - PY(unit, pt)), -60, 60)
+        s.x = Clamp(Round(PX(self, pt) - PX(pb, pt)), -80, 80)
+        s.y = Clamp(Round(PY(self, pt) - PY(pb, pt)), -60, 60)
         IndChanged()
     end)
 
     posSample.Refresh = function()
-        local s = Sel()
-        if not s or s.kind == "dispel" then return end
-        local L = ns.EP().layout
+        if not ns.P then return end
+        -- el marco de muestra usa el perfil que se está viendo; si editas otro,
+        -- se avisa (en modo prueba, el que se ve es siempre el que editas)
+        local same = ns.EditedProfileName() == ns.activeName
+        local L = ns.P.layout
         local W, H = L.width, L.height
-        -- ampliado para que se vea bien, con sitio alrededor para lo que quede fuera
-        local z = math.min(3, (SAMPLE_W - 80) / W, (SAMPLE_H - 24) / H)
-        unit:SetScale(z)
-        unit:SetSize(W, H)
-        unit:ClearAllPoints()
-        unit:SetPoint("CENTER", psBg, "CENTER", 0, 0)
-        uHealth:SetWidth(math.max(1, (W - 2) * 0.7))
+        local z = math.min(3, (SAMPLE_W - 60) / W, (SAMPLE_H - 20) / H)
+        pb:SetScale(z)
+        pb:SetSize(W, H)
+        pb:ClearAllPoints()
+        pb:SetPoint("CENTER", psBg, "CENTER", 0, 0)
+        ns.FillPreviewButton(pb)
 
-        local n = 0
-        for i, ind in ipairs(Inds()) do
-            if i ~= selInd and ind.kind ~= "dispel" and ind.enabled ~= false then
-                n = n + 1
-                local g = Ghost(n)
-                local gt = EffType(ind)
-                if gt == "text" then
-                    local fsz = (ind.timerText and ind.timerText.size) or 9
-                    g:SetSize(math.max(10, fsz * 2.5), fsz + 2)
-                else
-                    g:SetSize(ind.width or 10, ind.height or 10)
-                end
-                g:ClearAllPoints()
-                g:SetPoint(ind.point or "CENTER", unit, ind.point or "CENTER", ind.x or 0, ind.y or 0)
-                g:Show()
-            end
-        end
-        for i = n + 1, #ghosts do ghosts[i]:Hide() end
-
-        local t = EffType(s)
-        if t == "text" then
-            local fsz = (s.timerText and s.timerText.size) or 9
-            el:SetSize(math.max(10, fsz * 2.5), fsz + 2)
+        local s = Sel()
+        local w = same and s and s.kind ~= "dispel" and pb.ind and pb.ind[selInd]
+        handle:ClearAllPoints()
+        if w then
+            handle:SetAllPoints(w)
+            handle:Show()
+            psHint:SetText("Arrastra el indicador para colocarlo donde quieras.")
         else
-            el:SetSize(math.max(2, s.width), math.max(2, s.height))
-        end
-        el:ClearAllPoints()
-        el:SetPoint(s.point, unit, s.point, s.x, s.y)
-        PaintBorder()
-        el.text:SetText("")
-        if t == "icon" or t == "icons" then
-            local icon = 134400
-            if s.spells and s.spells[1] then
-                local _, ic = ns.SpellKeyInfo(s.spells[1])
-                icon = ic or icon
-            end
-            el.tex:SetTexture(icon)
-            el.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            el.tex:SetVertexColor(1, 1, 1, 1)
-        elseif t == "text" then
-            el.tex:SetTexCoord(0, 1, 0, 1)
-            el.tex:SetColorTexture(0, 0, 0, 0)
-            el.text:SetText("12")
-        else
-            el.tex:SetTexCoord(0, 1, 0, 1)
-            local col = s.color or { r = 1, g = 1, b = 1 }
-            el.tex:SetColorTexture(col.r or 1, col.g or 1, col.b or 1, 1)
+            handle:Hide()
+            psHint:SetText(same and "" or ("Se ve el perfil activo («%s»). Activa el modo prueba para ver el que editas.")
+                :format(tostring(ns.activeName)))
         end
     end
     table.insert(UI.widgets, posSample)
