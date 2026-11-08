@@ -14,6 +14,7 @@ local UNIT_EVENTS = {
     "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_HEAL_PREDICTION", "UNIT_ABSORB_AMOUNT_CHANGED",
     "UNIT_AURA", "UNIT_CONNECTION", "UNIT_NAME_UPDATE", "UNIT_FLAGS",
     "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_THREAT_SITUATION_UPDATE",
+    "INCOMING_RESURRECT_CHANGED",
 }
 
 local function V(v)
@@ -250,12 +251,23 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
+-- «Resucitando» tiene su propio color; el resto de estados, el del texto
+function ns.StatusColor(b, text, testClass)
+    local T = ns.P.texts.status
+    if text == "Resucitando" then
+        local c = T.resColor
+        b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    else
+        TextColor(b.status, T, UnitColor(b.unit, b.isPet, testClass))
+    end
+end
+
 function ns.UpdateColors(b, testClass, testPct)
     local T = ns.P.texts
     local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
     ns.UpdateBarColor(b, testClass, testPct)
     TextColor(b.name, T.name, r, g, bl)
-    TextColor(b.status, T.status, r, g, bl)
+    ns.StatusColor(b, b.cacheStatus, testClass)
     TextColor(b.hpText, T.health, r, g, bl)
 end
 
@@ -351,17 +363,22 @@ function ns.UpdateHealth(b, full)
     if maxChanged then ns.UpdatePrediction(b, max) end
 
     local text
+    local T = ns.P.texts.status
     if R(UnitIsConnected(u)) == false then
         text = "Desconectado"
-    elseif R(UnitIsGhost(u)) then
-        text = "Fantasma"
-    elseif R(UnitIsDead(u)) then
-        text = "Muerto"
+    elseif R(UnitIsGhost(u)) or R(UnitIsDead(u)) then
+        -- alguien le está lanzando un resucitar
+        if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
+            text = "Resucitando"
+        else
+            text = R(UnitIsGhost(u)) and "Fantasma" or "Muerto"
+        end
     end
     -- estado y transparencia solo cuando cambian
     if full or text ~= b.cacheStatus then
         b.cacheStatus = text
-        b.status:SetText(ns.P.texts.status.show and text or "")
+        b.status:SetText(T.show and text or "")
+        ns.StatusColor(b, text)
         b.health.bg:SetAlpha(text and 0.4 or 1)
         if text then b.hpText:SetText("") end
     end
@@ -512,7 +529,7 @@ local function OnButtonEvent(b, event)
         auraDirty[b] = true
     elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         ns.UpdateHealth(b)
-    elseif event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+    elseif event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" or event == "INCOMING_RESURRECT_CHANGED" then
         ns.UpdateHealth(b, true)
     elseif event == "UNIT_HEAL_PREDICTION" or event == "UNIT_ABSORB_AMOUNT_CHANGED" then
         -- solo sus barras: no tocar la de vida (cortaría su animación)
@@ -871,7 +888,7 @@ local function FillTest(b)
     if i == 4 then hp = 1 end
     b.health:SetMinMaxValues(0, 10000)
     b.health:SetValue(hp * 10000)
-    ns.UpdateBarColor(b, class, (i == 7) and 0 or hp)   -- para el degradado
+    ns.UpdateBarColor(b, class, (i == 7 or i == 12) and 0 or hp)   -- para el degradado
     b.pred:SetMinMaxValues(0, 10000)
     b.pred:SetValue((i % 3 == 0 and B.showHealPred) and 1500 or 0)
     b.pred:SetShown(B.showHealPred)
@@ -888,8 +905,12 @@ local function FillTest(b)
         or (class == "ROGUE" and PowerBarColor and PowerBarColor.ENERGY)
     if pc then PowerColor(b, pc.r, pc.g, pc.b, class) else PowerColor(b, 0, 0.55, 1, class) end
 
-    local dead = (i == 7)
-    b.status:SetText((dead and T.status.show) and "Muerto" or "")
+    local res = (i == 12) and T.status.showRes
+    local dead = (i == 7) or res
+    local stext = res and "Resucitando" or (dead and "Muerto" or nil)
+    b.cacheStatus = stext
+    b.status:SetText((stext and T.status.show) and stext or "")
+    ns.StatusColor(b, stext, class)
     if dead then
         b.hpText:SetText("")
         b.health:SetValue(0)

@@ -114,6 +114,7 @@ ns.profileDefaults = {
             show = true, font = FONT, size = 10, outline = "OUTLINE",
             colorMode = "custom", color = C(0.75, 0.75, 0.75),
             point = "CENTER", x = 0, y = -3,
+            showRes = true, resColor = C(0.3, 1, 0.45),   -- «Resucitando» (le están lanzando un resucitar)
         },
         health = {
             show = true, format = "none", hideFull = true,

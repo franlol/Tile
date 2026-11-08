@@ -473,7 +473,12 @@ local function BuildTexts(p)
     local nameList = TextSection(c, "name", "Nombre", {
         UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
-    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)")) do nameList[#nameList + 1] = w end
+    local function resOn() return ns.EP().texts.status.showRes end
+    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)", {
+        UI.Check(c, "Avisar si le están resucitando", PB("texts.status.showRes")),
+        Cond(UI.Attach(UI.Swatch(c, "Color de «Resucitando»", function() return ns.EP().texts.status.resColor end,
+            PAfter, true)), nil, resOn),
+    })) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 
     local b = UI.Stack(c, COL2, -6, TextSection(c, "health", "Texto de vida", {
