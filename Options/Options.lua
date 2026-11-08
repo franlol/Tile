@@ -818,8 +818,13 @@ local function BuildIndicators(p)
     -- lista de la izquierda
     local left = CreateFrame("Frame", nil, p)
     left:SetPoint("TOPLEFT", 6, -4)
-    left:SetSize(196, 520)
-    local ROWS = 16
+    left:SetPoint("BOTTOMLEFT", 6, 4)
+    left:SetWidth(196)
+    -- la lista llega hasta abajo: caben tantas filas como deja el espacio
+    -- que ocupan los botones y la nota de debajo
+    local leftH = math.max(200, (p:GetHeight() or 548) - 8)
+    local BELOW = 96
+    local ROWS = math.max(8, math.floor((leftH - BELOW - 4) / 20))
     local offset = 0
     local rows = {}
     local listBg = CreateFrame("Frame", nil, left, "BackdropTemplate")
