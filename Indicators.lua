@@ -957,6 +957,16 @@ function ns.UpdateAuras(b)
                 for _, a in ipairs(GetList(unit, c.filter)) do
                     local order
                     if c.any then order = 1 else order = Match(a, c.byID, c.byName) end
+                    -- «puedo disipar»: solo los tipos marcados. Si el juego oculta el
+                    -- tipo, se muestra o no según «mostrarlo igualmente»
+                    if order and c.dispellable then
+                        local t = R(a.dispelName)
+                        if t then
+                            if not cfg.dispelTypes[t] then order = nil end
+                        elseif not cfg.unknownType then
+                            order = nil
+                        end
+                    end
                     -- "de los demás": descartar las que he puesto yo
                     if order and c.others then
                         local src = R(a.sourceUnit)
@@ -1060,7 +1070,8 @@ function ns.TestAuras(b, i, all)
             -- (b.previewOnly) o, si no, todos a la vez
             local focus = all or (pv and pv.cfg == cfg)
             -- solo el que se edita: los demás se quedan ocultos
-            local skip = b.previewOnly and c.index ~= b.previewOnly
+            local skip = (b.previewOnly and c.index ~= b.previewOnly)
+                or (c.dispellable and not cfg.dispelTypes.Magic)
             if skip then
                 -- nada
             elseif c.kind == "aura" and UnitMeasure(cfg) then

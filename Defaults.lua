@@ -184,6 +184,9 @@ ns.indicatorDefaults = {
     mine = true,            -- solo las mías
     mode = "present",       -- present | missing
     watch = "spells",       -- spells (la lista; vacía = todas) | dispellable (los que el juego dice que puedo disipar)
+    -- «puedo disipar»: qué tipos; y si el juego oculta el tipo, mostrarlo igualmente
+    dispelTypes = { Magic = true, Curse = true, Disease = true, Poison = true },
+    unknownType = true,
     onlyOOC = false,        -- solo fuera de combate
     spells = {},
     point = "TOPRIGHT",

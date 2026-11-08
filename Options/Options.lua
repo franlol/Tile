@@ -1404,6 +1404,12 @@ local function BuildIndicators(p)
             { "dispellable", "Los debuffs que puedo disipar" },
         }, IB("watch")), watchAuras),
         W(UI.Attach(UI.Note(c, "El juego decide cuáles puedes disipar tú (según tu clase y talentos).", 340)), dispWatch),
+        W(UI.Attach(UI.Check(c, "Magia", IB("dispelTypes.Magic"))), dispWatch),
+        W(UI.Attach(UI.Check(c, "Maldición", IB("dispelTypes.Curse"))), dispWatch),
+        W(UI.Attach(UI.Check(c, "Enfermedad", IB("dispelTypes.Disease"))), dispWatch),
+        W(UI.Attach(UI.Check(c, "Veneno", IB("dispelTypes.Poison"))), dispWatch),
+        W(UI.Check(c, "Si el juego oculta el tipo, mostrarlo igualmente", IB("unknownType")), dispWatch),
+        W(UI.Attach(UI.Note(c, "En combate o en instancias el juego puede ocultar el tipo del debuff. Activado: se muestra (con el color «Sin tipo»). Desactivado: no se muestra.", 340)), dispWatch),
         W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), listWatch),
         W(UI.Dropdown(c, "De quién", { { "mine", "Solo las mías" }, { "others", "Solo las de los demás" }, { "any", "De cualquiera" } },
             function()

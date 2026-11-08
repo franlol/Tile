@@ -571,6 +571,10 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.Print("ScrollUtil: " .. (ScrollUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
             .. "  MenuUtil: " .. (MenuUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
             .. "  CreateScrollBoxListLinearView: " .. (CreateScrollBoxListLinearView and "|cff55ff55sí|r" or "|cffff5555no|r"))
+        local A = C_UnitAuras or {}
+        ns.Print("Tipo de debuff aunque esté oculto: GetAuraDispelTypeColor "
+            .. (A.GetAuraDispelTypeColor and "|cff55ff55sí|r" or "|cffff5555no|r")
+            .. "  C_CurveUtil: " .. (C_CurveUtil and "|cff55ff55sí|r" or "|cffff5555no|r"))
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then
