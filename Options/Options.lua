@@ -165,6 +165,7 @@ end
 -------------------------------------------------------------------------------
 local function BuildLayout(p)
     local _, c = UI.ScrollPage(p)
+    local function E(w, cond) w.enableIf = cond return w end
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Tamaño"),
         UI.Slider(c, "Ancho", 30, 200, 1, nil, PB("layout.width")),
@@ -175,8 +176,11 @@ local function BuildLayout(p)
         UI.Header(c, "Mascotas"),
         UI.Check(c, "Mostrar mascotas", PB("pets.enabled")),
         UI.Check(c, "Pegadas a la banda, como un grupo más", PB("pets.attach")),
-        UI.Slider(c, "Ancho de mascota", 30, 200, 1, nil, PB("pets.width")),
-        UI.Slider(c, "Alto de mascota", 12, 60, 1, nil, PB("pets.height")),
+        UI.Check(c, "Mismo tamaño que los jugadores", PB("pets.sameSize")),
+        UI.Attach(E(UI.Slider(c, "Ancho de mascota", 30, 200, 1, nil, PB("pets.width")),
+            function() return not ns.EP().pets.sameSize end)),
+        UI.Attach(E(UI.Slider(c, "Alto de mascota", 12, 100, 1, nil, PB("pets.height")),
+            function() return not ns.EP().pets.sameSize end)),
         UI.Slider(c, "Mascotas por columna/fila", 1, 10, 1, nil, PB("pets.perColumn")),
     })
     local list = {

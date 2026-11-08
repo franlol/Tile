@@ -22,6 +22,13 @@ local function V(v)
 end
 
 -------------------------------------------------------------------------------
+-- Tamaño de las mascotas: el de los jugadores o el suyo propio
+function ns.PetSize()
+    local P = ns.P
+    if P.pets.sameSize then return P.layout.width, P.layout.height end
+    return P.pets.width, P.pets.height
+end
+
 -- Visual de un botón (reales y de prueba)
 -------------------------------------------------------------------------------
 local function NewBar(parent)
@@ -116,7 +123,7 @@ end
 function ns.LayoutButton(b, isPet)
     local P = ns.P
     local L, B, T, E = P.layout, P.bars, P.texts, P.elements
-    local w = isPet and P.pets.width or L.width
+    local w = isPet and (ns.PetSize()) or L.width
 
     b.isPet = isPet
     b.bg:SetColorTexture(B.borderColor.r, B.borderColor.g, B.borderColor.b, B.borderColor.a or 1)
@@ -560,8 +567,8 @@ end
 local function SetHeaderLayout(h, isPet)
     local P = ns.P
     local L = P.layout
-    local w = isPet and P.pets.width or L.width
-    local hh = isPet and P.pets.height or L.height
+    local w, hh = L.width, L.height
+    if isPet then w, hh = ns.PetSize() end
     h:SetAttribute("mf-width", w)
     h:SetAttribute("mf-height", hh)
 
@@ -875,9 +882,11 @@ function ns.LayoutTest()
         else
             ox = groups * (L.width + L.groupSpacing)
         end
-        PositionGrid(pets, ns.anchor, P.pets.width, P.pets.height, P.pets.perColumn, ox, oy)
+        local pw, ph = ns.PetSize()
+        PositionGrid(pets, ns.anchor, pw, ph, P.pets.perColumn, ox, oy)
     else
-        PositionGrid(pets, ns.petAnchor, P.pets.width, P.pets.height, P.pets.perColumn)
+        local pw, ph = ns.PetSize()
+        PositionGrid(pets, ns.petAnchor, pw, ph, P.pets.perColumn)
     end
 end
 

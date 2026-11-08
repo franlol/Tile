@@ -65,6 +65,7 @@ ns.profileDefaults = {
     pets = {
         enabled = true,
         attach = true,
+        sameSize = true,      -- mismo ancho y alto que los jugadores
         width = 76,
         height = 22,
         perColumn = 5,
