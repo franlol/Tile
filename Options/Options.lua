@@ -986,6 +986,26 @@ local function BuildIndicators(p)
     nameW.Refresh = function() local s = Sel() nameBox:SetText(s and s.name or "") end
     table.insert(UI.widgets, nameW)
 
+    -- texto propio del tipo «Texto»
+    local customW = CreateFrame("Frame", nil, c)
+    customW:SetSize(UI.W, 36)
+    local cl = UI.Label(customW, "Texto")
+    cl:SetPoint("TOPLEFT")
+    local customBox = UI.EditBox(customW, UI.W)
+    customBox:SetPoint("TOPLEFT", 0, -14)
+    local function SaveCustom()
+        local s = Sel()
+        local t = customBox:GetText()
+        if s and t ~= s.customText then s.customText = t IndChanged() end
+    end
+    customBox:SetScript("OnEnterPressed", function(self) SaveCustom() self:ClearFocus() end)
+    customBox:SetScript("OnEditFocusLost", SaveCustom)
+    customW.Refresh = function()
+        local s = Sel()
+        if not customBox:HasFocus() then customBox:SetText(s and s.customText or "") end
+    end
+    table.insert(UI.widgets, customW)
+
     -- lista de hechizos del indicador (field = "spells" o "blacklist")
     -- Cada hechizo puede desplegar sus IDs ("Ver IDs"). Sin ninguno marcado
     -- cuentan todos; si se marca alguno, solo los marcados.
@@ -1408,8 +1428,18 @@ local function BuildIndicators(p)
         UI.Check(c, "Activo", IB("enabled")),
         W(UI.Dropdown(c, "Tipo", {
             { "square", "Cuadrado de color" }, { "icon", "Icono" }, { "icons", "Varios iconos" },
-            { "bar", "Barra de tiempo" }, { "text", "Texto (tiempo restante)" },
+            { "bar", "Barra de tiempo" }, { "text", "Texto" },
         }, IB("type")), isAura),
+        W(UI.Attach(UI.Dropdown(c, "Qué muestra", {
+            { "time", "Tiempo restante" },
+            { "custom", "Un texto propio" },
+            { "name", "Nombre del hechizo" },
+            { "stacks", "Cargas" },
+            { "caster", "Quién lo lanzó" },
+        }, IB("textShow"))), function() return isAura() and T() == "text" end),
+        W(UI.Attach(customW), function() return isAura() and T() == "text" and Sel().textShow == "custom" end),
+        W(UI.Attach(UI.Slider(c, "Máximo de letras", 0, 20, 1, function(v) return v == 0 and "todas" or tostring(v) end,
+            IB("nameLetters"))), function() return isAura() and T() == "text" and Sel().textShow == "name" end),
         W(UI.Dropdown(c, "Tipo", { { "border", "Borde de color" }, { "overlay", "Tinte sobre la vida" } },
             IB("type")), function() return K() == "dispel" end),
 
@@ -1490,12 +1520,13 @@ local function BuildIndicators(p)
         WE(UI.Attach(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true)),
             timed, function() return Sel().warnAt > 0 end),
 
-        -- el tipo «Texto» es el propio tiempo: va donde el indicador y con su color
-        W(UI.Header(c, "Texto del tiempo"), hasText),
+        -- en el tipo «Texto», este es el propio texto: va donde el indicador y con su color
+        W(UI.Header(c, "Texto del tiempo"), function() return hasText() and T() ~= "text" end),
+        W(UI.Header(c, "Texto"), function() return isAura() and T() == "text" end),
         TextBlock(c, function() return Sel().timerText end, IndChanged, {
             show = { IB("timer") },
             showCheckIf = function() return T() ~= "text" end,
-            showIf = hasText,
+            showIf = function() return hasText() or (isAura() and T() == "text") end,
             enableIf = function() return T() == "text" or Sel().timer end,
             colorIf = function() return T() ~= "text" end,
             positionIf = function() return T() ~= "text" end,

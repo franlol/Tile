@@ -90,6 +90,12 @@ end
 -------------------------------------------------------------------------------
 local timers = {}   -- [widget] = { exp, dur, cfg }
 
+-- ¿Este widget escribe el tiempo restante? (el tipo «Texto» puede mostrar otra cosa)
+function ns.ShowsTime(w, cfg)
+    if w.wtype == "text" then return (cfg.textShow or "time") == "time" end
+    return cfg.timer and true or false
+end
+
 local function FormatTime(t)
     if t >= 60 then return ("%dm"):format(math.ceil(t / 60)) end
     if t >= 3 then return ("%d"):format(math.ceil(t)) end
@@ -119,7 +125,7 @@ local function TickTimer(w, e, now)
         return false
     end
     local cfg = e.cfg
-    if w.timerText and (cfg.timer or w.wtype == "text") then w.timerText:SetText(FormatTime(remain)) end
+    if w.timerText and ns.ShowsTime(w, cfg) then w.timerText:SetText(FormatTime(remain)) end
     if w.bar then w.bar:SetValue(remain / e.dur) end
     if w.drainOn then w.drain:SetValue(1 - remain / e.dur) end
     local warn = cfg.warnAt > 0 and remain <= cfg.warnAt
@@ -424,7 +430,9 @@ local function StyleTexts(w, cfg)
             -- el propio indicador es el texto: va en su sitio
             ns.SetFont(w.timerText, tt.font, tt.size or 9, tt.outline or "")
             w.timerText:ClearAllPoints()
-            w.timerText:SetPoint("CENTER")
+            local p = cfg.point or "CENTER"
+            w.timerText:SetPoint(p, w, p)
+            w.timerText:SetJustifyH(p:find("LEFT") and "LEFT" or (p:find("RIGHT") and "RIGHT" or "CENTER"))
         else
             local o = INSET[tt.point or "CENTER"] or INSET.CENTER
             ns.StyleText(w.timerText, tt, w, o[1], o[2])
@@ -548,7 +556,7 @@ end
 local function ApplyCooldown(w, unit, aura, cfg)
     local cd = w.cd
     if not cd then return end
-    local wantNumbers = (cfg.timer or w.wtype == "text") and AnyS(aura.duration, aura.expirationTime)
+    local wantNumbers = ns.ShowsTime(w, cfg) and AnyS(aura.duration, aura.expirationTime)
     if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(not wantNumbers) end
     if not (cfg.swipe or wantNumbers) then cd:Clear() return end
     if unit and GetAuraDuration and cd.SetCooldownFromDurationObject and aura.auraInstanceID then
@@ -640,6 +648,45 @@ local function DispelBorder(w, aura, cfg)
     w.border:SetColorTexture(bb[1], bb[2], bb[3], 1)
 end
 
+-- Recorta a N letras (respeta tildes); los textos secretos no se pueden tocar
+local function Letters(s, n)
+    if not s or n <= 0 or S(s) then return s end
+    return s:match("^" .. ("[%z\1-\127\194-\244][\128-\191]*"):rep(n)) or s
+end
+
+-- Lo que escribe un indicador de tipo «Texto» que no muestra el tiempo
+local function ApplyTextContent(w, unit, aura, cfg)
+    if w.wtype ~= "text" then return end
+    local show = cfg.textShow or "time"
+    if show == "time" then return end
+    local fs = w.timerText
+    if show == "custom" then
+        fs:SetText(cfg.customText or "")
+    elseif show == "name" then
+        local name = aura.name
+        if name == nil and aura.spellId then name = ns.GetSpellName(aura.spellId) end
+        fs:SetText(Letters(name, cfg.nameLetters or 0) or "")
+    elseif show == "stacks" then
+        local n = aura.applications
+        if not S(n) then
+            fs:SetText((n and n > 0) and n or "")
+        elseif unit and GetAuraApplicationDisplayCount and aura.auraInstanceID then
+            if not pcall(function() fs:SetText(GetAuraApplicationDisplayCount(unit, aura.auraInstanceID, 1, 99)) end) then
+                fs:SetText("")
+            end
+        else
+            fs:SetText("")
+        end
+    elseif show == "caster" then
+        local src = aura.sourceUnit
+        local ok, name = false, nil
+        if src then ok, name = pcall(UnitName, src) end
+        fs:SetText((ok and name) or "")
+    end
+    -- con «Cargas» el número ya es el texto: no repetirlo al lado
+    if w.count and show == "stacks" then w.count:SetText("") end
+end
+
 function ns.ShowAura(w, unit, aura, cfg)
     RememberAura(w, unit, aura, cfg)
     if w.tex and w.wtype ~= "square" then w.tex:SetTexture(aura.icon) end
@@ -652,6 +699,7 @@ function ns.ShowAura(w, unit, aura, cfg)
     ApplyDrain(w, unit, aura)
     ApplyCount(w, unit, aura, cfg)
     ApplyTimer(w, unit, aura, cfg)   -- puede ocultarlo ("solo si quedan menos de")
+    ApplyTextContent(w, unit, aura, cfg)
 end
 
 -- Indicador en modo "le falta": se muestra fijo, sin tiempo
@@ -670,7 +718,16 @@ function ns.ShowMissing(w, cfg)
     elseif w.wtype == "bar" then
         w.bar:SetValue(1)
     elseif w.wtype == "text" then
-        w.timerText:SetText("!")
+        -- le falta el aura: su texto propio, el nombre del hechizo o «!»
+        local show = cfg.textShow or "time"
+        if show == "custom" and (cfg.customText or "") ~= "" then
+            w.timerText:SetText(cfg.customText)
+        elseif show == "name" then
+            local name = ns.SpellKeyInfo(cfg.spells[1])
+            w.timerText:SetText(Letters(name, cfg.nameLetters or 0) or "!")
+        else
+            w.timerText:SetText("!")
+        end
     end
     w:Show()
 end

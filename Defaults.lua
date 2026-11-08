@@ -196,6 +196,10 @@ ns.indicatorDefaults = {
     timer = false,
     stacks = true,
     swipe = true,
+    -- tipo «Texto»: qué muestra (time | custom | name | stacks | caster)
+    textShow = "time",
+    customText = "",
+    nameLetters = 0,        -- nombre del hechizo: máximo de letras (0 = entero)
     swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
     max = 3,
     grow = "LEFT",
