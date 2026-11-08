@@ -485,6 +485,7 @@ function UI.Stack(content, x, y, list, gap, fill)
     function st:Layout()
         local yy = self.y
         local first = true
+        local afterHeader = false
         for _, w in ipairs(self.list) do
             local visible = not w.showIf or w.showIf()
             w:SetShown(visible)
@@ -492,9 +493,11 @@ function UI.Stack(content, x, y, list, gap, fill)
             if visible then
                 -- hueco extra antes de cada título de sección (salvo el primero)
                 if w.isHeader and not first then yy = yy - UI.SECTION_GAP end
-                -- unido al anterior: casi sin hueco
-                if w.attached and not first then yy = yy + self.gap - UI.ATTACH_GAP end
+                -- unido al anterior: casi sin hueco (nunca pegado a un título:
+                -- si el control del que depende está oculto, va como uno normal)
+                if w.attached and not first and not afterHeader then yy = yy + self.gap - UI.ATTACH_GAP end
                 first = false
+                afterHeader = w.isHeader and true or false
                 w:ClearAllPoints()
                 w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
                 if self.fill and not w.fixedWidth then

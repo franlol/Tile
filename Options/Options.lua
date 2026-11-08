@@ -225,20 +225,20 @@ local function BuildBars(p)
         E(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
             or "Llenado y vaciado suave (no disponible en este cliente)", PB("bars.smooth")),
             function() return ns.hasNativeSmooth end),
-        UI.Attach(UI.Dropdown(c, "Color de la barra", {
+        UI.Dropdown(c, "Color de la barra", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
             { "gradient", "Degradado según la vida" },
-        }, PB("bars.healthColor"))),
+        }, PB("bars.healthColor")),
         barSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
             function() return ns.EP().bars.healthColor ~= "custom" end),
         UI.Dropdown(c, "Textura del fondo (vida que falta)", ns.TextureList, PB("bars.bgTex")),
-        UI.Attach(UI.Dropdown(c, "Color del fondo", {
+        UI.Dropdown(c, "Color del fondo", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
             { "gradient", "Degradado según la vida" },
-        }, PB("bars.bgColor"))),
+        }, PB("bars.bgColor")),
         bgSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness"))),
             function() return ns.EP().bars.bgColor ~= "custom" end),
@@ -295,8 +295,8 @@ local function TextSection(c, key, title, extra)
         }, PB(base .. ".colorMode")),
         sw,
         UI.Dropdown(c, "Posición", UI.POINTS, PB(base .. ".point")),
-        UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x")),
-        UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y")),
+        UI.Attach(UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x"))),
+        UI.Attach(UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y"))),
     }) do list[#list + 1] = w end
     return list
 end
@@ -332,8 +332,8 @@ local function ElementSection(c, key, title)
         UI.Header(c, title),
         UI.Check(c, "Mostrar", PB(base .. ".show")),
         UI.Dropdown(c, "Posición", UI.POINTS, PB(base .. ".point")),
-        UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x")),
-        UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y")),
+        UI.Attach(UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x"))),
+        UI.Attach(UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y"))),
         UI.Slider(c, "Tamaño", 6, 40, 1, nil, PB(base .. ".size")),
     }
 end
@@ -493,7 +493,7 @@ local function BuildSide()
         E(UI.Slider(c, "Velocidad", 0.05, 1, 0.05, function(v) return ("%d%%"):format(v * 400 + 0.5) end, SG("freq")),
             hasGlow),
         E(UI.Slider(c, "Desplazamiento X", -30, 30, 1, nil, SG("offsetX")), hasGlow),
-        E(UI.Slider(c, "Desplazamiento Y", -30, 30, 1, nil, SG("offsetY")), hasGlow),
+        E(UI.Attach(UI.Slider(c, "Desplazamiento Y", -30, 30, 1, nil, SG("offsetY"))), hasGlow),
 
         UI.Header(c, "Marco"),
         UI.Check(c, "Borde de color en el marco", SG("border")),
@@ -1055,14 +1055,14 @@ local function BuildIndicators(p)
 
         W(UI.Header(c, "Posición y tamaño"), notDispel),
         W(UI.Dropdown(c, "Punto de anclaje", UI.POINTS, IB("point")), notDispel),
-        W(UI.Slider(c, "Desplazamiento X", -80, 80, 1, nil, IB("x")), notDispel),
-        W(UI.Slider(c, "Desplazamiento Y", -60, 60, 1, nil, IB("y")), notDispel),
+        W(UI.Attach(UI.Slider(c, "Desplazamiento X", -80, 80, 1, nil, IB("x"))), notDispel),
+        W(UI.Attach(UI.Slider(c, "Desplazamiento Y", -60, 60, 1, nil, IB("y"))), notDispel),
         W(sizeW, iconLike),
         W(UI.Slider(c, "Ancho", 1, 120, 1, nil, IB("width")), rect),
-        W(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height")), rect),
+        W(UI.Attach(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height"))), rect),
         W(UI.Dropdown(c, "Orientación de la barra", { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
             IB("barOrient")), function() return T() == "bar" end),
-        W(UI.Check(c, "Vaciar al revés", IB("barReverse")), function() return T() == "bar" end),
+        W(UI.Attach(UI.Check(c, "Vaciar al revés", IB("barReverse"))), function() return T() == "bar" end),
         W(UI.Slider(c, "Grosor del borde", 1, 6, 1, nil, IB("width")),
             function() return K() == "dispel" and T() == "border" end),
         W(UI.Slider(c, "Intensidad del tinte", 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")),
@@ -1089,13 +1089,13 @@ local function BuildIndicators(p)
 
         W(UI.Header(c, "Textos"), hasText),
         W(UI.Check(c, "Mostrar tiempo restante", IB("timer")), function() return hasText() and T() ~= "text" end),
+        WE(UI.Attach(UI.Dropdown(c, "Posición del tiempo", UI.POINTS, IB("timerPoint"))),
+            function() return hasText() and T() ~= "text" end, function() return Sel().timer end),
         W(UI.Check(c, "Mostrar cargas", IB("stacks")), hasText),
+        WE(UI.Attach(UI.Dropdown(c, "Posición de las cargas", UI.POINTS, IB("stacksPoint"))),
+            function() return hasText() and T() ~= "text" end, function() return Sel().stacks end),
         W(UI.Dropdown(c, "Fuente", ns.FontList, IB("font")), hasText),
         W(UI.Slider(c, "Tamaño del texto", 6, 24, 1, nil, IB("fontSize")), hasText),
-        WE(UI.Dropdown(c, "Posición del tiempo", UI.POINTS, IB("timerPoint")),
-            function() return hasText() and T() ~= "text" end, function() return Sel().timer end),
-        WE(UI.Dropdown(c, "Posición de las cargas", UI.POINTS, IB("stacksPoint")),
-            function() return hasText() and T() ~= "text" end, function() return Sel().stacks end),
 
         UI.Header(c, "Resaltado"),
         hlSummary,
@@ -1816,7 +1816,10 @@ function ns.OpenOptions()
 end
 
 function ns.ToggleOptions()
-    if not win then CreateWindow() end
+    if not win then
+        CreateWindow()
+        win:Hide() -- CreateFrame la deja visible: sin esto el primer /mf la cerraba
+    end
     if win:IsShown() then
         win:Hide()
     else
