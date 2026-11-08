@@ -888,9 +888,6 @@ function ns.SetLocked(locked)
     end
     ns.db.locked = locked
     UpdateHandles()
-    if not locked and not ns.testing and not IsInGroup() then
-        ns.ToggleTest(true)
-    end
     if ns.OnLockChanged then ns.OnLockChanged() end
 end
 
@@ -1192,6 +1189,7 @@ function ns.ToggleTest(force, size)
     if size then ns.testSize = size end
     if force ~= nil then ns.testing = force else ns.testing = not ns.testing end
     ns.testSize = ns.testSize or "raid20"
+    ns.db.testing, ns.db.testSize = ns.testing, ns.testSize   -- remembered after /reload
     if ns.testing and #testButtons == 0 then
         for i = 1, 40 do NewTestButton(ns.anchor, false, i) end
         for i = 1, NUM_TEST_PETS do NewTestButton(ns.petAnchor, true, i) end

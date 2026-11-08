@@ -149,7 +149,7 @@ local function BuildProfiles(p)
 
     -- Changes the profile being edited (in test mode, also the one shown)
     local function SetEdit(n)
-        ns.editName = n
+        ns.SetEditName(n)
         ns.ActivateProfile()
         Refresh()
     end
@@ -199,7 +199,7 @@ local function BuildProfiles(p)
         local used = #UsedBy(old) > 0
         ns.db.profiles[old] = nil
         Reassign(old, "Default")
-        ns.editName = nil
+        ns.SetEditName(nil)
         ns.ActivateProfile(true)
         Refresh()
         Say(used and (L["\"%s\" deleted. Where it was used, Default is used now."]):format(old)
@@ -317,7 +317,7 @@ local function BuildProfiles(p)
         { "party", L["5 (party)"] }, { "raid10", L["10 (raid)"] }, { "raid20", L["20 (raid)"] }, { "raid40", L["40 (raid)"] },
     }, function() return ns.testSize or "raid20" end, function(v)
         -- simulating a size shows (and edits) the profile assigned to that size
-        ns.editName = ns.CharProfiles()[v]
+        ns.SetEditName(ns.CharProfiles()[v])
         ns.ToggleTest(true, v)
         Refresh()
     end)
@@ -1598,7 +1598,6 @@ function ns.ToggleOptions()
         win:Hide()
     else
         win:Show()
-        if not ns.testing and not IsInGroup() then ns.ToggleTest(true) end
         UI.RefreshAll()
     end
 end

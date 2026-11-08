@@ -17,6 +17,8 @@ local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 ns.dbDefaults = {
     version = 2,
     locked = true,
+    testing = false,
+    testSize = "raid20",
     hideBlizzard = true,
     language = "enUS",   -- enUS | esES
     profiles = {},

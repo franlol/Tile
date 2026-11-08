@@ -318,6 +318,12 @@ function ns.EditedProfileName()
 end
 function ns.EP() return ns.db.profiles[ns.EditedProfileName()] end
 
+-- Changes the profile being edited; it is remembered per character
+function ns.SetEditName(name)
+    ns.editName = name
+    ns.CharProfiles().editing = name
+end
+
 function ns.ActivateProfile(force)
     local name = ns.ActiveProfileName()
     if name == ns.activeName and not force then return end
@@ -383,21 +389,30 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         self:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_LOGIN" then
         ns.charKey = ns.CharKey()
-        ns.CharProfiles()
+        local editing = ns.CharProfiles().editing
+        ns.editName = editing and ns.db.profiles[editing] and editing or nil
         ns.activeName = ns.ActiveProfileName()
         ns.P = ns.db.profiles[ns.activeName]
         ns.CreateFrames()
+        -- test mode is remembered too
+        if ns.db.testing then ns.ToggleTest(true, ns.db.testSize) end
         ns.HideBlizzard()
         ns.Print(L["loaded. Type |cffffff00/mf|r to open the options."])
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
+        -- frames cannot be moved in combat: lock them and unlock them again after
         if ns.db and not ns.db.locked then
             ns.SetLocked(true)
+            ns.unlockAfterCombat = true
             ns.Print(L["frames locked when entering combat."])
         end
         if ns.UpdateAllButtons then ns.UpdateAllButtons() end
     elseif event == "PLAYER_REGEN_ENABLED" then
+        if ns.unlockAfterCombat then
+            ns.unlockAfterCombat = nil
+            ns.SetLocked(false)
+        end
         local order = ns.pendingOrder
         ns.pendingOrder = {}
         for _, key in ipairs(order) do
