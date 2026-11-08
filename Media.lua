@@ -13,7 +13,12 @@ local FONTS = {
     { "Morpheus", "Fonts\\MORPHEUS.ttf" },
 }
 
+-- Texturas que trae el propio addon (carpeta Media)
+local DARK = "Interface\\AddOns\\MendFrames\\Media\\Dark"
+ns.TEX_DARK = DARK
+
 local TEXTURES = {
+    { "MendFrames · Oscura", DARK },
     { "Plano", "Interface\\Buttons\\WHITE8X8" },
     { "Blizzard", "Interface\\TargetingFrame\\UI-StatusBar" },
     { "Blizzard (banda)", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
@@ -46,6 +51,16 @@ local function Merge(base, mediaType)
     end
     return out
 end
+
+-- Registrar nuestras texturas en LibSharedMedia para que otros addons las usen
+local function RegisterMedia()
+    local lsm = LSM()
+    if lsm then lsm:Register("statusbar", "MendFrames Dark", DARK) end
+end
+RegisterMedia()
+local regFrame = CreateFrame("Frame")
+regFrame:RegisterEvent("PLAYER_LOGIN")
+regFrame:SetScript("OnEvent", RegisterMedia)
 
 -- Listas { valor, etiqueta } para los desplegables
 function ns.FontList() return Merge(FONTS, "font") end

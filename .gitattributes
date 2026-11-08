@@ -2,3 +2,4 @@
 *.lua text eol=lf
 *.toc text eol=lf
 *.md text eol=lf
+*.tga binary

@@ -5,6 +5,7 @@
 ## Version: 0.2.0
 ## IconTexture: Interface\Icons\Spell_Nature_Rejuvenation
 ## SavedVariables: MendFramesDB
+## OptionalDeps: LibSharedMedia-3.0, SharedMedia
 
 Core.lua
 Defaults.lua
