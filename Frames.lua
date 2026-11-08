@@ -29,16 +29,7 @@ end
 local NATIVE_SMOOTH = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ns.hasNativeSmooth = NATIVE_SMOOTH ~= nil
 
--- diagnóstico (/mf suave): cuenta las veces que se fija la barra vigilada
-local diag
-
 local function SetBarValue(bar, v, smooth)
-    if diag and bar == diag.bar then
-        diag.calls = diag.calls + 1
-        if smooth then diag.smooth = diag.smooth + 1 end
-        local ev = diag.event or "otro"
-        diag.byEvent[ev] = (diag.byEvent[ev] or 0) + 1
-    end
     if smooth and NATIVE_SMOOTH then
         bar:SetValue(v, NATIVE_SMOOTH)
     else
@@ -47,43 +38,6 @@ local function SetBarValue(bar, v, smooth)
 end
 ns.SetBarValue = SetBarValue
 
--- /mf suave: prueba la animación nativa en tu propio marco y cuenta durante 5 s
--- cuántas veces se fija tu barra de vida y por qué
-function ns.DiagnoseSmooth()
-    local pb
-    for _, b in ipairs(ns.buttons) do
-        if b.unit and R(UnitIsUnit(b.unit, "player")) then pb = b break end
-    end
-    ns.Print(("animación nativa en este cliente: %s | opción vida: %s | opción maná: %s"):format(
-        NATIVE_SMOOTH and "sí" or "NO", tostring(ns.P.bars.smooth), tostring(ns.P.bars.powerSmooth)))
-    if not pb then
-        ns.Print("no encuentro tu marco: activa 'Mostrar estando solo' o entra en un grupo.")
-        return
-    end
-    if NATIVE_SMOOTH then
-        -- 1) vaciar al momento y volver a llenar con la animación nativa
-        local _, max = pb.health:GetMinMaxValues()
-        if not S(max) then
-            pb.health:SetValue(0)
-            C_Timer.After(0.4, function()
-                pb.health:SetValue(max, NATIVE_SMOOTH)
-                ns.Print("prueba 1: ¿se ha rellenado tu barra de vida con animación?")
-            end)
-        end
-    end
-    -- 2) contar durante 5 segundos
-    diag = { bar = pb.health, calls = 0, smooth = 0, byEvent = {} }
-    C_Timer.After(5, function()
-        local parts = {}
-        for ev, n in pairs(diag.byEvent) do parts[#parts + 1] = ev .. "=" .. n end
-        ns.Print(("prueba 2: barra de vida fijada %d veces en 5 s (%d con animación). Por evento: %s"):format(
-            diag.calls, diag.smooth, #parts > 0 and table.concat(parts, ", ") or "ninguno"))
-        diag = nil
-    end)
-end
-
--- el evento que está en curso, para el recuento del diagnóstico
-function ns.DiagEvent(ev) if diag then diag.event = ev end end
 
 -------------------------------------------------------------------------------
 -- Tamaño de las mascotas: el de los jugadores o el suyo propio
@@ -305,6 +259,19 @@ local function Abbrev(n)
     return tostring(n)
 end
 
+-- Texto de vida con valores ocultos por el juego (sin crear funciones por llamada)
+local function SecretHealthText(fs, format, u, cur)
+    if format == "percent" and UnitHealthPercent and CurveConstants and CurveConstants.ScaleTo100 then
+        fs:SetFormattedText("%d%%", UnitHealthPercent(u, false, CurveConstants.ScaleTo100))
+    elseif format == "deficit" and UnitHealthMissing and AbbreviateNumbers then
+        fs:SetText(AbbreviateNumbers(UnitHealthMissing(u)))
+    elseif AbbreviateNumbers then
+        fs:SetText(AbbreviateNumbers(cur))
+    else
+        error("sin soporte")
+    end
+end
+
 local function HealthText(b, u, cur, max)
     local t = ns.P.texts.health
     local fs = b.hpText
@@ -318,18 +285,7 @@ local function HealthText(b, u, cur, max)
         return
     end
     -- valores secretos: lo que el cliente permita, si no, nada
-    local ok = pcall(function()
-        if t.format == "percent" and UnitHealthPercent and CurveConstants and CurveConstants.ScaleTo100 then
-            fs:SetFormattedText("%d%%", UnitHealthPercent(u, false, CurveConstants.ScaleTo100))
-        elseif t.format == "deficit" and UnitHealthMissing and AbbreviateNumbers then
-            fs:SetText(AbbreviateNumbers(UnitHealthMissing(u)))
-        elseif AbbreviateNumbers then
-            fs:SetText(AbbreviateNumbers(cur))
-        else
-            error("sin soporte")
-        end
-    end)
-    if not ok then fs:SetText("") end
+    if not pcall(SecretHealthText, fs, t.format, u, cur) then fs:SetText("") end
 end
 
 -- Curación entrante y escudos. Van aparte de la vida: así sus cambios no
@@ -354,16 +310,38 @@ function ns.UpdatePrediction(b, max)
     end
 end
 
-function ns.UpdateHealth(b)
+-- Fija el máximo de una barra solo si ha cambiado. Devuelve true si cambió.
+-- Con valores secretos no se puede comparar: se fija siempre.
+local function SetBarMax(bar, max, cacheKey, holder)
+    if S(max) then
+        bar:SetMinMaxValues(0, max)
+        holder[cacheKey] = nil
+        return true
+    end
+    max = max or 0
+    if holder[cacheKey] == max then return false end
+    holder[cacheKey] = max
+    bar:SetMinMaxValues(0, max)
+    return true
+end
+
+-- full: también todo lo que no cambia con cada golpe (al cambiar de unidad,
+-- al reordenar la banda, al cambiar el máximo...)
+function ns.UpdateHealth(b, full)
     local u = b.unit
     local B = ns.P.bars
-    local max, cur = UnitHealthMax(u), UnitHealth(u)
-    b.health:SetMinMaxValues(0, V(max))
-    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
-    SetBarValue(b.health, V(cur), B.smooth and b.lastHealthUnit == u)
+    local sameUnit = b.lastHealthUnit == u
+    if not sameUnit then full = true end
     b.lastHealthUnit = u
+
+    local max, cur = UnitHealthMax(u), UnitHealth(u)
+    local maxChanged = SetBarMax(b.health, max, "cacheHealthMax", b) or full
+    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
+    SetBarValue(b.health, V(cur), B.smooth and sameUnit)
     if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
-    ns.UpdatePrediction(b, max)
+    -- curación entrante y escudos tienen sus propios eventos: aquí solo
+    -- cuando cambia el máximo (su escala)
+    if maxChanged then ns.UpdatePrediction(b, max) end
 
     local text
     if R(UnitIsConnected(u)) == false then
@@ -373,16 +351,24 @@ function ns.UpdateHealth(b)
     elseif R(UnitIsDead(u)) then
         text = "Muerto"
     end
-    b.status:SetText(ns.P.texts.status.show and text or "")
-    if text then
-        b.hpText:SetText("")
-        b.health.bg:SetAlpha(0.4)
-    else
-        HealthText(b, u, cur, max)
-        b.health.bg:SetAlpha(1)
+    -- estado y transparencia solo cuando cambian
+    if full or text ~= b.cacheStatus then
+        b.cacheStatus = text
+        b.status:SetText(ns.P.texts.status.show and text or "")
+        b.health.bg:SetAlpha(text and 0.4 or 1)
+        if text then b.hpText:SetText("") end
     end
+    if not text then HealthText(b, u, cur, max) end
 end
 
+-- Valor de maná/energía/ira: lo que llega en cada tic (UNIT_POWER_UPDATE)
+function ns.UpdatePowerValue(b)
+    if not b.powerShown then return end
+    local u = b.unit
+    SetBarValue(b.power, V(UnitPower(u)), ns.P.bars.powerSmooth and b.lastPowerUnit == u)
+end
+
+-- Todo lo de la barra de recurso: tipo, color, máximo y valor
 function ns.UpdatePower(b)
     local B = ns.P.bars
     local u = b.unit
@@ -394,9 +380,9 @@ function ns.UpdatePower(b)
     end
     if want ~= b.powerShown then AnchorHealth(b, want) end
     if not want then return end
-    b.power:SetMinMaxValues(0, V(UnitPowerMax(u)))
-    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
-    SetBarValue(b.power, V(UnitPower(u)), B.powerSmooth and b.lastPowerUnit == u)
+    if b.lastPowerUnit ~= u then b.cachePowerMax = nil end
+    SetBarMax(b.power, UnitPowerMax(u), "cachePowerMax", b)
+    ns.UpdatePowerValue(b)
     b.lastPowerUnit = u
     token = R(token)
     local c = token and PowerBarColor and PowerBarColor[token]
@@ -491,7 +477,7 @@ function ns.UpdateButton(b)
     ns.UpdateColors(b)
     ns.UpdateName(b)
     ns.UpdatePower(b)
-    ns.UpdateHealth(b)
+    ns.UpdateHealth(b, true)
     ns.UpdateRole(b)
     ns.UpdateLeader(b)
     ns.UpdateRaidIcon(b)
@@ -515,16 +501,19 @@ end
 local auraDirty = {}
 
 local function OnButtonEvent(b, event)
-    ns.DiagEvent(event)
     if event == "UNIT_AURA" then
         auraDirty[b] = true
-    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH"
-        or event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+    elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         ns.UpdateHealth(b)
+    elseif event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" then
+        ns.UpdateHealth(b, true)
     elseif event == "UNIT_HEAL_PREDICTION" or event == "UNIT_ABSORB_AMOUNT_CHANGED" then
         -- solo sus barras: no tocar la de vida (cortaría su animación)
         ns.UpdatePrediction(b)
-    elseif event == "UNIT_POWER_UPDATE" or event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
+    elseif event == "UNIT_POWER_UPDATE" then
+        -- cada tic: solo el valor
+        ns.UpdatePowerValue(b)
+    elseif event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
         ns.UpdatePower(b)
     elseif event == "UNIT_NAME_UPDATE" then
         ns.UpdateName(b)
@@ -783,7 +772,6 @@ for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "RAID_TARGE
 end
 gev:SetScript("OnEvent", function(_, event)
     if not ns.header then return end
-    ns.DiagEvent("global:" .. event)
     if event == "PLAYER_TARGET_CHANGED" then
         for _, b in ipairs(ns.buttons) do if b.unit then ns.UpdateTarget(b) end end
     elseif event == "RAID_TARGET_UPDATE" then

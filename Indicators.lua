@@ -515,7 +515,8 @@ end
 local function ApplyTimer(w, unit, aura, cfg)
     local dur, exp = aura.duration, aura.expirationTime
     if not AnyS(dur, exp) and dur and exp and dur > 0 then
-        local e = { exp = exp, dur = dur, cfg = cfg }
+        local e = timers[w] or {}
+        e.exp, e.dur, e.cfg, e.warned = exp, dur, cfg, nil
         timers[w] = e
         if not TickTimer(w, e, GetTime()) then timers[w] = nil end
     else
@@ -655,6 +656,8 @@ local function ResetCache()
 end
 
 local claimed, matches = {}, {}
+-- tablas reutilizadas en cada actualización (sin crear basura)
+local matchPool, tmpList, tmpStyles = {}, {}, {}
 local function SortMatches(a, b) return a.order < b.order end
 
 local function ShowDispel(b, w, found, cfg, unit)
@@ -718,7 +721,11 @@ function ns.UpdateAuras(b)
                         end
                     end
                     if order then
-                        matches[#matches + 1] = { aura = a, order = order }
+                        local n = #matches + 1
+                        local m = matchPool[n]
+                        if not m then m = {} matchPool[n] = m end
+                        m.aura, m.order = a, order
+                        matches[n] = m
                         local id = a.auraInstanceID
                         if cfg.auraType == "HARMFUL" and id and not S(id) then claimed[id] = true end
                     end
@@ -728,7 +735,7 @@ function ns.UpdateAuras(b)
                 else
                     table.sort(matches, SortMatches)
                     if w.wtype == "icons" then
-                        local list, styles = {}, {}
+                        local list, styles = wipe(tmpList), wipe(tmpStyles)
                         for i, m in ipairs(matches) do
                             list[i] = m.aura
                             styles[i] = StyleFor(cfg, (not c.any) and cfg.spells[m.order] or nil)
@@ -768,7 +775,7 @@ function ns.UpdateAuras(b)
             end
 
         elseif c.kind == "debuffs" then
-            local list = {}
+            local list = wipe(tmpList)
             for _, a in ipairs(GetList(unit, cfg.onlyDispellable and "HARMFUL|RAID" or "HARMFUL")) do
                 local id = a.auraInstanceID
                 local skip = cfg.excludeClaimed and id and not S(id) and claimed[id]
