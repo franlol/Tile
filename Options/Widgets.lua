@@ -12,6 +12,8 @@ local FLAT = "Interface\\Buttons\\WHITE8X8"
 UI.ACCENT = { 0.31, 0.76, 0.97 }
 local ACCENT = UI.ACCENT
 UI.W = 230          -- ancho estándar de un control
+UI.GAP = 10         -- separación entre controles
+UI.SECTION_GAP = 10 -- separación extra antes de cada título de sección
 
 UI.widgets = {}     -- controles con Refresh()
 UI.stacks = {}      -- columnas que se recolocan al refrescar
@@ -86,6 +88,7 @@ end
 -- Título de sección (como control para poder apilarlo)
 function UI.Header(parent, text)
     local f = CreateFrame("Frame", nil, parent)
+    f.isHeader = true
     f:SetSize(UI.W, 22)
     f.text = UI.Label(f, text, "GameFontNormal")
     f.text:SetPoint("BOTTOMLEFT", 0, 3)
@@ -410,14 +413,18 @@ end
 -- enableIf: el control se queda en su sitio y se desactiva (sub-opciones)
 -- fill: los controles se estiran al ancho del contenido (ventana redimensionable)
 function UI.Stack(content, x, y, list, gap, fill)
-    local st = { content = content, x = x, y = y, list = list, gap = gap or 6, fill = fill }
+    local st = { content = content, x = x, y = y, list = list, gap = gap or UI.GAP, fill = fill }
     function st:Layout()
         local yy = self.y
+        local first = true
         for _, w in ipairs(self.list) do
             local visible = not w.showIf or w.showIf()
             w:SetShown(visible)
             if visible and w.enableIf then UI.SetEnabled(w, w.enableIf() and true or false) end
             if visible then
+                -- hueco extra antes de cada título de sección (salvo el primero)
+                if w.isHeader and not first then yy = yy - UI.SECTION_GAP end
+                first = false
                 w:ClearAllPoints()
                 w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
                 if self.fill and not w.fixedWidth then
