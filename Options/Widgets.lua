@@ -236,11 +236,26 @@ function UI.Dropdown(parent, text, options, get, set, width)
 
     local function Opts() return type(options) == "function" and options() or options end
 
+    -- Si la opción trae una fuente (3er campo), el texto se pinta con ella
+    local function ApplyFont(fs, font)
+        if font then
+            ns.SetFont(fs, font, 12, "")
+        else
+            fs:SetFontObject(GameFontHighlightSmall)
+        end
+    end
+    UI.ApplyOptionFont = ApplyFont
+
     f.Refresh = function()
         local cur = get()
         for _, o in ipairs(Opts()) do
-            if o[1] == cur then b.text:SetText(o[2]) return end
+            if o[1] == cur then
+                ApplyFont(b.text, o[3])
+                b.text:SetText(o[2])
+                return
+            end
         end
+        ApplyFont(b.text, nil)
         b.text:SetText(cur ~= nil and tostring(cur):match("([^\\]+)$") or "")
     end
 
@@ -270,6 +285,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
                 local o = opts[i + offset]
                 local item = items[i]
                 item.value = o and o[1]
+                ApplyFont(item.t, o and o[3])
                 item.t:SetText(o and o[2] or "")
                 item.sel:SetShown(o and o[1] == get() or false)
             end

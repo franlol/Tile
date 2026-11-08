@@ -62,8 +62,13 @@ local regFrame = CreateFrame("Frame")
 regFrame:RegisterEvent("PLAYER_LOGIN")
 regFrame:SetScript("OnEvent", RegisterMedia)
 
--- Listas { valor, etiqueta } para los desplegables
-function ns.FontList() return Merge(FONTS, "font") end
+-- Listas { valor, etiqueta } para los desplegables.
+-- En las fuentes, el 3er campo es la fuente con la que se pinta la etiqueta.
+function ns.FontList()
+    local list = Merge(FONTS, "font")
+    for _, o in ipairs(list) do o[3] = o[1] end
+    return list
+end
 function ns.TextureList() return Merge(TEXTURES, "statusbar") end
 
 ns.OUTLINES = {
