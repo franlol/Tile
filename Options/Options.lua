@@ -1496,6 +1496,390 @@ local function BuildCatalog(p)
 end
 
 -------------------------------------------------------------------------------
+-- Instances: a guide of each instance's bosses and debuffs (read only)
+-- Left, the instances by category. Right, the debuffs grouped by boss, with
+-- the game's crowd control flag.
+-------------------------------------------------------------------------------
+local LIST_ROWS, INST_ROWS = 17, 25
+local PLUS_TEX = "Interface\\Buttons\\UI-PlusButton-Up"
+local MINUS_TEX = "Interface\\Buttons\\UI-MinusButton-Up"
+
+local function BuildInstances(p)
+    local selKey, picked
+    local listOffset, instOffset = 0, 0
+    local query = ""
+    local collapsed = {}   -- [instance .. "\n" .. boss] = true (this session only)
+    -- collapsed at first: every category except raids (and the one you are in)
+    local catClosed = { dungeon = true, solo = true, world = true, zone = true, unannounced = true }
+    local Refresh
+
+    local function IsHere(key)
+        for _, k in ipairs(ns.CurrentInstanceKeys()) do
+            if k == key then return true end
+        end
+        return false
+    end
+
+    local function Matches(name, id)
+        if query == "" then return true end
+        local q = query:lower()
+        if name and tostring(name):lower():find(q, 1, true) then return true end
+        return id ~= nil and tostring(id):find(q, 1, true) ~= nil
+    end
+
+    -- Rows: { cat, label, n, closed } (category title) or { key }
+    local function InstanceRows()
+        local groups = {}
+        for _, k in ipairs(ns.InstanceOrder) do
+            local cat = ns.InstanceCategory(k)
+            groups[cat] = groups[cat] or {}
+            table.insert(groups[cat], k)
+        end
+        local out = {}
+        for _, cat in ipairs(ns.INSTANCE_KINDS) do
+            local list = groups[cat]
+            if list and #list > 0 then
+                local closed = catClosed[cat] or false
+                out[#out + 1] = { cat = cat, label = L[ns.INSTANCE_KIND_NAMES[cat]], n = #list, closed = closed }
+                if not closed then
+                    for _, k in ipairs(list) do out[#out + 1] = { key = k } end
+                end
+            end
+        end
+        return out
+    end
+
+    -- Rows: { header = boss, n, ck, closed } or { key, name, id }
+    local function ListRows()
+        local rows = {}
+        local def = selKey and ns.Instances[selKey]
+        for _, b in ipairs(def and def.bosses or {}) do
+            local items = {}
+            for _, key in ipairs(b[2]) do
+                local name, _, id = ns.SpellKeyInfo(key)
+                if Matches(name, id) then items[#items + 1] = { key = key, name = name, id = id } end
+            end
+            if #items > 0 or query == "" then
+                local ck = tostring(selKey) .. "\n" .. b[1]
+                local closed = collapsed[ck] and query == "" or false
+                rows[#rows + 1] = { header = b[1], n = #items, ck = ck, closed = closed }
+                if not closed then
+                    for _, e in ipairs(items) do rows[#rows + 1] = e end
+                end
+            end
+        end
+        return rows
+    end
+
+    local function Wheel(frame, fn)
+        frame:EnableMouseWheel(true)
+        frame:SetScript("OnMouseWheel", function(_, d) fn(d) Refresh() end)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Left: instances
+    ---------------------------------------------------------------------------
+    local left = CreateFrame("Frame", nil, p, "BackdropTemplate")
+    left:SetPoint("TOPLEFT")
+    left:SetPoint("BOTTOMLEFT")
+    left:SetWidth(176)
+    UI.Backdrop(left, { 0.095, 0.095, 0.118, 1 }, { 0.19, 0.19, 0.235, 1 })
+    local lt = UI.Label(left, L["Instances"], "GameFontNormal")
+    lt:SetPoint("TOPLEFT", 10, -8)
+    lt:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+
+    local instArea = CreateFrame("Frame", nil, left)
+    instArea:SetPoint("TOPLEFT", 4, -28)
+    instArea:SetSize(168, INST_ROWS * 20)
+    Wheel(instArea, function(d) instOffset = math.max(0, instOffset - d) end)
+    local instBar = UI.ScrollBar(instArea, function(v) instOffset = v Refresh() end)
+    instBar:SetPoint("TOPRIGHT", 0, 0)
+    instBar:SetPoint("BOTTOMRIGHT", 0, 0)
+
+    local instRows = {}
+    for i = 1, INST_ROWS do
+        local r = CreateFrame("Button", nil, instArea)
+        r:SetSize(156, 19)
+        r:SetPoint("TOPLEFT", 0, -(i - 1) * 20)
+        r.sel = r:CreateTexture(nil, "BACKGROUND")
+        r.sel:SetAllPoints()
+        r.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.22)
+        r.hl = r:CreateTexture(nil, "HIGHLIGHT")
+        r.hl:SetAllPoints()
+        r.hl:SetColorTexture(1, 1, 1, 0.07)
+        -- green dot: you are here
+        r.dot = r:CreateTexture(nil, "ARTWORK")
+        r.dot:SetSize(6, 6)
+        r.dot:SetPoint("LEFT", 4, 0)
+        r.dot:SetColorTexture(0.3, 0.9, 0.4, 1)
+        -- +/- of the categories
+        r.exp = r:CreateTexture(nil, "ARTWORK")
+        r.exp:SetSize(12, 12)
+        r.exp:SetPoint("LEFT", 0, 0)
+        r.name = UI.Label(r, "")
+        r.name:SetPoint("LEFT", 14, 0)
+        r.name:SetWidth(116)
+        r.name:SetWordWrap(false)
+        r.count = UI.Label(r, "")
+        r.count:SetPoint("RIGHT", -4, 0)
+        r.count:SetTextColor(0.6, 0.6, 0.6)
+        r:SetScript("OnClick", function(self)
+            if self.cat then
+                -- collapse / expand the category
+                catClosed[self.cat] = not self.closed
+            elseif self.key ~= nil then
+                selKey, picked = self.key, true
+                listOffset = 0
+            end
+            Refresh()
+        end)
+        r:SetScript("OnEnter", function(self)
+            if self.key == nil or not IsHere(self.key) then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(L["You are here"])
+            GameTooltip:Show()
+        end)
+        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        instRows[i] = r
+    end
+
+    ---------------------------------------------------------------------------
+    -- Right: title, search and the list
+    ---------------------------------------------------------------------------
+    local right = CreateFrame("Frame", nil, p)
+    right:SetPoint("TOPLEFT", 186, 0)
+    right:SetPoint("BOTTOMRIGHT")
+
+    local title = UI.Label(right, "", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 2, -4)
+    title:SetWidth(400)
+    title:SetWordWrap(false)
+
+    local search = UI.EditBox(right, 230)
+    search:SetPoint("TOPLEFT", 0, -30)
+    local ph = UI.Label(search, L["Search by name or ID"])
+    ph:SetPoint("LEFT", 6, 0)
+    ph:SetTextColor(0.45, 0.45, 0.45)
+    search:SetScript("OnTextChanged", function(self)
+        local txt = self:GetText() or ""
+        ph:SetShown(txt == "")
+        query = txt:trim()
+        listOffset = 0
+        Refresh()
+    end)
+    search:SetScript("OnEnterPressed", search.ClearFocus)
+    local clearQ = UI.Button(right, "x", 20, 20, function()
+        search:SetText("")
+        search:ClearFocus()
+    end)
+    clearQ:SetPoint("LEFT", search, "RIGHT", 4, 0)
+
+    local function ColLabel(text, x)
+        local l = UI.Label(right, text)
+        l:SetPoint("TOPLEFT", x, -58)
+        l:SetTextColor(0.6, 0.6, 0.6)
+        return l
+    end
+    ColLabel(L["Debuff"], 38)
+    ColLabel(L["ID"], 252)
+    ColLabel(L["Type"], 318)
+    local scrollInfo = UI.Label(right, "")
+    scrollInfo:SetPoint("TOPRIGHT", -14, -58)
+    scrollInfo:SetTextColor(0.6, 0.6, 0.6)
+
+    local emptyText = UI.Label(right, "")
+    emptyText:SetPoint("TOPLEFT", 4, -78)
+    emptyText:SetWidth(400)
+    emptyText:SetTextColor(0.6, 0.6, 0.6)
+
+    local listArea = CreateFrame("Frame", nil, right)
+    listArea:SetPoint("TOPLEFT", 0, -72)
+    listArea:SetSize(418, LIST_ROWS * 20)
+    Wheel(listArea, function(d) listOffset = math.max(0, listOffset - d) end)
+    local listBar = UI.ScrollBar(listArea, function(v) listOffset = v Refresh() end)
+    listBar:SetPoint("TOPRIGHT", -2, 0)
+    listBar:SetPoint("BOTTOMRIGHT", -2, 0)
+
+    local listRows = {}
+    for i = 1, LIST_ROWS do
+        local row = CreateFrame("Button", nil, listArea)
+        row:SetSize(406, 19)
+        row:SetPoint("TOPLEFT", 0, -(i - 1) * 20)
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        -- click on a boss: collapse / expand it
+        row:SetScript("OnClick", function(self)
+            local d = self.data
+            if d and d.header then
+                collapsed[d.ck] = (not collapsed[d.ck]) or nil
+                Refresh()
+            end
+        end)
+
+        -- boss row
+        row.h = CreateFrame("Frame", nil, row)
+        row.h:SetAllPoints()
+        row.exp = row.h:CreateTexture(nil, "ARTWORK")
+        row.exp:SetSize(14, 14)
+        row.exp:SetPoint("LEFT", 2, 0)
+        row.hname = UI.Label(row.h, "", "GameFontNormal")
+        row.hname:SetPoint("LEFT", 20, 0)
+        row.hname:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+        row.hcount = UI.Label(row.h, "")
+        row.hcount:SetPoint("LEFT", row.hname, "RIGHT", 6, 0)
+        row.hcount:SetTextColor(0.6, 0.6, 0.6)
+
+        -- debuff row
+        row.e = CreateFrame("Frame", nil, row)
+        row.e:SetAllPoints()
+        row.icon = row.e:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(17, 17)
+        row.icon:SetPoint("LEFT", 16, 0)
+        row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        UI.IconTip(row.e, row.icon, function() return row.data and row.data.id end)
+        row.name = UI.Label(row.e, "")
+        row.name:SetPoint("LEFT", 38, 0)
+        row.name:SetWidth(208)
+        row.name:SetWordWrap(false)
+        row.id = UI.Label(row.e, "")
+        row.id:SetPoint("LEFT", 252, 0)
+        row.id:SetTextColor(0.6, 0.6, 0.6)
+        row.tag = UI.Label(row.e, "")
+        row.tag:SetPoint("LEFT", 318, 0)
+        listRows[i] = row
+    end
+
+    -- how to read the guide
+    local noteTitle = UI.Label(right, L["How to read this guide"], "GameFontNormal")
+    noteTitle:SetPoint("TOPLEFT", 0, -72 - LIST_ROWS * 20 - 12)
+    noteTitle:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+    local note = UI.Label(right, table.concat({
+        L["The debuffs each boss puts on your group. In combat the game does not tell addons which debuff is which, so your frames show these like any other debuff: you recognise them by their icon."],
+        "",
+        "|cffff5a4d" .. L["Control"] .. "|r: " .. L["the game flags it as crowd control (stun, fear, sleep, mind control...)."],
+        "|cffaaaaaa" .. L["Debuff"] .. "|r: " .. L["any other debuff."],
+    }, "\n"))
+    note:SetPoint("TOPLEFT", noteTitle, "BOTTOMLEFT", 0, -6)
+    note:SetWidth(418)
+    note:SetJustifyH("LEFT")
+    note:SetTextColor(0.75, 0.75, 0.75)
+
+    ---------------------------------------------------------------------------
+    -- Refresh
+    ---------------------------------------------------------------------------
+    local function RefreshInstances()
+        local rows = InstanceRows()
+        instOffset = math.max(0, math.min(instOffset, #rows - INST_ROWS))
+        instBar:SetRange(#rows - INST_ROWS, #rows > 0 and INST_ROWS / #rows or 1)
+        instBar:SetPos(instOffset)
+        for i, r in ipairs(instRows) do
+            local d = rows[i + instOffset]
+            r.key = d and d.key
+            r.cat = d and d.cat
+            r.closed = d and d.closed
+            if not d then
+                r:Hide()
+            elseif d.cat then
+                r.exp:SetTexture(d.closed and PLUS_TEX or MINUS_TEX)
+                r.exp:Show()
+                r.name:SetText(d.label)
+                if d.cat == "unannounced" then
+                    r.name:SetTextColor(0.55, 0.55, 0.55)
+                else
+                    r.name:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+                end
+                r.count:SetText(d.n)
+                r.sel:Hide()
+                r.dot:Hide()
+                r:Show()
+            else
+                r.exp:Hide()
+                r.name:SetText(ns.Instances[d.key].name)
+                local g = ns.InstanceCategory(d.key) == "unannounced" and 0.6 or 1
+                r.name:SetTextColor(g, g, g)
+                local n = 0
+                for _, b in ipairs(ns.Instances[d.key].bosses) do n = n + #b[2] end
+                r.count:SetText(n)
+                r.sel:SetShown(d.key == selKey)
+                r.dot:SetShown(IsHere(d.key))
+                r:Show()
+            end
+        end
+    end
+
+    local function RefreshList()
+        local rows = ListRows()
+        listOffset = math.max(0, math.min(listOffset, #rows - LIST_ROWS))
+        listBar:SetRange(#rows - LIST_ROWS, #rows > 0 and LIST_ROWS / #rows or 1)
+        listBar:SetPos(listOffset)
+        if #rows > LIST_ROWS then
+            scrollInfo:SetText((L["%d-%d of %d"]):format(listOffset + 1, math.min(#rows, listOffset + LIST_ROWS), #rows))
+        else
+            scrollInfo:SetText("")
+        end
+        for i, row in ipairs(listRows) do
+            local d = rows[i + listOffset]
+            row.data = d
+            if not d then
+                row:Hide()
+            elseif d.header then
+                row.h:Show()
+                row.e:Hide()
+                row.bg:SetColorTexture(1, 1, 1, 0.06)
+                row.exp:SetTexture(d.closed and PLUS_TEX or MINUS_TEX)
+                row.exp:SetShown(d.n > 0)
+                row.hname:SetText(d.header)
+                row.hcount:SetText(d.n > 0 and ("(%d)"):format(d.n) or L["(no known debuffs)"])
+                row:Show()
+            else
+                row.h:Hide()
+                row.e:Show()
+                row.bg:SetColorTexture(1, 1, 1, 0)
+                local _, icon = ns.SpellKeyInfo(d.key)
+                row.icon:SetTexture(icon or 134400)
+                row.name:SetText(d.name)
+                row.id:SetText(d.id or L["looking up..."])
+                if ns.IsCrowdControlKey(d.key) then
+                    row.tag:SetText(L["Control"])
+                    row.tag:SetTextColor(1, 0.35, 0.3)
+                else
+                    row.tag:SetText(L["Debuff"])
+                    row.tag:SetTextColor(0.6, 0.6, 0.6)
+                end
+                row:Show()
+            end
+        end
+        if #rows == 0 then
+            emptyText:SetText(query ~= "" and L["Nothing matches the search."] or L["No known bosses or debuffs yet."])
+        else
+            emptyText:SetText("")
+        end
+    end
+
+    Refresh = function()
+        RefreshInstances()
+        local def = selKey and ns.Instances[selKey]
+        local unannounced = def and ns.InstanceCategory(selKey) == "unannounced"
+        title:SetText(def and (def.name .. (unannounced and ("  |cff888888(" .. L["not announced"] .. ")|r") or "")) or "")
+        clearQ:SetShown(query ~= "")
+        RefreshList()
+    end
+
+    p.OnShow = function()
+        -- until you pick one, follow the place where you are
+        if not picked then
+            local here = ns.CurrentInstanceKeys()[1]
+            if here then
+                selKey = here
+                catClosed[ns.InstanceCategory(here)] = false
+            end
+            selKey = selKey or ns.InstanceOrder[1]
+        end
+        Refresh()
+    end
+end
+
+-------------------------------------------------------------------------------
 -- Window
 -------------------------------------------------------------------------------
 local function SelectPage(i)
@@ -1537,8 +1921,8 @@ local function CreateWindow()
     win.testBtn = UI.Button(win, "", 100, 20, function() ns.ToggleTest() end)
     win.testBtn:SetPoint("TOPRIGHT", win.lockBtn, "TOPLEFT", -6, 0)
 
-    local names = { L["Profiles"], L["Layout"], L["Bars"], L["Texts"], L["Status icons"], L["Indicators"], L["Catalog"] }
-    local builders = { BuildProfiles, BuildLayout, BuildBars, BuildTexts, BuildElements, BuildIndicators, BuildCatalog }
+    local names = { L["Profiles"], L["Layout"], L["Bars"], L["Texts"], L["Status icons"], L["Indicators"], L["Catalog"], L["Instances"] }
+    local builders = { BuildProfiles, BuildLayout, BuildBars, BuildTexts, BuildElements, BuildIndicators, BuildCatalog, BuildInstances }
     for i, n in ipairs(names) do
         local nb = UI.Button(win, n, 130, 26, function() SelectPage(i) end)
         nb:SetPoint("TOPLEFT", 10, -44 - (i - 1) * 30)

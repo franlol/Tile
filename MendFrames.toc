@@ -14,6 +14,10 @@ Locales\esES.lua
 Core.lua
 Defaults.lua
 Catalog.lua
+Instances.lua
+Data\Raids.lua
+Data\Dungeons.lua
+Data\World.lua
 Media.lua
 Indicators.lua
 Frames.lua
