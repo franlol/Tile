@@ -461,32 +461,54 @@ end
 -- Página con scroll vertical
 -------------------------------------------------------------------------------
 function UI.ScrollPage(parent)
-    local sf = CreateFrame("ScrollFrame", nil, parent)
-    sf:SetAllPoints()
+    -- scroll nativo de Blizzard (rueda del ratón y barra arrastrable)
+    local sf = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT")
+    sf:SetPoint("BOTTOMRIGHT", -14, 0)
+    if sf.ScrollBar then
+        sf.ScrollBar:ClearAllPoints()
+        sf.ScrollBar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 4, 0)
+        sf.ScrollBar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 4, 0)
+    end
     local content = CreateFrame("Frame", nil, sf)
     content:SetSize(560, 10)
     sf:SetScrollChild(content)
-    sf:EnableMouseWheel(true)
-    local bar = sf:CreateTexture(nil, "OVERLAY")
-    bar:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.5)
-    bar:SetWidth(3)
-    local function UpdateBar()
-        local h, view = content:GetHeight(), sf:GetHeight()
-        if h <= view + 1 then bar:Hide() return end
-        local frac = view / h
-        bar:SetHeight(math.max(20, view * frac))
-        bar:ClearAllPoints()
-        bar:SetPoint("TOPRIGHT", sf, "TOPRIGHT", -1, -(sf:GetVerticalScroll() / h) * view)
-        bar:Show()
-    end
-    sf:SetScript("OnMouseWheel", function(self, d)
-        local max = math.max(0, content:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.min(max, math.max(0, self:GetVerticalScroll() - d * 40)))
-        UpdateBar()
-    end)
-    content.UpdateBar = UpdateBar
     sf.content = content
     return sf, content
+end
+
+-------------------------------------------------------------------------------
+-- Lista nativa de Blizzard (WowScrollBoxList + MinimalScrollBar).
+-- setup(row) crea el contenido de una fila una sola vez (las filas se
+-- reutilizan); fill(row, data) la rellena con un elemento de la lista.
+-- Se coloca con list.box (la barra va pegada a su derecha).
+-------------------------------------------------------------------------------
+function UI.List(parent, rowH, frameType, setup, fill)
+    local box = CreateFrame("Frame", nil, parent, "WowScrollBoxList")
+    local bar = CreateFrame("EventFrame", nil, parent, "MinimalScrollBar")
+    bar:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, 0)
+    bar:SetPoint("BOTTOMLEFT", box, "BOTTOMRIGHT", 4, 0)
+    local view = CreateScrollBoxListLinearView()
+    view:SetElementExtent(rowH)
+    view:SetElementInitializer(frameType or "Frame", function(row, data)
+        if not row.mfSetup then
+            row.mfSetup = true
+            setup(row)
+        end
+        fill(row, data)
+    end)
+    ScrollUtil.InitScrollBoxListWithScrollBar(box, bar, view)
+    local list = { box = box, bar = bar }
+    -- items: lista de tablas; reset: volver arriba (si no, se queda donde estaba)
+    function list:SetItems(items, reset)
+        local dp = CreateDataProvider(items)
+        if reset then
+            box:SetDataProvider(dp)
+        else
+            box:SetDataProvider(dp, ScrollBoxConstants.RetainScrollPosition)
+        end
+    end
+    return list
 end
 
 -------------------------------------------------------------------------------
