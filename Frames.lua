@@ -1031,8 +1031,10 @@ local function FillTest(b)
     b.leader:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
     b.raidIcon:SetShown(E.raidIcon.show and i == 2 and not b.isPet)
     if SetRaidTargetIconTexture then SetRaidTargetIconTexture(b.raidIcon, 8) end
-    b.ready:SetShown(E.ready.show and i == 5 and not b.isPet)
-    b.ready:SetTexture(READY_TEX.ready)
+    -- comprobación de listos simulada: casi todos listos, alguno en espera y alguno no
+    local rstate = (i % 7 == 0) and "notready" or ((i % 5 == 3) and "waiting" or "ready")
+    b.ready:SetShown(E.ready.show and not b.isPet)
+    b.ready:SetTexture(READY_TEX[rstate])
 
     ns.TestAuras(b, i)
 end
