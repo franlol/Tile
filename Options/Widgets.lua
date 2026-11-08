@@ -261,7 +261,10 @@ function UI.Dropdown(parent, text, options, get, set, width)
         list:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -1)
         list:EnableMouse(true)
         local offset = 0
+        local maxOffset = math.max(0, #opts - MAX_ITEMS)
+        local scrollable = maxOffset > 0
         local items = {}
+        local bar
         local function Fill()
             for i = 1, shown do
                 local o = opts[i + offset]
@@ -271,9 +274,16 @@ function UI.Dropdown(parent, text, options, get, set, width)
                 item.sel:SetShown(o and o[1] == get() or false)
             end
         end
+        local function ScrollTo(v)
+            offset = math.max(0, math.min(maxOffset, math.floor(v + 0.5)))
+            Fill()
+            if bar and math.floor(bar:GetValue() + 0.5) ~= offset then bar:SetValue(offset) end
+        end
+        -- con barra de desplazamiento, las opciones dejan sitio a la derecha
+        local itemW = list:GetWidth() - 4 - (scrollable and 12 or 0)
         for i = 1, shown do
             local item = CreateFrame("Button", nil, list)
-            item:SetSize(list:GetWidth() - 4, 18)
+            item:SetSize(itemW, 18)
             item:SetPoint("TOPLEFT", 2, -2 - (i - 1) * 18)
             item.hl = item:CreateTexture(nil, "HIGHLIGHT")
             item.hl:SetAllPoints()
@@ -292,12 +302,31 @@ function UI.Dropdown(parent, text, options, get, set, width)
             end)
             items[i] = item
         end
-        if #opts > MAX_ITEMS then
+        if scrollable then
+            -- barra de desplazamiento arrastrable
+            bar = CreateFrame("Slider", nil, list, "BackdropTemplate")
+            bar:SetOrientation("VERTICAL")
+            bar:SetPoint("TOPRIGHT", -3, -3)
+            bar:SetPoint("BOTTOMRIGHT", -3, 3)
+            bar:SetWidth(8)
+            UI.Backdrop(bar, { 0.03, 0.03, 0.04, 1 }, { 0.2, 0.2, 0.25, 1 })
+            local thumb = bar:CreateTexture(nil, "OVERLAY")
+            thumb:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.9)
+            -- el tamaño del tirador refleja la parte visible de la lista
+            thumb:SetSize(6, math.max(16, (list:GetHeight() - 6) * shown / #opts))
+            bar:SetThumbTexture(thumb)
+            bar:SetMinMaxValues(0, maxOffset)
+            bar:SetValueStep(1)
+            bar:SetObeyStepOnDrag(true)
+            bar:SetValue(0)
+            bar:SetScript("OnValueChanged", function(_, v) ScrollTo(v) end)
             list:EnableMouseWheel(true)
-            list:SetScript("OnMouseWheel", function(_, d)
-                offset = math.max(0, math.min(#opts - MAX_ITEMS, offset - d))
-                Fill()
-            end)
+            list:SetScript("OnMouseWheel", function(_, d) ScrollTo(offset - d) end)
+            -- al abrir, enseñar la opción seleccionada
+            local cur = get()
+            for k, o in ipairs(opts) do
+                if o[1] == cur then ScrollTo(k - math.ceil(shown / 2)) break end
+            end
         end
         Fill()
         openMenu = list
