@@ -1059,6 +1059,17 @@ local function FillTest(b)
     b.ready:SetShown(E.ready.show and not b.isPet)
     b.ready:SetTexture(READY_TEX[rstate])
 
+    -- en la muestra de Indicadores solo cuenta el indicador: fuera lo que el
+    -- modo prueba simula sobre el jugador (amenaza, objetivo, líder, rol,
+    -- marca y listos). La vida, el nombre, los textos y el maná se quedan.
+    if b.previewAll then
+        b.aggro:Hide()
+        b.hl:SetAlpha(0)
+        b.role:Hide()
+        b.leader:Hide()
+        b.raidIcon:Hide()
+        b.ready:Hide()
+    end
     ns.TestAuras(b, i, b.previewAll)
 end
 
