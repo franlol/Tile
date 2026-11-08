@@ -501,7 +501,7 @@ local function LayoutWidget(w, cfg, b)
     else
         w:SetSize(cfg.width, cfg.height)
         -- ocupar un lado entero del marco (como la línea de amenaza)
-        if t == "bar" and cfg.span and cfg.span ~= "none" then
+        if t == "bar" and (cfg.span == "width" or cfg.span == "height") then
             local L = ns.P.layout
             local fw, fh = L.width, L.height
             if b.isPet then fw, fh = ns.PetSize() end
@@ -572,6 +572,8 @@ function ns.BuildIndicators(b)
         w:SetFrameLevel(b.overlay:GetFrameLevel() + (wt == "border" and 1 or (3 + c.index * 3)))
         b.ind[c.index] = w
     end
+    -- franjas propias: su sitio depende de las demás y de la barra de maná
+    if ns.AnchorHealth then ns.AnchorHealth(b, b.powerShown) end
 end
 
 -------------------------------------------------------------------------------

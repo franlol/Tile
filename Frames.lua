@@ -130,15 +130,67 @@ local function PlaceElement(tex, e, b)
 end
 
 -- Ajusta la barra de vida según haya o no barra de maná
+-- Indicadores de barra con franja propia (como la de maná): cada uno ocupa
+-- una franja del marco por su lado y la vida se acorta para dejarles sitio.
+-- Arriba/abajo usan su alto; izquierda/derecha, su ancho. Se apilan en el
+-- orden de la lista; abajo, por encima de la barra de maná.
+local STRIP_SIDE = { stripTop = "top", stripBottom = "bottom", stripLeft = "left", stripRight = "right" }
+ns.STRIP_SIDE = STRIP_SIDE
+
+local function PlaceStrips(b, bottomStart)
+    local ins = { top = 0, bottom = bottomStart, left = 0, right = 0 }
+    local list = ns.P.indicators
+    -- primero las horizontales (cruzan todo el ancho), luego las verticales
+    for pass = 1, 2 do
+        for i, cfg in ipairs(list) do
+            local side = cfg.enabled and cfg.type == "bar" and cfg.kind == "aura" and STRIP_SIDE[cfg.span]
+            local horiz = side == "top" or side == "bottom"
+            if side and ((pass == 1) == horiz) then
+                local size = math.max(1, horiz and cfg.height or cfg.width)
+                local w = b.ind and b.ind[i]
+                if w then
+                    w:ClearAllPoints()
+                    if side == "top" then
+                        w:SetPoint("TOPLEFT", b, "TOPLEFT", 1, -1 - ins.top)
+                        w:SetPoint("TOPRIGHT", b, "TOPRIGHT", -1, -1 - ins.top)
+                        w:SetHeight(size)
+                    elseif side == "bottom" then
+                        w:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 1, 1 + ins.bottom)
+                        w:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 1 + ins.bottom)
+                        w:SetHeight(size)
+                    elseif side == "left" then
+                        w:SetPoint("TOPLEFT", b, "TOPLEFT", 1 + ins.left, -1 - ins.top)
+                        w:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 1 + ins.left, 1 + ins.bottom)
+                        w:SetWidth(size)
+                    else
+                        w:SetPoint("TOPRIGHT", b, "TOPRIGHT", -1 - ins.right, -1 - ins.top)
+                        w:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1 - ins.right, 1 + ins.bottom)
+                        w:SetWidth(size)
+                    end
+                end
+                ins[side] = ins[side] + size + 1
+            end
+        end
+    end
+    return ins
+end
+
 local function AnchorHealth(b, powerShown)
     local P = ns.P
     local powerH = powerShown and P.bars.powerHeight or 0
+    local ins = PlaceStrips(b, powerH > 0 and powerH + 1 or 0)
     b.health:ClearAllPoints()
-    b.health:SetPoint("TOPLEFT", 1, -1)
-    b.health:SetPoint("BOTTOMRIGHT", -1, 1 + (powerH > 0 and powerH + 1 or 0))
+    b.health:SetPoint("TOPLEFT", 1 + ins.left, -1 - ins.top)
+    b.health:SetPoint("BOTTOMRIGHT", -1 - ins.right, 1 + ins.bottom)
+    -- curación entrante y escudos miden lo mismo que la vida
+    local fw = b.isPet and (ns.PetSize()) or P.layout.width
+    local hw = math.max(1, fw - 2 - ins.left - ins.right)
+    b.pred:SetWidth(hw)
+    b.absorb:SetWidth(hw)
     b.power:SetShown(powerH > 0)
     b.powerShown = powerShown
 end
+ns.AnchorHealth = AnchorHealth
 
 function ns.LayoutButton(b, isPet)
     local P = ns.P
@@ -156,9 +208,7 @@ function ns.LayoutButton(b, isPet)
     local pc, ac = B.healPredColor, B.absorbColor
     b.pred:SetStatusBarColor(pc.r, pc.g, pc.b, pc.a)
     b.absorb:SetStatusBarColor(ac.r, ac.g, ac.b, ac.a)
-    b.pred:SetWidth(w - 2)
-    b.absorb:SetWidth(w - 2)
-
+    b.isPet = isPet
     AnchorHealth(b, B.showPower and not isPet)
     b.power:ClearAllPoints()
     b.power:SetPoint("BOTTOMLEFT", 1, 1)

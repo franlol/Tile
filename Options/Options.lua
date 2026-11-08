@@ -1313,7 +1313,8 @@ local function BuildIndicators(p)
         ns.FillPreviewButton(pb)
 
         local s = Sel()
-        local w = same and s and s.kind ~= "dispel" and pb.ind and pb.ind[selInd]
+        local strip = s and s.type == "bar" and ns.STRIP_SIDE[s.span]
+        local w = same and s and s.kind ~= "dispel" and not strip and pb.ind and pb.ind[selInd]
         handle:ClearAllPoints()
         if w then
             handle:SetAllPoints(w)
@@ -1410,12 +1411,23 @@ local function BuildIndicators(p)
 
         W(UI.Header(c, "Posición y tamaño"), notDispel),
         W(posSample, notDispel),
-        PositionBlock(c, Sel, IndChanged, { showIf = notDispel }),
+        PositionBlock(c, Sel, IndChanged, { showIf = function()
+            return notDispel() and not (T() == "bar" and ns.STRIP_SIDE[Sel().span])
+        end }),
         W(sizeW, iconLike),
         W(UI.Slider(c, "Ancho", 1, 120, 1, nil, IB("width")), rect),
         W(UI.Attach(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height"))), rect),
-        W(UI.Dropdown(c, "Ocupar", { { "none", "No (su ancho y alto)" }, { "width", "Todo el ancho del marco" },
-            { "height", "Todo el alto del marco" } }, IB("span")), function() return T() == "bar" end),
+        W(UI.Dropdown(c, "Ocupar", {
+            { "none", "No (su ancho y alto)" },
+            { "width", "Todo el ancho, encima del marco" },
+            { "height", "Todo el alto, encima del marco" },
+            { "stripTop", "Franja propia arriba" },
+            { "stripBottom", "Franja propia abajo" },
+            { "stripLeft", "Franja propia a la izquierda" },
+            { "stripRight", "Franja propia a la derecha" },
+        }, IB("span")), function() return T() == "bar" end),
+        W(UI.Attach(UI.Note(c, "Con franja propia, la vida se acorta para dejarle sitio (como la barra de maná). Arriba y abajo usan el alto; izquierda y derecha, el ancho.", 340)),
+            function() return T() == "bar" and ns.STRIP_SIDE[Sel().span] ~= nil end),
         W(UI.Dropdown(c, "Orientación de la barra", { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
             IB("barOrient")), function() return T() == "bar" end),
         W(UI.Attach(UI.Check(c, "Vaciar al revés", IB("barReverse"))), function() return T() == "bar" end),
