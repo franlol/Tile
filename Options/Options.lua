@@ -214,8 +214,6 @@ local function BuildBars(p)
     barSwatch.enableIf = function() return ns.EP().bars.healthColor == "custom" end
     local bgSwatch = UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged)
     bgSwatch.enableIf = function() return ns.EP().bars.bgColor == "custom" end
-    local gradNote = UI.Note(c, "Si en combate el juego oculta la vida, se usa el color de clase.")
-    gradNote.enableIf = function() return ns.EP().bars.healthColor == "gradient" end
 
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
@@ -226,7 +224,6 @@ local function BuildBars(p)
             { "gradient", "Degradado según la vida" },
         }, PB("bars.healthColor")),
         barSwatch,
-        gradNote,
         E(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness")),
             function() return ns.EP().bars.healthColor ~= "custom" end),
         UI.Dropdown(c, "Color del fondo (vida que falta)", {
