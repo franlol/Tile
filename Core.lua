@@ -1,18 +1,19 @@
 -------------------------------------------------------------------------------
 -- MendFrames - Core
--- Marcos de banda para sanadores pensados para WoW Forever (motor 12.x).
--- En instancias y en combate el cliente puede devolver "valores secretos":
--- se pueden pasar a los widgets (SetValue, SetText, SetTexture...) pero no se
--- pueden comparar ni operar. Todo el addon pasa por los helpers de aquí.
+-- Raid frames for healers built for WoW Forever (12.x engine).
+-- In instances and in combat the client can return "secret values": they can
+-- be passed to widgets (SetValue, SetText, SetTexture...) but cannot be
+-- compared or used in math. The whole addon goes through the helpers here.
 -------------------------------------------------------------------------------
 
 local ADDON, ns = ...
+local L = ns.L
 _G.MendFrames = ns
 
 ns.version = "0.2.0"
 
 -------------------------------------------------------------------------------
--- Valores secretos
+-- Secret values
 -------------------------------------------------------------------------------
 local issecretvalue = _G.issecretvalue or function() return false end
 
@@ -31,7 +32,7 @@ function ns.AnyS(...)
 end
 
 -------------------------------------------------------------------------------
--- Utilidades
+-- Utilities
 -------------------------------------------------------------------------------
 function ns.Print(...)
     print("|cff4fc3f7MendFrames|r:", ...)
@@ -69,16 +70,16 @@ function ns.SpellIDFromName(name)
 end
 
 -------------------------------------------------------------------------------
--- Índice nativo nombre -> todos los IDs de hechizo (todos los rangos)
+-- Native index name -> every spell ID (every rank)
 --
--- La identidad de un hechizo es su nombre, tal como lo da el cliente. Los IDs
--- no se escriben a mano: se le piden al cliente recorriendo sus hechizos en
--- segundo plano (unos miles por fotograma) solo para los nombres que usa el
--- addon. El índice se guarda y se rehace si cambia la versión del cliente, así
--- que rangos nuevos, IDs nuevos o expansiones se recogen solos.
+-- A spell's identity is its name, as the client gives it. IDs are not written
+-- by hand: the client is asked for them by walking its spells in the
+-- background (a few thousand per frame), only for the names the addon uses.
+-- The index is saved and rebuilt when the client version changes, so new
+-- ranks, new IDs or expansions are picked up on their own.
 -------------------------------------------------------------------------------
 local SCAN_MAX, SCAN_STEP = 1500000, 5000
-local pending = {}   -- [nombre en minúsculas] = { left = IDs por revisar, ids = {} }
+local pending = {}   -- [lowercase name] = { left = IDs still to check, ids = {} }
 local scanID = 1
 local scanFrame = CreateFrame("Frame")
 scanFrame:Hide()
@@ -115,7 +116,7 @@ scanFrame:SetScript("OnUpdate", function(self)
         p.left = p.left - step
         if p.left <= 0 then
             table.sort(p.ids)
-            names[lower] = (#p.ids > 0) and p.ids or false   -- false: no existe en este cliente
+            names[lower] = (#p.ids > 0) and p.ids or false   -- false: does not exist in this client
             pending[lower] = nil
             finished = true
         end
@@ -124,7 +125,7 @@ scanFrame:SetScript("OnUpdate", function(self)
     if not next(pending) then self:Hide() end
 end)
 
--- Todos los IDs de un nombre (lista ordenada), o nil si aún se están buscando
+-- Every ID for a name (sorted list), or nil while they are still being looked up
 function ns.SpellIDs(name)
     if not name or name == "" or not ns.db then return nil end
     local lower = name:lower()
@@ -139,7 +140,7 @@ function ns.SpellIDs(name)
     return v or nil
 end
 
--- Un ID para un nombre (el del libro de hechizos si lo conoces, si no el primero)
+-- One ID for a name (the spellbook one if known, otherwise the first)
 function ns.ResolveName(name)
     if not name or name == "" then return nil end
     local id = ns.SpellIDFromName(name)
@@ -148,16 +149,16 @@ function ns.ResolveName(name)
     return ids and ids[1]
 end
 
--- Nombre de una clave de hechizo (número o "n:Nombre")
+-- Name of a spell key (number or "n:Name")
 function ns.KeyName(key)
     if type(key) == "number" then return ns.GetSpellName(key) end
     if type(key) == "string" then return key:match("^n:(.+)$") or key end
 end
 
--- Todos los IDs de una clave de hechizo. La comparación es SOLO por ID: el
--- nombre únicamente sirve para encontrar, una vez, todos los IDs (rangos).
--- pick: IDs elegidos a mano ({ [id] = true }). Si hay alguno, solo esos;
--- si no hay ninguno, todos los IDs del hechizo.
+-- Every ID of a spell key. Matching is ONLY by ID: the name is only used to
+-- find, once, every ID (ranks).
+-- pick: IDs chosen by hand ({ [id] = true }). If there are any, only those;
+-- if there are none, every ID of the spell.
 function ns.KeyIDs(key, pick)
     if type(pick) == "number" then return { pick } end
     if type(pick) == "table" and next(pick) then
@@ -177,31 +178,31 @@ function ns.KeyIDs(key, pick)
     return out
 end
 
--- Registra una clave en una tabla de búsqueda por ID
+-- Registers a key in a lookup table by ID
 function ns.AddSpellKey(byID, _, key, value, rankID)
     for _, id in ipairs(ns.KeyIDs(key, rankID)) do
         if byID[id] == nil then byID[id] = value end
     end
 end
 
--- IDs elegidos a mano para un hechizo de un indicador ({ [id] = true }),
--- o nil si no hay ninguno (= todos los IDs del hechizo)
+-- IDs chosen by hand for a spell of an indicator ({ [id] = true }),
+-- or nil when there are none (= every ID of the spell)
 function ns.KeyRank(cfg, key)
     local r = cfg.ranks and cfg.ranks[key]
     if type(r) == "table" and next(r) then return r end
 end
 
--- Cuando el índice encuentra IDs nuevos: los indicadores se rehacen con ellos
+-- When the index finds new IDs: the indicators are rebuilt with them
 function ns.OnSpellIndexUpdated()
     if ns.ClearIconCache then ns.ClearIconCache() end
     if ns.P and ns.header and ns.ApplyProfile then ns.ApplyProfile() end
     if ns.OnSpellResolved then ns.OnSpellResolved() end
 end
 
--- Nombre e icono de una clave de hechizo (número o "n:Nombre")
--- Icono de una clave: muchos hechizos de PNJ (internos) tienen el icono de
--- interrogación; se busca el primero con icono de verdad entre todos los IDs
--- con el mismo nombre. Solo para enseñarlo: la detección usa todos los IDs.
+-- Name and icon of a spell key (number or "n:Name")
+-- Icon of a key: many NPC (internal) spells have the question mark icon; the
+-- first real icon is searched among every ID with the same name. Display
+-- only: detection uses every ID.
 local QUESTION_ICON = 134400
 local iconCache = {}
 local function KeyIcon(key, first)
@@ -212,7 +213,7 @@ local function KeyIcon(key, first)
         local name = ns.KeyName(key)
         local ids = name and ns.SpellIDs(name)
         if not ids and name and ns.db and Index().names[name:lower()] == nil then
-            return icon -- todavía buscando: no se guarda
+            return icon -- still searching: not cached
         end
         for _, id in ipairs(ids or {}) do
             local t = ns.GetSpellIcon(id)
@@ -237,12 +238,12 @@ function ns.SpellKeyInfo(key)
     return (id and ns.GetSpellName(id)) or name, KeyIcon(key, id), id
 end
 
--- el índice ha cambiado: los iconos se vuelven a buscar
+-- the index changed: icons are looked up again
 function ns.ClearIconCache() wipe(iconCache) end
 
--- Convierte lo que escribe el usuario en una clave de hechizo.
--- Un nombre se guarda como nombre (vale cualquier rango); su icono e ID se
--- buscan en segundo plano.
+-- Turns what the user types into a spell key.
+-- A name is stored as a name (any rank works); its icon and ID are looked up
+-- in the background.
 function ns.ParseSpellInput(txt)
     txt = (txt or ""):trim()
     if txt == "" then return nil end
@@ -255,7 +256,7 @@ function ns.ParseSpellInput(txt)
 end
 
 -------------------------------------------------------------------------------
--- Cola para cosas que no se pueden hacer en combate
+-- Queue for things that cannot be done in combat
 -------------------------------------------------------------------------------
 ns.pending = {}
 ns.pendingOrder = {}
@@ -269,7 +270,7 @@ function ns.RunOOC(key, func)
 end
 
 -------------------------------------------------------------------------------
--- Perfiles
+-- Profiles
 -------------------------------------------------------------------------------
 function ns.CharKey()
     return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
@@ -287,7 +288,7 @@ function ns.CharProfiles()
     return c
 end
 
--- Tamaño real del grupo (sin contar el modo prueba)
+-- Real group size (ignoring test mode)
 function ns.RealSizeKey()
     if IsInRaid() then
         local n = GetNumGroupMembers()
@@ -303,14 +304,14 @@ function ns.SizeKey()
     return ns.RealSizeKey()
 end
 
--- Perfil que se está viendo ahora mismo. En modo prueba se ve el que se
--- edita en las opciones: así lo que cambias siempre se ve al momento.
+-- Profile being shown right now. In test mode it is the one being edited in
+-- the options: that way every change is visible at once.
 function ns.ActiveProfileName()
     if ns.testing and ns.editName and ns.db.profiles[ns.editName] then return ns.editName end
     return ns.CharProfiles()[ns.SizeKey()]
 end
 
--- Perfil que se edita en las opciones (por defecto, el activo)
+-- Profile being edited in the options (the active one by default)
 function ns.EditedProfileName()
     if ns.editName and ns.db.profiles[ns.editName] then return ns.editName end
     return ns.ActiveProfileName()
@@ -326,7 +327,7 @@ function ns.ActivateProfile(force)
     if ns.OnProfileChanged then ns.OnProfileChanged() end
 end
 
--- Tras cambiar una opción del perfil editado
+-- After changing an option of the edited profile
 function ns.ProfileChanged()
     if ns.EditedProfileName() == ns.activeName then
         ns.ApplyProfile()
@@ -334,7 +335,7 @@ function ns.ProfileChanged()
 end
 
 -------------------------------------------------------------------------------
--- Ocultar los marcos de banda de Blizzard
+-- Hide the Blizzard raid frames
 -------------------------------------------------------------------------------
 local hiddenParent = CreateFrame("Frame")
 hiddenParent:Hide()
@@ -353,11 +354,12 @@ function ns.HideBlizzard()
 end
 
 -------------------------------------------------------------------------------
--- Carga de la base de datos
+-- Load the database
 -------------------------------------------------------------------------------
 local function LoadDB()
     MendFramesDB = CopyDefaults(ns.dbDefaults, MendFramesDB)
     ns.db = MendFramesDB
+    ns.SetLanguage(ns.db.language)
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
     end
@@ -365,7 +367,7 @@ local function LoadDB()
 end
 
 -------------------------------------------------------------------------------
--- Eventos
+-- Events
 -------------------------------------------------------------------------------
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("ADDON_LOADED")
@@ -386,13 +388,13 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         ns.P = ns.db.profiles[ns.activeName]
         ns.CreateFrames()
         ns.HideBlizzard()
-        ns.Print("cargado. Escribe |cffffff00/mf|r para abrir las opciones.")
+        ns.Print(L["loaded. Type |cffffff00/mf|r to open the options."])
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
         if ns.db and not ns.db.locked then
             ns.SetLocked(true)
-            ns.Print("marcos bloqueados al entrar en combate.")
+            ns.Print(L["frames locked when entering combat."])
         end
         if ns.UpdateAllButtons then ns.UpdateAllButtons() end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -408,7 +410,7 @@ ev:SetScript("OnEvent", function(self, event, arg1)
 end)
 
 -------------------------------------------------------------------------------
--- Comandos
+-- Commands
 -------------------------------------------------------------------------------
 SLASH_MENDFRAMES1 = "/mf"
 SLASH_MENDFRAMES2 = "/mendframes"
@@ -421,12 +423,12 @@ SlashCmdList.MENDFRAMES = function(msg)
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "estado" or msg == "status" then
-        ns.Print(("perfil: %s (%s)"):format(tostring(ns.activeName), ns.SIZE_NAMES[ns.SizeKey()] or "?"))
+        ns.Print((L["profile: %s (%s)"]):format(tostring(ns.activeName), L[ns.SIZE_NAMES[ns.SizeKey()] or "?"]))
     elseif msg == "reset" then
         ns.RunOOC("reset", function()
             ns.P.pos = ns.DeepCopy(ns.profileDefaults.pos)
             ns.ApplyPositions()
-            ns.Print("posiciones restablecidas.")
+            ns.Print(L["positions reset."])
         end)
     else
         ns.ToggleOptions()

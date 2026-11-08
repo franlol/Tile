@@ -1,20 +1,21 @@
 -------------------------------------------------------------------------------
--- MendFrames - Indicadores (estilo Cell)
--- Cada indicador vigila unas auras y las dibuja en un sitio fijo del marco:
--- icono, varios iconos, cuadrado de color, barra, texto, borde o tinte.
+-- MendFrames - Indicators (Cell style)
+-- Each indicator watches some auras and draws them at a fixed spot of the
+-- frame: icon, several icons, color square, bar, text, border or tint.
 --
--- Las auras reales las elige y las dibuja el juego con sus contenedores
--- nativos de auras (CustomAuraContainerTemplate). El addon solo prepara el
--- aspecto: texturas, textos y barrido. Así funcionan igual en combate y en
--- instancias, donde el juego no deja que un addon lea las auras.
+-- Real auras are chosen and drawn by the game with its native aura
+-- containers (CustomAuraContainerTemplate). The addon only sets up the
+-- look: textures, texts and sweep. That way they work the same in combat
+-- and in instances, where the game does not let addons read auras.
 --
--- Hay dos excepciones, que no usan el contenedor:
---   · «Le falta»: solo fuera de combate (lee las auras de la unidad).
---   · Barras de escudos o de curación entrante: datos de la unidad.
--- El modo prueba dibuja auras de ejemplo con las mismas piezas.
+-- There are two exceptions that do not use the container:
+--   · "Missing": out of combat only (reads the unit's auras).
+--   · Shield or incoming heal bars: unit data.
+-- Test mode draws sample auras with the same pieces.
 -------------------------------------------------------------------------------
 
 local _, ns = ...
+local L = ns.L
 local S, R = ns.S, ns.R
 
 local GetAuraDataByIndex = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
@@ -30,7 +31,7 @@ ns.DISPEL_COLORS = {
     none    = { 0.85, 0.1, 0.1 },
 }
 
--- Iconos nativos de cada tipo (los de los marcos de banda de Blizzard)
+-- Native icons for each type (the ones from the Blizzard raid frames)
 ns.DISPEL_ICONS = {
     Magic   = "Interface\\RaidFrame\\Raid-Icon-DebuffMagic",
     Curse   = "Interface\\RaidFrame\\Raid-Icon-DebuffCurse",
@@ -38,14 +39,14 @@ ns.DISPEL_ICONS = {
     Poison  = "Interface\\RaidFrame\\Raid-Icon-DebuffPoison",
 }
 
--- Texto con el icono del tipo delante (para las opciones)
+-- Text with the type icon in front (for the options)
 function ns.DispelLabel(t, text)
     local icon = ns.DISPEL_ICONS[t]
     if not icon then return text end
     return ("|T%s:14:14:0:0|t %s"):format(icon, text)
 end
 
--- Color de un tipo de debuff: el del perfil (configurable) o el de siempre
+-- Color of a debuff type: the profile one (configurable) or the standard one
 function ns.DispelColor(t)
     local c = ns.P and ns.P.dispelColors and ns.P.dispelColors[t]
     if c then return c.r, c.g, c.b end
@@ -54,8 +55,8 @@ function ns.DispelColor(t)
     return nil
 end
 
--- Textura del tinte: lisa o degradado (la opacidad va en la propia imagen,
--- porque el juego cambia el color del vértice al dibujar el tipo)
+-- Tint texture: solid or gradient (the opacity is in the image itself,
+-- because the game changes the vertex color when drawing the type)
 function ns.DispelTintAsset(shape)
     if shape == "solid" then return FLAT end
     return "Interface\\AddOns\\MendFrames\\Media\\"
@@ -63,21 +64,21 @@ function ns.DispelTintAsset(shape)
 end
 
 -------------------------------------------------------------------------------
--- Qué es cada indicador
+-- What each indicator is
 -------------------------------------------------------------------------------
--- Barras que miden algo de la unidad (no un aura): escudos o curación entrante
+-- Bars that measure something of the unit (not an aura): shields or incoming heals
 local function UnitMeasure(cfg)
     local m = cfg.kind == "aura" and cfg.type == "bar" and cfg.barMeasure
     return m == "absorb" or m == "heal"
 end
 ns.IndicatorUnitMeasure = UnitMeasure
 
--- «Le falta»: lista de bufos, solo fuera de combate
+-- "Missing": list of buffs, out of combat only
 local function Missing(cfg)
     return cfg.kind == "aura" and cfg.watch == "spells" and cfg.mode == "missing" and not UnitMeasure(cfg)
 end
 
--- Enseña debuffs con tipo (magia, veneno...): su color puede salir del tipo
+-- Shows debuffs with a type (magic, poison...): its color can come from the type
 local function Typed(cfg)
     return cfg.kind ~= "aura" or cfg.watch == "dispellable" or cfg.watch == "debuffTypes"
 end
@@ -95,7 +96,7 @@ local function ClockSweep(cfg)
 end
 
 -------------------------------------------------------------------------------
--- Indicadores del perfil activo
+-- Indicators of the active profile
 -------------------------------------------------------------------------------
 ns.compiled = {}
 
@@ -115,7 +116,7 @@ function ns.CompileIndicators()
     end
 end
 
--- Qué auras elige el juego para un indicador: filtro, filtros extra y orden
+-- Which auras the game picks for an indicator: filter, extra filters and order
 local function Query(cfg)
     local sort = AuraContainerSortMethod
     if cfg.kind == "raiddebuff" then
@@ -123,21 +124,21 @@ local function Query(cfg)
     elseif cfg.kind == "debuffs" then
         return cfg.onlyDispellable and "HARMFUL|RAID" or "HARMFUL"
     elseif cfg.watch == "dispellable" then
-        -- los que puedo disipar (lo decide el juego), sin los tipos desmarcados
+        -- the ones I can dispel (the game decides), without the unchecked types
         local excluded = {}
         for kind, on in pairs(cfg.dispelTypes) do
             if not on then excluded[kind] = true end
         end
         return "HARMFUL|RAID", { excludeDispelTypes = excluded }
     elseif cfg.watch == "debuffTypes" then
-        -- los tipos marcados, aunque mi clase no pueda disiparlos
+        -- the checked types, even if my class cannot dispel them
         local included = {}
         for kind, on in pairs(cfg.dispelTypes) do
             if on then included[kind] = true end
         end
         return "HARMFUL", { includeDispelTypes = included }
     end
-    -- bufos: por hechizo (todos los IDs de cada uno) o todos si no hay lista
+    -- buffs: by spell (every ID of each one) or all of them when there is no list
     local filter = "HELPFUL" .. ((cfg.mine and not cfg.others) and "|PLAYER" or "")
     local cand = {}
     if #cfg.spells > 0 then
@@ -152,7 +153,7 @@ local function Query(cfg)
 end
 
 -------------------------------------------------------------------------------
--- Piezas comunes (las usan el botón nativo y el widget de muestra)
+-- Shared pieces (used by the native button and the sample widget)
 -------------------------------------------------------------------------------
 local INSET = {
     TOPLEFT = { 1, -1 }, TOP = { 0, -1 }, TOPRIGHT = { 2, -1 },
@@ -179,7 +180,7 @@ local function NewCooldown(f)
     return cd
 end
 
--- Vaciado (vertical, horizontal o barra fina abajo): alternativa al reloj
+-- Drain (vertical, horizontal or thin bar at the bottom): alternative to the clock
 local function NewDrain(f)
     local d = CreateFrame("StatusBar", nil, f)
     d:SetStatusBarTexture(FLAT)
@@ -190,7 +191,7 @@ local function NewDrain(f)
     return d
 end
 
--- Capa por encima del barrido para los textos
+-- Layer above the sweep for the texts
 local function NewTop(f, above)
     local top = CreateFrame("Frame", nil, f)
     top:SetAllPoints()
@@ -222,7 +223,7 @@ local function StyleSweep(cd, drain, cfg, h)
     end
 end
 
--- Texto del tiempo / de las cargas sobre un elemento
+-- Time / stack text over an element
 local function StyleTimer(fs, cfg, anchor, r, g, b)
     local tt = TextCfg(cfg)
     local o = INSET[tt.point or "CENTER"] or INSET.CENTER
@@ -237,7 +238,7 @@ local function StyleCount(fs, cfg, anchor, r, g, b)
     ns.ColorText(fs, st, r, g, b)
 end
 
--- El tipo «Texto»: el propio texto va donde el indicador
+-- The "Text" type: the text itself goes where the indicator is
 local function StyleMainText(fs, cfg, anchor, r, g, b)
     local tt = TextCfg(cfg)
     ns.SetFont(fs, tt.font, tt.size or 9, tt.outline or "")
@@ -249,7 +250,7 @@ local function StyleMainText(fs, cfg, anchor, r, g, b)
     fs:SetTextColor(c.r, c.g, c.b, c.a or 1)
 end
 
--- Cargas al lado del texto (tipo «Texto»)
+-- Stacks next to the text ("Text" type)
 local function StyleSideCount(fs, cfg, main)
     local _, st = TextCfg(cfg)
     ns.SetFont(fs, st.font, st.size or 9, st.outline or "")
@@ -258,7 +259,7 @@ local function StyleSideCount(fs, cfg, main)
     ns.ColorText(fs, st)
 end
 
--- Las cuatro líneas de un borde de grosor th
+-- The four lines of a border of thickness th
 local function PlaceEdges(edges, th)
     for edge, tex in pairs(edges) do
         tex:ClearAllPoints()
@@ -292,7 +293,7 @@ local function PlaceTypeIcon(icon, cfg, anchor)
     icon:SetSize(sz, sz)
 end
 
--- Color de borde y tinte: el del tipo de debuff o el del indicador
+-- Border and tint color: the debuff type one or the indicator one
 local function FrameColor(cfg, kind)
     if Typed(cfg) and cfg.dispelColor then
         local r, g, b = ns.DispelColor(kind or "none")
@@ -303,7 +304,7 @@ local function FrameColor(cfg, kind)
 end
 
 -------------------------------------------------------------------------------
--- Botón nativo: el juego le asigna un aura y rellena sus piezas
+-- Native button: the game assigns it an aura and fills its pieces
 -------------------------------------------------------------------------------
 local function DispelColorMap(cfg, noneR, noneG, noneB)
     local map = { None = CreateColor(noneR, noneG, noneB) }
@@ -313,7 +314,7 @@ local function DispelColorMap(cfg, noneR, noneG, noneB)
     return map
 end
 
--- El color lo pone el juego según el tipo del aura
+-- The game sets the color based on the aura type
 local function AddDispelTexture(button, tex, colors)
     button:AddDispelTypeTexture(tex, {
         showAlways = true,
@@ -344,7 +345,7 @@ local function BuildFrameButton(button, cfg, wt)
         end
     end
     if wt == "overlay" then
-        -- la intensidad va en un marco aparte: el juego cambia el color del vértice
+        -- the intensity goes in a separate frame: the game changes the vertex color
         local tint = CreateFrame("Frame", nil, button)
         tint:SetAllPoints()
         tint:SetAlpha(cfg.overlayAlpha or 0.6)
@@ -451,7 +452,7 @@ local function BuildAuraButton(button, cfg, wt)
     return w
 end
 
--- Contenedor nativo de un indicador, pegado a su widget
+-- Native container of an indicator, attached to its widget
 local function NewContainer(w, cfg)
     local filter, candidates, sort = Query(cfg)
     local wt = WidgetType(cfg)
@@ -488,7 +489,7 @@ local function NewContainer(w, cfg)
     return container
 end
 
--- Firma de todo lo que define un contenedor: si no cambia, se reutiliza
+-- Signature of everything that defines a container: if it does not change, it is reused
 local function Sig(v, out)
     if type(v) == "table" then
         local keys = {}
@@ -512,7 +513,7 @@ local function NativeKey(w, cfg)
     return table.concat(Sig({ cfg, ns.P.dispelColors, filter, candidates, sort, w:GetFrameLevel() }, {}))
 end
 
--- Solo fuera de combate: crear contenedores no se puede hacer en combate
+-- Out of combat only: containers cannot be created in combat
 local function AttachNative(b, w, cfg)
     if b.testIndex or Missing(cfg) or UnitMeasure(cfg) then
         if w.native then
@@ -534,13 +535,13 @@ local function AttachNative(b, w, cfg)
         w.native, w.nativeKey = result, key
     elseif not ns.nativeWarned then
         ns.nativeWarned = true
-        ns.Print("no se pudo crear un indicador: " .. tostring(result))
+        ns.Print((L["could not create an indicator: %s"]):format(tostring(result)))
     end
 end
 
 -------------------------------------------------------------------------------
--- Widget propio: modo prueba, muestra de opciones, «Le falta» y barras de
--- escudos o curación. Se crea una vez por tipo y se vuelve a colocar.
+-- Own widget: test mode, options preview, "Missing" and shield or heal
+-- bars. Created once per type and placed again.
 -------------------------------------------------------------------------------
 local function NewIcon(parent)
     local f = CreateFrame("Frame", nil, parent)
@@ -639,7 +640,7 @@ local function GrowOffset(cfg, i)
     return n, 0
 end
 
--- Estilo de un icono o cuadrado propio (lo mismo que su botón nativo)
+-- Style of an own icon or square (the same as its native button)
 local function StyleIconWidget(f, cfg)
     f.border:SetShown(cfg.showBorder ~= false)
     f.border:SetColorTexture(0, 0, 0, 1)
@@ -688,7 +689,7 @@ local function LayoutWidget(w, cfg, b)
         return
     end
     w:SetSize(cfg.width, cfg.height)
-    -- ocupar un lado entero del marco (como la línea de amenaza)
+    -- span a whole side of the frame (like the threat line)
     if t == "bar" and (cfg.span == "width" or cfg.span == "height") then
         local L = ns.P.layout
         local fw, fh = L.width, L.height
@@ -701,7 +702,7 @@ local function LayoutWidget(w, cfg, b)
         w.bar:SetReverseFill(cfg.barReverse and true or false)
         local c = cfg.color
         w.bar:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
-        -- escudos / curación: sin fondo, para que vacía no se vea
+        -- shields / heals: no background, so it is invisible when empty
         w.bg:SetShown(not UnitMeasure(cfg))
         StyleTimer(w.timerText, cfg, w)
         StyleCount(w.count, cfg, w)
@@ -734,8 +735,8 @@ local function HideWidget(w)
     w:Hide()
 end
 
--- Crea/reutiliza los widgets y contenedores de todos los indicadores de un
--- botón. Se llama fuera de combate (al aplicar el perfil).
+-- Creates/reuses the widgets and containers of every indicator of a
+-- button. Called out of combat (when applying the profile).
 function ns.BuildIndicators(b)
     b.ind = b.ind or {}
     b.pool = b.pool or {}
@@ -752,7 +753,7 @@ function ns.BuildIndicators(b)
         local wt = WidgetType(cfg)
         local p = b.pool[wt]
         local w
-        -- mejor el que ya tenía este mismo indicador (conserva su contenedor)
+        -- prefer the one this same indicator already had (keeps its container)
         for i = #(p or {}), 1, -1 do
             if p[i].cfgRef == cfg then w = table.remove(p, i) break end
         end
@@ -762,12 +763,12 @@ function ns.BuildIndicators(b)
         end
         w.cfgRef = cfg
         LayoutWidget(w, cfg, b)
-        -- orden de dibujo = orden de la lista (los de abajo, por encima)
+        -- drawing order = list order (the ones below, on top)
         w:SetFrameLevel(b.overlay:GetFrameLevel() + (wt == "border" and 1 or (3 + c.index * 3)))
         b.ind[c.index] = w
         AttachNative(b, w, cfg)
     end
-    -- los que sobran ya no se usan: sus contenedores, sin unidad
+    -- the leftover ones are no longer used: their containers, without a unit
     for _, p in pairs(b.pool) do
         for _, w in ipairs(p) do
             if w.native then
@@ -777,11 +778,11 @@ function ns.BuildIndicators(b)
             w.cfgRef = nil
         end
     end
-    -- franjas propias: su sitio depende de las demás y de la barra de maná
+    -- own strips: their place depends on the others and on the mana bar
     if ns.AnchorHealth then ns.AnchorHealth(b, b.powerShown) end
 end
 
--- La unidad del botón ha cambiado: los contenedores siguen a la nueva
+-- The button's unit changed: the containers follow the new one
 function ns.SetIndicatorsUnit(b, unit)
     for _, w in pairs(b.ind or {}) do
         if w.native then
@@ -793,7 +794,7 @@ function ns.SetIndicatorsUnit(b, unit)
 end
 
 -------------------------------------------------------------------------------
--- Pintar auras de ejemplo (modo prueba) y «Le falta» en el widget propio
+-- Paint sample auras (test mode) and "Missing" on the own widget
 -------------------------------------------------------------------------------
 local function FormatTime(t)
     if t >= 60 then return ("%dm"):format(math.ceil(t / 60)) end
@@ -801,7 +802,7 @@ local function FormatTime(t)
     return ("%.1f"):format(t)
 end
 
--- Color de clase en los textos del tiempo y las cargas
+-- Class color for the time and stack texts
 local function ColorTexts(w, cfg)
     if w.wtype == "text" then return end
     local tt, st = TextCfg(cfg)
@@ -876,7 +877,7 @@ local function PaintAura(w, cfg, a)
     w:Show()
 end
 
--- «Le falta»: el widget se ve fijo, sin tiempo
+-- "Missing": the widget is shown steady, without time
 local function ShowMissing(w, cfg)
     local wt = w.wtype
     if wt == "border" or wt == "overlay" then return PaintFrame(w, cfg, nil) end
@@ -926,9 +927,9 @@ local function PaintIcons(w, cfg, list)
 end
 
 -------------------------------------------------------------------------------
--- Actualizar
+-- Update
 -------------------------------------------------------------------------------
--- Barra de escudos o de curación entrante (datos de la unidad)
+-- Shield or incoming heal bar (unit data)
 local function ShowUnitBar(w, unit, cfg)
     local max = UnitHealthMax(unit)
     local value
@@ -941,7 +942,7 @@ local function ShowUnitBar(w, unit, cfg)
     w:Show()
 end
 
--- Tras cambiar los escudos, la curación entrante o la vida máxima
+-- After a change of shields, incoming heals or max health
 function ns.UpdateUnitBars(b)
     local unit = b.unit
     if not unit or not b.ind then return end
@@ -954,7 +955,7 @@ function ns.UpdateUnitBars(b)
     end
 end
 
--- ¿Tiene alguno de los bufos? true / false, o nil si el juego no deja saberlo
+-- Does it have any of the buffs? true / false, or nil if the game does not tell
 local function HasAura(unit, cfg, byID)
     if not GetAuraDataByIndex then return nil end
     local filter = "HELPFUL" .. ((cfg.mine and not cfg.others) and "|PLAYER" or "")
@@ -980,7 +981,7 @@ function ns.UpdateAuras(b)
     for _, c in ipairs(ns.compiled) do
         local cfg, w = c.cfg, b.ind[c.index]
         if not w then
-            -- nada
+            -- nothing
         elseif w.native then
             w:Hide()
             if w.nativeUnit ~= unit then
@@ -999,7 +1000,7 @@ function ns.UpdateAuras(b)
 end
 
 -------------------------------------------------------------------------------
--- Datos falsos para el modo prueba y la muestra de opciones
+-- Fake data for test mode and the options preview
 -------------------------------------------------------------------------------
 function ns.TestAuras(b, i, all)
     if not b.ind then return end
@@ -1011,7 +1012,7 @@ function ns.TestAuras(b, i, all)
             for _, icon in ipairs(w.icons or {}) do
                 icon.previewClass, icon.previewIsPet = b.testClass, b.isPet
             end
-            -- tipo de ejemplo: uno de los marcados
+            -- sample type: one of the checked ones
             local kind
             if cfg.kind == "aura" and Typed(cfg) then
                 for _, k in ipairs(DISPEL_KINDS) do
@@ -1026,13 +1027,13 @@ function ns.TestAuras(b, i, all)
                     spellId = key ~= nil and ns.KeyIDs(key)[1] or nil }
             end
             HideWidget(w)
-            -- all: la muestra de Indicadores enseña el indicador que se edita
-            -- (b.previewOnly) o, si no, todos a la vez
+            -- all: the Indicators preview shows the indicator being edited
+            -- (b.previewOnly) or, otherwise, all of them at once
             local focus = all
             local skip = (b.previewOnly and c.index ~= b.previewOnly)
                 or (cfg.kind == "aura" and Typed(cfg) and not kind)
             if skip then
-                -- nada
+                -- nothing
             elseif UnitMeasure(cfg) then
                 w.bar:SetMinMaxValues(0, 100)
                 w.bar:SetValue((i % 3 == 0 or focus) and (15 + (i * 13) % 40) or 0)
@@ -1049,7 +1050,7 @@ function ns.TestAuras(b, i, all)
                         end
                         PaintIcons(w, cfg, list)
                     elseif w.wtype == "border" or w.wtype == "overlay" then
-                        -- en pocos marcos, para que no tape todo el modo prueba
+                        -- on a few frames, so it does not cover the whole test mode
                         if i % 6 == 4 or focus then PaintAura(w, cfg, Fake(first, 1, kind)) end
                     else
                         PaintAura(w, cfg, Fake(first, 1, kind))

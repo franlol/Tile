@@ -1,10 +1,11 @@
 -------------------------------------------------------------------------------
--- MendFrames - Fuentes y texturas
--- Las de Blizzard siempre; si otro addon carga LibSharedMedia-3.0 se añaden
--- también todas las suyas.
+-- MendFrames - Fonts and textures
+-- Blizzard's are always there; if another addon loads LibSharedMedia-3.0,
+-- all of its ones are added too.
 -------------------------------------------------------------------------------
 
 local _, ns = ...
+local L = ns.L
 
 local FONTS = {
     { "Friz Quadrata", "Fonts\\FRIZQT__.TTF" },
@@ -13,17 +14,17 @@ local FONTS = {
     { "Morpheus", "Fonts\\MORPHEUS.ttf" },
 }
 
--- Texturas que trae el propio addon (carpeta Media)
+-- Textures shipped with the addon (Media folder)
 local DARK = "Interface\\AddOns\\MendFrames\\Media\\Dark"
 
 local TEXTURES = {
-    { "MendFrames · Oscura", DARK },
-    { "Plano", "Interface\\Buttons\\WHITE8X8" },
+    { "MendFrames · Dark", DARK },
+    { "Flat", "Interface\\Buttons\\WHITE8X8" },
     { "Blizzard", "Interface\\TargetingFrame\\UI-StatusBar" },
-    { "Blizzard (banda)", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
-    { "Blizzard (recurso)", "Interface\\RaidFrame\\Raid-Bar-Resource-Fill" },
-    { "Brillo", "Interface\\TargetingFrame\\BarFill2" },
-    { "Lisa", "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar" },
+    { "Blizzard (raid)", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
+    { "Blizzard (resource)", "Interface\\RaidFrame\\Raid-Bar-Resource-Fill" },
+    { "Gloss", "Interface\\TargetingFrame\\BarFill2" },
+    { "Smooth", "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar" },
 }
 
 local function LSM()
@@ -33,7 +34,7 @@ end
 local function Merge(base, mediaType)
     local out, seen = {}, {}
     for _, e in ipairs(base) do
-        out[#out + 1] = { e[2], e[1] }
+        out[#out + 1] = { e[2], L[e[1]] }
         seen[e[2]:lower()] = true
     end
     local lsm = LSM()
@@ -51,7 +52,7 @@ local function Merge(base, mediaType)
     return out
 end
 
--- Registrar nuestras texturas en LibSharedMedia para que otros addons las usen
+-- Register our textures in LibSharedMedia so other addons can use them
 local function RegisterMedia()
     local lsm = LSM()
     if lsm then lsm:Register("statusbar", "MendFrames Dark", DARK) end
@@ -61,25 +62,25 @@ local regFrame = CreateFrame("Frame")
 regFrame:RegisterEvent("PLAYER_LOGIN")
 regFrame:SetScript("OnEvent", RegisterMedia)
 
--- Listas { valor, etiqueta } para los desplegables.
--- En las fuentes, el 3er campo es la fuente con la que se pinta la etiqueta.
+-- { value, label } lists for the dropdowns.
+-- For fonts, the 3rd field is the font used to draw the label.
 function ns.FontList()
     local list = Merge(FONTS, "font")
     for _, o in ipairs(list) do o[3] = o[1] end
     return list
 end
--- En las texturas, el 4º campo es la textura que se enseña de muestra detrás
--- «Ninguna» (valor "none"): esa parte no se dibuja
+-- For textures, the 4th field is the texture shown as a sample behind it
+-- "None" (value "none"): that part is not drawn
 function ns.TextureList()
     local list = Merge(TEXTURES, "statusbar")
     for _, o in ipairs(list) do o[4] = o[1] end
-    table.insert(list, 1, { "none", "Ninguna" })
+    table.insert(list, 1, { "none", L["None"] })
     return list
 end
 
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 
--- Textura de una barra; con «Ninguna» la barra sigue ahí pero no se ve
+-- Texture of a bar; with "None" the bar is still there but invisible
 function ns.SetBarTexture(bar, path)
     local none = path == "none" or path == nil or path == ""
     bar:SetStatusBarTexture(none and FLAT or path)
@@ -87,22 +88,24 @@ function ns.SetBarTexture(bar, path)
     if t then t:SetAlpha(none and 0 or 1) end
 end
 
--- Textura de un fondo (textura suelta)
+-- Texture of a background (plain texture)
 function ns.SetBgTexture(tex, path)
     local none = path == "none" or path == nil or path == ""
     tex:SetTexture(none and FLAT or path)
     tex:SetShown(not none)
 end
 
-ns.OUTLINES = {
-    { "", "Sin contorno" },
-    { "OUTLINE", "Contorno" },
-    { "THICKOUTLINE", "Contorno grueso" },
-    { "MONOCHROME", "Monocromo" },
-    { "OUTLINE, MONOCHROME", "Contorno monocromo" },
-}
+function ns.OutlineList()
+    return {
+        { "", L["No outline"] },
+        { "OUTLINE", L["Outline"] },
+        { "THICKOUTLINE", L["Thick outline"] },
+        { "MONOCHROME", L["Monochrome"] },
+        { "OUTLINE, MONOCHROME", L["Monochrome outline"] },
+    }
+end
 
--- Aplica una fuente; si la ruta no vale, usa la estándar
+-- Applies a font; if the path is not valid, uses the standard one
 function ns.SetFont(fs, font, size, outline)
     outline = outline or ""
     local ok = pcall(fs.SetFont, fs, font or ns.FONT, size, outline)
@@ -112,10 +115,10 @@ function ns.SetFont(fs, font, size, outline)
 end
 
 -------------------------------------------------------------------------------
--- Estilo común de cualquier texto (nombre, vida, estado, tiempo, cargas):
+-- Common style of any text (name, health, status, time, stacks):
 -- { font, size, outline, colorMode = white|class|custom, color, point, x, y }
 -------------------------------------------------------------------------------
--- dx, dy: ajuste extra (p. ej. para que el texto no se salga de un icono)
+-- dx, dy: extra offset (e.g. so the text does not stick out of an icon)
 function ns.StyleText(fs, t, anchor, dx, dy)
     ns.SetFont(fs, t.font, t.size or 10, t.outline or "")
     fs:ClearAllPoints()
@@ -124,7 +127,7 @@ function ns.StyleText(fs, t, anchor, dx, dy)
     fs:SetJustifyH(p:find("LEFT") and "LEFT" or (p:find("RIGHT") and "RIGHT" or "CENTER"))
 end
 
--- r, g, b: color de clase de la unidad (si se conoce)
+-- r, g, b: class color of the unit (if known)
 function ns.ColorText(fs, t, r, g, b)
     if t.colorMode == "class" and r then
         fs:SetTextColor(r, g, b, 1)
@@ -136,7 +139,7 @@ function ns.ColorText(fs, t, r, g, b)
     end
 end
 
--- Color de clase de una unidad (si el juego lo deja leer)
+-- Class color of a unit (if the game lets us read it)
 function ns.ClassColorOf(unit, previewClass, isPet)
     if isPet then return 0.25, 0.75, 0.3 end
     local c = previewClass

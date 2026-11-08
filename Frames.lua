@@ -1,8 +1,9 @@
 -------------------------------------------------------------------------------
--- MendFrames - Marcos (cabeceras seguras, botones, actualizaciones, modo prueba)
+-- MendFrames - Frames (secure headers, buttons, updates, test mode)
 -------------------------------------------------------------------------------
 
 local _, ns = ...
+local L = ns.L
 local S, R, AnyS = ns.S, ns.R, ns.AnyS
 
 local FLAT = "Interface\\Buttons\\WHITE8X8"
@@ -23,9 +24,9 @@ local function V(v)
 end
 
 -------------------------------------------------------------------------------
--- Llenado suave de barras: SOLO la animación nativa del cliente
--- (StatusBar:SetValue(valor, interpolación)). Si el cliente no la tiene, la
--- opción no está disponible y las barras cambian al momento.
+-- Smooth bar filling: ONLY the client's native animation
+-- (StatusBar:SetValue(value, interpolation)). If the client does not have it,
+-- the option is unavailable and bars change instantly.
 -------------------------------------------------------------------------------
 local NATIVE_SMOOTH = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ns.hasNativeSmooth = NATIVE_SMOOTH ~= nil
@@ -40,14 +41,14 @@ end
 
 
 -------------------------------------------------------------------------------
--- Tamaño de las mascotas: el de los jugadores o el suyo propio
+-- Pet size: the players' size or their own
 function ns.PetSize()
     local P = ns.P
     if P.pets.sameSize then return P.layout.width, P.layout.height end
     return P.pets.width, P.pets.height
 end
 
--- Visual de un botón (reales y de prueba)
+-- Visuals of a button (real and test ones)
 -------------------------------------------------------------------------------
 local function NewBar(parent)
     local bar = CreateFrame("StatusBar", nil, parent)
@@ -96,7 +97,7 @@ function ns.BuildVisuals(b)
     b.raidIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     b.ready = overlay:CreateTexture(nil, "OVERLAY", nil, 7)
     b.ready:Hide()
-    -- capa para los iconos de estado que van por encima de los indicadores
+    -- layer for the status icons that go above the indicators
     b.topLayer = CreateFrame("Frame", nil, b)
     b.topLayer:SetAllPoints()
     b.topLayer:SetFrameLevel(overlay:GetFrameLevel() + 250)
@@ -128,18 +129,18 @@ local function PlaceElement(tex, e, b)
     tex:SetSize(e.size, e.size)
 end
 
--- Ajusta la barra de vida según haya o no barra de maná
--- Indicadores de barra con franja propia (como la de maná): cada uno ocupa
--- una franja del marco por su lado y la vida se acorta para dejarles sitio.
--- Arriba/abajo usan su alto; izquierda/derecha, su ancho. Se apilan en el
--- orden de la lista; abajo, por encima de la barra de maná.
+-- Fits the health bar depending on whether there is a mana bar
+-- Bar indicators with their own strip (like the mana bar): each one takes a
+-- strip of the frame on its side and the health bar shrinks to make room.
+-- Top/bottom use their height; left/right, their width. They stack in list
+-- order; at the bottom, above the mana bar.
 local STRIP_SIDE = { stripTop = "top", stripBottom = "bottom", stripLeft = "left", stripRight = "right" }
 ns.STRIP_SIDE = STRIP_SIDE
 
 local function PlaceStrips(b, bottomStart)
     local ins = { top = 0, bottom = bottomStart, left = 0, right = 0 }
     local list = ns.P.indicators
-    -- primero las horizontales (cruzan todo el ancho), luego las verticales
+    -- horizontal ones first (they cross the whole width), then the vertical ones
     for pass = 1, 2 do
         for i, cfg in ipairs(list) do
             local side = cfg.enabled and cfg.type == "bar" and cfg.kind == "aura" and STRIP_SIDE[cfg.span]
@@ -181,7 +182,7 @@ local function AnchorHealth(b, powerShown)
     b.health:ClearAllPoints()
     b.health:SetPoint("TOPLEFT", 1 + ins.left, -1 - ins.top)
     b.health:SetPoint("BOTTOMRIGHT", -1 - ins.right, 1 + ins.bottom)
-    -- curación entrante y escudos miden lo mismo que la vida
+    -- incoming heals and shields measure the same as health
     local fw = b.isPet and (ns.PetSize()) or P.layout.width
     local hw = math.max(1, fw - 2 - ins.left - ins.right)
     b.pred:SetWidth(hw)
@@ -236,7 +237,7 @@ function ns.LayoutButton(b, isPet)
 end
 
 -------------------------------------------------------------------------------
--- Actualizaciones
+-- Updates
 -------------------------------------------------------------------------------
 local function UnitColor(unit, isPet, testClass)
     local r, g, blue = ns.ClassColorOf(unit, testClass, isPet)
@@ -246,14 +247,14 @@ end
 
 local TextColor = ns.ColorText
 
--- Degradado rojo -> amarillo -> verde según el porcentaje de vida (0..1)
+-- Red -> yellow -> green gradient by health percentage (0..1)
 local function Gradient(pct)
     pct = math.max(0, math.min(1, pct))
     if pct < 0.5 then return 1, pct * 2, 0 end
     return 2 - pct * 2, 1, 0
 end
 
--- Porcentaje de vida legible, o nil si el juego lo oculta
+-- Readable health percentage, or nil when the game hides it
 local function HealthPct(b, testPct)
     if testPct then return testPct end
     if not b.unit then return nil end
@@ -262,11 +263,11 @@ local function HealthPct(b, testPct)
     return cur / max
 end
 
--- Color de la barra de vida y de su fondo (la vida que falta)
--- Color para un modo (class | custom | gradient). El brillo solo oscurece el
--- color de clase y el degradado; un color elegido a mano se ve tal cual.
--- Si el juego oculta la vida, el degradado usa el color de clase.
--- Devuelve r, g, b, a. Lo usan la vida, su fondo y la barra de recurso.
+-- Color of the health bar and its background (the missing health)
+-- Color for a mode (class | custom | gradient). Brightness only darkens the
+-- class color and the gradient; a hand-picked color is shown as is.
+-- If the game hides the health, the gradient uses the class color.
+-- Returns r, g, b, a. Used by the health bar, its background and the resource bar.
 local function ModeColor(mode, custom, brightness, cr, cg, cb, pct)
     if mode == "custom" then return custom.r, custom.g, custom.b, custom.a or 1 end
     local r, g, bl = cr, cg, cb
@@ -275,7 +276,7 @@ local function ModeColor(mode, custom, brightness, cr, cg, cb, pct)
     return r * k, g * k, bl * k, 1
 end
 
--- Barra de recurso: color del recurso, de clase o uno elegido (con brillo)
+-- Resource bar: resource color, class color or a chosen one (with brightness)
 local function PowerColor(b, pr, pg, pb, testClass)
     local B = ns.P.bars
     local mode = B.powerColor or "power"
@@ -288,7 +289,7 @@ local function PowerColor(b, pr, pg, pb, testClass)
     end
 end
 
--- Color de la barra de vida y de su fondo (la vida que falta): mismas opciones
+-- Color of the health bar and its background (the missing health): same options
 function ns.UpdateBarColor(b, testClass, testPct)
     local B = ns.P.bars
     local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
@@ -299,8 +300,8 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
--- Color del texto de estado: los estados extra tienen el suyo; el resto
--- (Desconectado, Muerto, Fantasma) usa el color del texto
+-- Status text color: the extra states have their own; the rest
+-- (Offline, Dead, Ghost) use the text color
 local STATUS_COLOR = { res = "resColor", charm = "charmColor", summon = "summonColor", afk = "afkColor" }
 function ns.StatusColor(b, key, testClass)
     local T = ns.P.texts.status
@@ -312,28 +313,28 @@ function ns.StatusColor(b, key, testClass)
     end
 end
 
-local SUMMON_TEXT = { [1] = "Invocación", [2] = "Inv. aceptada", [3] = "Inv. rechazada" }
+local SUMMON_TEXT = { [1] = "Summon", [2] = "Summon accepted", [3] = "Summon declined" }
 
--- Qué pone el texto de estado: texto, clave (para el color) y si está «caído»
--- (desconectado o muerto: se apaga el fondo y el texto de vida). Por orden:
--- Desconectado > Resucitando > Fantasma/Muerto > Controlado > Invocación > Ausente
+-- What the status text says: text, key (for the color) and whether they are
+-- "down" (offline or dead: the background and health text are dimmed). In order:
+-- Offline > Resurrecting > Ghost/Dead > Charmed > Summon > AFK
 local function StatusOf(u)
     local T = ns.P.texts.status
-    if R(UnitIsConnected(u)) == false then return "Desconectado", "offline", true end
+    if R(UnitIsConnected(u)) == false then return L["Offline"], "offline", true end
     local ghost = R(UnitIsGhost(u))
     if ghost or R(UnitIsDead(u)) then
         if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
-            return "Resucitando", "res", true
+            return L["Resurrecting"], "res", true
         end
-        return ghost and "Fantasma" or "Muerto", "dead", true
+        return ghost and L["Ghost"] or L["Dead"], "dead", true
     end
-    if T.showCharm and UnitIsCharmed and R(UnitIsCharmed(u)) then return "Controlado", "charm", false end
+    if T.showCharm and UnitIsCharmed and R(UnitIsCharmed(u)) then return L["Charmed"], "charm", false end
     if T.showSummon and C_IncomingSummon and C_IncomingSummon.IncomingSummonStatus then
         local ok, st = pcall(C_IncomingSummon.IncomingSummonStatus, u)
         st = ok and R(st)
-        if st and SUMMON_TEXT[st] then return SUMMON_TEXT[st], "summon", false end
+        if st and SUMMON_TEXT[st] then return L[SUMMON_TEXT[st]], "summon", false end
     end
-    if T.showAFK and UnitIsAFK and R(UnitIsAFK(u)) then return "Ausente", "afk", false end
+    if T.showAFK and UnitIsAFK and R(UnitIsAFK(u)) then return L["AFK"], "afk", false end
     return nil
 end
 
@@ -353,7 +354,7 @@ local function Abbrev(n)
     return tostring(n)
 end
 
--- Texto de vida con valores ocultos por el juego (sin crear funciones por llamada)
+-- Health text with values hidden by the game (without creating functions per call)
 local function SecretHealthText(fs, format, u, cur)
     if format == "percent" and UnitHealthPercent and CurveConstants and CurveConstants.ScaleTo100 then
         fs:SetFormattedText("%d%%", UnitHealthPercent(u, false, CurveConstants.ScaleTo100))
@@ -362,7 +363,7 @@ local function SecretHealthText(fs, format, u, cur)
     elseif AbbreviateNumbers then
         fs:SetText(AbbreviateNumbers(cur))
     else
-        error("sin soporte")
+        error(L["not supported"])
     end
 end
 
@@ -378,12 +379,12 @@ local function HealthText(b, u, cur, max)
         else fs:SetText(Abbrev(cur) .. "/" .. Abbrev(max)) end
         return
     end
-    -- valores secretos: lo que el cliente permita, si no, nada
+    -- secret values: whatever the client allows, otherwise nothing
     if not pcall(SecretHealthText, fs, t.format, u, cur) then fs:SetText("") end
 end
 
--- Curación entrante y escudos. Van aparte de la vida: así sus cambios no
--- vuelven a fijar la barra de vida (y no cortan su animación).
+-- Incoming heals and shields. Kept apart from health: so their changes do
+-- not set the health bar again (and do not cut its animation).
 function ns.UpdatePrediction(b, max)
     local u = b.unit
     local B = ns.P.bars
@@ -402,12 +403,12 @@ function ns.UpdatePrediction(b, max)
     else
         b.absorb:Hide()
     end
-    -- indicadores de barra que miden escudos o curación entrante
+    -- bar indicators that measure shields or incoming heals
     ns.UpdateUnitBars(b)
 end
 
--- Fija el máximo de una barra solo si ha cambiado. Devuelve true si cambió.
--- Con valores secretos no se puede comparar: se fija siempre.
+-- Sets the max of a bar only if it changed. Returns true if it changed.
+-- Secret values cannot be compared: it is always set.
 local function SetBarMax(bar, max, cacheKey, holder)
     if S(max) then
         bar:SetMinMaxValues(0, max)
@@ -421,8 +422,8 @@ local function SetBarMax(bar, max, cacheKey, holder)
     return true
 end
 
--- full: también todo lo que no cambia con cada golpe (al cambiar de unidad,
--- al reordenar la banda, al cambiar el máximo...)
+-- full: also everything that does not change with each hit (unit change,
+-- raid reorder, max change...)
 function ns.UpdateHealth(b, full)
     local u = b.unit
     local B = ns.P.bars
@@ -432,15 +433,15 @@ function ns.UpdateHealth(b, full)
 
     local max, cur = UnitHealthMax(u), UnitHealth(u)
     local maxChanged = SetBarMax(b.health, max, "cacheHealthMax", b) or full
-    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
+    -- smooth only for the same unit (when the player changes, jump directly)
     SetBarValue(b.health, V(cur), B.smooth and sameUnit)
     if B.healthColor == "gradient" or B.bgColor == "gradient" then ns.UpdateBarColor(b) end
-    -- curación entrante y escudos tienen sus propios eventos: aquí solo
-    -- cuando cambia el máximo (su escala)
+    -- incoming heals and shields have their own events: here only
+    -- when the max (their scale) changes
     if maxChanged then ns.UpdatePrediction(b, max) end
 
     local text, key, down = StatusOf(u)
-    -- estado y transparencia solo cuando cambian
+    -- status and transparency only when they change
     if full or text ~= b.cacheStatus then
         b.cacheStatus, b.statusKey = text, key
         b.status:SetText(ns.P.texts.status.show and text or "")
@@ -451,14 +452,14 @@ function ns.UpdateHealth(b, full)
     if not down then HealthText(b, u, cur, max) end
 end
 
--- Valor de maná/energía/ira: lo que llega en cada tic (UNIT_POWER_UPDATE)
+-- Mana/energy/rage value: what arrives on each tick (UNIT_POWER_UPDATE)
 function ns.UpdatePowerValue(b)
     if not b.powerShown then return end
     local u = b.unit
     SetBarValue(b.power, V(UnitPower(u)), ns.P.bars.powerSmooth and b.lastPowerUnit == u)
 end
 
--- Todo lo de la barra de recurso: tipo, color, máximo y valor
+-- Everything about the resource bar: type, color, max and value
 function ns.UpdatePower(b)
     local B = ns.P.bars
     local u = b.unit
@@ -479,8 +480,8 @@ function ns.UpdatePower(b)
     if c then PowerColor(b, c.r, c.g, c.b) else PowerColor(b, 0.3, 0.5, 1) end
 end
 
--- En Forever los personajes tienen apellido: UnitName devuelve (nombre,
--- apellido) y el nombre completo lo da NameUtil.FormatUnitNameForDisplay
+-- In Forever characters have a surname: UnitName returns (name, surname)
+-- and NameUtil.FormatUnitNameForDisplay gives the full name
 function ns.UnitDisplayName(u)
     if ns.P.texts.name.surname ~= false and NameUtil and NameUtil.FormatUnitNameForDisplay then
         local ok, n = pcall(NameUtil.FormatUnitNameForDisplay, u)
@@ -493,8 +494,8 @@ function ns.UpdateName(b)
     b.name:SetText(ns.UnitDisplayName(b.unit))
 end
 
--- ¿Se ve ahora este icono de estado? (siempre, solo en la comprobación de
--- listos o solo fuera de combate)
+-- Is this status icon shown right now? (always, only during ready checks or
+-- only out of combat)
 local function ElementOn(key)
     local e = ns.P.elements[key]
     if not e.show then return false end
@@ -504,7 +505,7 @@ local function ElementOn(key)
     return true
 end
 
--- Rol, líder y marca (los que dependen de «cuándo»)
+-- Role, leader and marker (the ones that depend on "when")
 local function UpdateStateIcons()
     for _, b in ipairs(ns.buttons) do
         if b.unit then
@@ -618,7 +619,7 @@ function ns.UpdateAllButtons()
 end
 
 -------------------------------------------------------------------------------
--- Eventos por botón
+-- Per-button events
 -------------------------------------------------------------------------------
 local auraDirty = {}
 
@@ -631,10 +632,10 @@ local function OnButtonEvent(b, event)
         or event == "INCOMING_SUMMON_CHANGED" or event == "PLAYER_FLAGS_CHANGED" or event == "UNIT_FACTION" then
         ns.UpdateHealth(b, true)
     elseif event == "UNIT_HEAL_PREDICTION" or event == "UNIT_ABSORB_AMOUNT_CHANGED" then
-        -- solo sus barras: no tocar la de vida (cortaría su animación)
+        -- only its bars: do not touch the health bar (it would cut its animation)
         ns.UpdatePrediction(b)
     elseif event == "UNIT_POWER_UPDATE" then
-        -- cada tic: solo el valor
+        -- every tick: only the value
         ns.UpdatePowerValue(b)
     elseif event == "UNIT_MAXPOWER" or event == "UNIT_DISPLAYPOWER" then
         ns.UpdatePower(b)
@@ -685,7 +686,7 @@ local function InitButton(header, name)
 end
 
 -------------------------------------------------------------------------------
--- Cabeceras y anclas
+-- Headers and anchors
 -------------------------------------------------------------------------------
 local INIT_SNIPPET = [[
     local header = self:GetParent()
@@ -723,7 +724,7 @@ local function CreateAnchor(name, label, posKey)
         local p, _, rp, x, y = a:GetPoint(1)
         ns.P.pos[posKey] = { p, "UIParent", rp, x, y }
     end)
-    -- clic (sin arrastrar): abrir las opciones, como /mf
+    -- click (without dragging): open the options, like /mf
     handle:SetScript("OnClick", function(self)
         if self.dragged then self.dragged = false return end
         if ns.OpenOptions then ns.OpenOptions() end
@@ -732,7 +733,7 @@ local function CreateAnchor(name, label, posKey)
     handle:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine("MendFrames")
-        GameTooltip:AddLine("Arrastra para mover · Clic para abrir las opciones", 1, 1, 1)
+        GameTooltip:AddLine(L["Drag to move · Click to open the options"], 1, 1, 1)
         GameTooltip:Show()
     end)
     handle:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -844,13 +845,13 @@ end
 local function UpdateHandles()
     local name = ns.activeName or "?"
     ns.anchor.handle.text:SetText(("MendFrames · %s"):format(name))
-    ns.petAnchor.handle.text:SetText(("Mascotas · %s"):format(name))
+    ns.petAnchor.handle.text:SetText((L["Pets · %s"]):format(name))
     local unlocked = not ns.db.locked
     ns.anchor.handle:SetShown(unlocked)
     ns.petAnchor.handle:SetShown(unlocked and ns.P.pets.enabled and not ns.P.pets.attach)
 end
 
--- Aplica todo el perfil activo (fuera de combate)
+-- Applies the whole active profile (out of combat)
 function ns.ApplyProfile()
     ns.RunOOC("profile", function()
         ns.CompileIndicators()
@@ -873,7 +874,7 @@ end
 
 function ns.SetLocked(locked)
     if not locked and InCombatLockdown() then
-        ns.Print("no se puede desbloquear en combate.")
+        ns.Print(L["cannot unlock in combat."])
         return
     end
     ns.db.locked = locked
@@ -885,7 +886,7 @@ function ns.SetLocked(locked)
 end
 
 -------------------------------------------------------------------------------
--- Eventos globales y temporizadores
+-- Global events and timers
 -------------------------------------------------------------------------------
 local gev = CreateFrame("Frame")
 for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "RAID_TARGET_UPDATE",
@@ -906,7 +907,7 @@ gev:SetScript("OnEvent", function(_, event)
         for _, b in ipairs(ns.buttons) do if b.unit then ns.UpdateReady(b) end end
         if started then UpdateStateIcons() end
     elseif event == "READY_CHECK_FINISHED" then
-        -- los iconos se quedan unos segundos para ver quién no estaba listo
+        -- the icons stay a few seconds to see who was not ready
         C_Timer.After(6, function()
             ns.readyActive = false
             for _, b in ipairs(ns.buttons) do b.ready:Hide() end
@@ -935,12 +936,12 @@ gev:SetScript("OnUpdate", function(_, elapsed)
 end)
 
 -------------------------------------------------------------------------------
--- Creación
+-- Creation
 -------------------------------------------------------------------------------
 function ns.CreateFrames()
     ns.CompileIndicators()
     ns.anchor = CreateAnchor("MendFramesAnchor", "MendFrames", "main")
-    ns.petAnchor = CreateAnchor("MendFramesPetAnchor", "Mascotas", "pets")
+    ns.petAnchor = CreateAnchor("MendFramesPetAnchor", L["Pets"], "pets")
     ns.ApplyPositions()
     ns.anchor:SetScale(ns.P.layout.scale)
     ns.petAnchor:SetScale(ns.P.layout.scale)
@@ -955,16 +956,16 @@ function ns.CreateFrames()
 end
 
 -------------------------------------------------------------------------------
--- Modo prueba
+-- Test mode
 -------------------------------------------------------------------------------
 local TEST_CLASSES = { "WARRIOR", "PRIEST", "MAGE", "ROGUE", "DRUID", "HUNTER", "WARLOCK", "PALADIN", "SHAMAN", "PRIEST" }
--- nombre y apellido, como los muestra Forever
+-- first name and surname, as Forever shows them
 local TEST_NAMES = { "Thrall Martillo", "Jaina Valiente", "Uther Luzclara", "Valeera Sangrefría", "Malfurion Tempestira",
     "Rexxar Colmillo", "Guldan Sombravil", "Tirion Vadín", "Nobundo Marea", "Anduin Lobonegro" }
 local NUM_TEST_PETS = 10
--- rol de cada clase de prueba (para «Agrupar por: rol»)
+-- role of each test class (for "Group by: role")
 local TEST_ROLE = { WARRIOR = "TANK", PRIEST = "HEALER", PALADIN = "HEALER" }
--- mascotas que se simulan según el tamaño del grupo
+-- pets simulated depending on the group size
 local TEST_PETS = { party = 2, raid10 = 3, raid20 = 5, raid40 = 10 }
 
 local function TestClass(i)
@@ -976,7 +977,7 @@ local function TestClass(i)
     return TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1]
 end
 local function TestName(i)
-    if i == 1 then return ns.UnitDisplayName("player") or TEST_NAMES[1] end -- el 1 eres tú
+    if i == 1 then return ns.UnitDisplayName("player") or TEST_NAMES[1] end -- number 1 is you
     local n = TEST_NAMES[(i - 1) % #TEST_NAMES + 1]
     if ns.P.texts.name.surname == false then n = n:match("^(%S+)") or n end
     return n
@@ -999,12 +1000,12 @@ local function FillTest(b)
     b.testClass = class
     ns.UpdateColors(b, class)
 
-    b.name:SetText(b.isPet and ("Mascota " .. i) or TestName(i))
+    b.name:SetText(b.isPet and (L["Pet %d"]):format(i) or TestName(i))
     local hp = 0.35 + ((i * 37) % 65) / 100
     if i == 4 then hp = 1 end
     b.health:SetMinMaxValues(0, 10000)
     b.health:SetValue(hp * 10000)
-    ns.UpdateBarColor(b, class, (i == 7 or i == 12) and 0 or hp)   -- para el degradado
+    ns.UpdateBarColor(b, class, (i == 7 or i == 12) and 0 or hp)   -- for the gradient
     b.pred:SetMinMaxValues(0, 10000)
     b.pred:SetValue((i % 3 == 0 and B.showHealPred) and 1500 or 0)
     b.pred:SetShown(B.showHealPred)
@@ -1021,14 +1022,14 @@ local function FillTest(b)
         or (class == "ROGUE" and PowerBarColor and PowerBarColor.ENERGY)
     if pc then PowerColor(b, pc.r, pc.g, pc.b, class) else PowerColor(b, 0, 0.55, 1, class) end
 
-    -- un ejemplo de cada estado
+    -- one example of each state
     local TS = T.status
     local stext, skey
-    if i == 7 then stext, skey = "Muerto", "dead"
-    elseif i == 12 and TS.showRes then stext, skey = "Resucitando", "res"
-    elseif i == 3 and TS.showAFK then stext, skey = "Ausente", "afk"
-    elseif i == 9 and TS.showCharm then stext, skey = "Controlado", "charm"
-    elseif i == 11 and TS.showSummon then stext, skey = "Invocación", "summon" end
+    if i == 7 then stext, skey = L["Dead"], "dead"
+    elseif i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
+    elseif i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
+    elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
+    elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
     local dead = skey == "dead" or skey == "res"
     b.cacheStatus, b.statusKey = stext, skey
     b.status:SetText((stext and TS.show) and stext or "")
@@ -1055,14 +1056,14 @@ local function FillTest(b)
     b.leader:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
     b.raidIcon:SetShown(E.raidIcon.show and i == 2 and not b.isPet)
     if SetRaidTargetIconTexture then SetRaidTargetIconTexture(b.raidIcon, 8) end
-    -- comprobación de listos simulada: casi todos listos, alguno en espera y alguno no
+    -- simulated ready check: almost everyone ready, some waiting and some not
     local rstate = (i % 7 == 0) and "notready" or ((i % 5 == 3) and "waiting" or "ready")
     b.ready:SetShown(E.ready.show and not b.isPet)
     b.ready:SetTexture(READY_TEX[rstate])
 
-    -- en la muestra de Indicadores solo cuenta el indicador: fuera lo que el
-    -- modo prueba simula sobre el jugador (amenaza, objetivo, líder, rol,
-    -- marca y listos). La vida, el nombre, los textos y el maná se quedan.
+    -- in the Indicators preview only the indicator matters: drop what test mode
+    -- simulates on the player (threat, target, leader, role, marker and ready).
+    -- Health, name, texts and mana stay.
     if b.previewAll then
         b.aggro:Hide()
         b.hl:SetAlpha(0)
@@ -1074,8 +1075,8 @@ local function FillTest(b)
     ns.TestAuras(b, i, b.previewAll)
 end
 
--- Marco suelto con datos de prueba (la muestra de la pestaña Indicadores).
--- only: índice del único indicador que se enseña (nil = todos)
+-- Standalone frame with test data (the Indicators tab preview).
+-- only: index of the only indicator shown (nil = all)
 function ns.FillPreviewButton(b, only)
     b.testIndex = 1
     b.testClass = TestClass(1)
@@ -1113,8 +1114,8 @@ function ns.LayoutTest()
     local count = ns.SIZE_TEST[size] or 20
     local petCount = TEST_PETS[size] or 5
 
-    -- igual que la cabecera de Blizzard: filtra por grupo, por «mostrarme»
-    -- y por «mostrar en grupo», y ordena según «agrupar por» y el nombre
+    -- same as the Blizzard header: filters by group, by "show myself" and by
+    -- "show in party", and sorts by "group by" and the name
     local anyGroup = false
     for g = 1, 8 do if L.groups[g] then anyGroup = true end end
     local hideAll = size == "party" and not L.showParty
@@ -1177,7 +1178,7 @@ function ns.LayoutTest()
     end
 end
 
--- force: true/false para fijar; size: party | raid10 | raid20 | raid40
+-- force: true/false to set it; size: party | raid10 | raid20 | raid40
 function ns.ToggleTest(force, size)
     if size then ns.testSize = size end
     if force ~= nil then ns.testing = force else ns.testing = not ns.testing end
@@ -1191,7 +1192,7 @@ function ns.ToggleTest(force, size)
     end
     ns.header:SetAlpha(ns.testing and 0 or 1)
     ns.petHeader:SetAlpha(ns.testing and 0 or 1)
-    -- el perfil activo depende del tamaño simulado
+    -- the active profile depends on the simulated size
     ns.ActivateProfile(true)
     if ns.OnTestChanged then ns.OnTestChanged() end
 end

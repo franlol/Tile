@@ -1,9 +1,10 @@
 -------------------------------------------------------------------------------
--- MendFrames - Controles propios para la ventana de opciones
--- (sin plantillas de Blizzard que cambian entre versiones)
+-- MendFrames - Custom controls for the options window
+-- (no Blizzard templates, which change between versions)
 -------------------------------------------------------------------------------
 
 local _, ns = ...
+local L = ns.L
 
 local UI = {}
 ns.UI = UI
@@ -11,19 +12,19 @@ ns.UI = UI
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 UI.ACCENT = { 0.31, 0.76, 0.97 }
 local ACCENT = UI.ACCENT
-UI.W = 230          -- ancho estándar de un control
-UI.GAP = 10         -- separación entre controles
-UI.SECTION_GAP = 10 -- separación extra antes de cada título de sección
-UI.ATTACH_GAP = 2   -- separación de un control unido al anterior (su color, su brillo...)
+UI.W = 230          -- standard width of a control
+UI.GAP = 10         -- spacing between controls
+UI.SECTION_GAP = 10 -- extra spacing before each section title
+UI.ATTACH_GAP = 2   -- spacing of a control attached to the previous one (its color, its brightness...)
 
--- Marca un control como parte del de arriba: va pegado a él
+-- Marks a control as part of the one above: it sits right below it
 function UI.Attach(w)
     w.attached = true
     return w
 end
 
--- Botón que pide un segundo clic para confirmar (borrar, restablecer...).
--- El primer clic cambia el texto a «¿Seguro?»; si no se confirma en 3 s, vuelve.
+-- Button that asks for a second click to confirm (delete, reset...).
+-- The first click changes the text to "Sure?"; if not confirmed within 3 s, it goes back.
 function UI.Confirm(b, armedText)
     local orig = b:GetScript("OnClick")
     local token, saved = 0, nil
@@ -42,7 +43,7 @@ function UI.Confirm(b, armedText)
         end
         saved = self.text:GetText()
         self.armed = true
-        self.text:SetText(armedText or "¿Seguro?")
+        self.text:SetText(armedText or L["Sure?"])
         self.text:SetTextColor(1, 0.45, 0.35)
         token = token + 1
         local mine = token
@@ -52,11 +53,11 @@ function UI.Confirm(b, armedText)
     return b
 end
 
-UI.widgets = {}     -- controles con Refresh()
-UI.stacks = {}      -- columnas que se recolocan al refrescar
+UI.widgets = {}     -- controls with Refresh()
+UI.stacks = {}      -- columns that are relaid out on refresh
 
 -------------------------------------------------------------------------------
--- Enlace con la base de datos: Bind(raíz, "a.b.c", después)
+-- Binding to the database: Bind(root, "a.b.c", after)
 -------------------------------------------------------------------------------
 local function Resolve(root, path)
     local t = root
@@ -78,7 +79,7 @@ function UI.Bind(rootFn, path, after)
 end
 
 -------------------------------------------------------------------------------
--- Básicos
+-- Basics
 -------------------------------------------------------------------------------
 function UI.Backdrop(f, bg, border)
     f:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, edgeSize = 1 })
@@ -122,7 +123,7 @@ local function Register(w)
     return w
 end
 
--- Título de sección (como control para poder apilarlo)
+-- Section title (as a control so it can be stacked)
 function UI.Header(parent, text)
     local f = CreateFrame("Frame", nil, parent)
     f.isHeader = true
@@ -138,7 +139,7 @@ function UI.Header(parent, text)
     return f
 end
 
--- Texto de ayuda apilable
+-- Stackable help text
 function UI.Note(parent, text, w)
     local f = CreateFrame("Frame", nil, parent)
     f.text = UI.Label(f, text)
@@ -150,7 +151,7 @@ function UI.Note(parent, text, w)
 end
 
 -------------------------------------------------------------------------------
--- Casilla
+-- Checkbox
 -------------------------------------------------------------------------------
 function UI.Check(parent, text, get, set)
     local f = CreateFrame("Frame", nil, parent)
@@ -176,7 +177,7 @@ function UI.Check(parent, text, get, set)
 end
 
 -------------------------------------------------------------------------------
--- Deslizador con botones < >
+-- Slider with < > buttons
 -------------------------------------------------------------------------------
 function UI.Slider(parent, text, minV, maxV, step, fmt, get, set)
     local f = CreateFrame("Frame", nil, parent)
@@ -233,9 +234,9 @@ function UI.Slider(parent, text, minV, maxV, step, fmt, get, set)
 end
 
 -------------------------------------------------------------------------------
--- Barra de desplazamiento con el estilo del addon: se arrastra, y la rueda
--- del ratón de su lista o página la mueve. La usan páginas, listas y
--- desplegables. onScroll(v) recibe la posición (0..máximo) al moverla.
+-- Scroll bar in the addon's style: it can be dragged, and the mouse wheel
+-- over its list or page moves it. Used by pages, lists and dropdowns.
+-- onScroll(v) receives the position (0..max) when it moves.
 -------------------------------------------------------------------------------
 function UI.ScrollBar(parent, onScroll)
     local bar = CreateFrame("Slider", nil, parent, "BackdropTemplate")
@@ -258,14 +259,14 @@ function UI.ScrollBar(parent, onScroll)
         self.cur = v
         onScroll(v)
     end)
-    -- max: hasta dónde se puede desplazar; frac: parte visible (0..1)
+    -- max: how far it can scroll; frac: visible part (0..1)
     function bar:SetRange(max, frac)
         max = math.max(0, math.floor((max or 0) + 0.5))
         self:SetMinMaxValues(0, max)
         self.thumb:SetHeight(math.max(16, (self:GetHeight() - 2) * math.min(1, frac or 1)))
         self:SetShown(max > 0)
     end
-    -- colocarla sin avisar (cuando la posición cambia por otro lado)
+    -- place it without notifying (when the position changes elsewhere)
     function bar:SetPos(v)
         self.cur = math.floor((v or 0) + 0.5)
         self:SetValue(self.cur)
@@ -274,7 +275,7 @@ function UI.ScrollBar(parent, onScroll)
 end
 
 -------------------------------------------------------------------------------
--- Desplegable (con scroll si hay muchas opciones)
+-- Dropdown (with scroll when there are many options)
 -------------------------------------------------------------------------------
 local openMenu
 local MAX_ITEMS = 14
@@ -283,13 +284,13 @@ function UI.CloseMenu()
     if openMenu then openMenu:Hide() openMenu = nil end
 end
 
--- Clic fuera del desplegable abierto: se cierra (evento nativo del juego)
+-- Click outside the open dropdown: it closes (native game event)
 local outside = CreateFrame("Frame")
 pcall(outside.RegisterEvent, outside, "GLOBAL_MOUSE_DOWN")
 outside:SetScript("OnEvent", function()
     local m = openMenu
     if not m then return end
-    -- en la lista o en su propio botón (que ya lo abre y cierra) no se toca
+    -- clicks on the list or on its own button (which already opens and closes it) are ignored
     if m:IsMouseOver() or (m.owner and m.owner.button and m.owner.button:IsMouseOver()) then return end
     UI.CloseMenu()
 end)
@@ -306,7 +307,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
     end
     local b = UI.Button(f, "", width, 18)
     b:SetPoint("TOPLEFT", 0, yOff)
-    b:SetPoint("TOPRIGHT", 0, yOff)   -- sigue el ancho del marco
+    b:SetPoint("TOPRIGHT", 0, yOff)   -- follows the frame width
     b.text:ClearAllPoints()
     b.text:SetPoint("LEFT", 6, 0)
     b.text:SetPoint("RIGHT", -16, 0)
@@ -318,7 +319,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
 
     local function Opts() return type(options) == "function" and options() or options end
 
-    -- Si la opción trae una fuente (3er campo), el texto se pinta con ella
+    -- If the option has a font (3rd field), the text is drawn with it
     local function ApplyFont(fs, font)
         if font then
             ns.SetFont(fs, font, 12, "")
@@ -328,7 +329,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
     end
     UI.ApplyOptionFont = ApplyFont
 
-    -- Si la opción trae una textura (4º campo), se enseña de muestra detrás
+    -- If the option has a texture (4th field), it is shown as a sample behind it
     local function ApplyTex(frame, tex)
         if not frame.preview then
             if not tex then return end
@@ -393,7 +394,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
             Fill()
             if bar then bar:SetPos(offset) end
         end
-        -- con barra de desplazamiento, las opciones dejan sitio a la derecha
+        -- with a scroll bar, the options leave room on the right
         local itemW = list:GetWidth() - 4 - (scrollable and 12 or 0)
         for i = 1, shown do
             local item = CreateFrame("Button", nil, list)
@@ -417,14 +418,14 @@ function UI.Dropdown(parent, text, options, get, set, width)
             items[i] = item
         end
         if scrollable then
-            -- barra de desplazamiento arrastrable
+            -- draggable scroll bar
             bar = UI.ScrollBar(list, ScrollTo)
             bar:SetPoint("TOPRIGHT", -3, -3)
             bar:SetPoint("BOTTOMRIGHT", -3, 3)
             bar:SetRange(maxOffset, shown / #opts)
             list:EnableMouseWheel(true)
             list:SetScript("OnMouseWheel", function(_, d) ScrollTo(offset - d) end)
-            -- al abrir, enseñar la opción seleccionada
+            -- on open, show the selected option
             local cur = get()
             for k, o in ipairs(opts) do
                 if o[1] == cur then ScrollTo(k - math.ceil(shown / 2)) break end
@@ -438,7 +439,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
 end
 
 -------------------------------------------------------------------------------
--- Muestra de color
+-- Color swatch
 -------------------------------------------------------------------------------
 local function OpenColorPicker(c, hasAlpha, onChange)
     local prev = { r = c.r, g = c.g, b = c.b, a = c.a }
@@ -473,8 +474,8 @@ local function OpenColorPicker(c, hasAlpha, onChange)
     end
 end
 
--- getEdit (opcional): devuelve la tabla a modificar al hacer clic (si la de
--- getColor es solo de lectura, p. ej. valores por defecto)
+-- getEdit (optional): returns the table to change on click (when the one from
+-- getColor is read only, e.g. default values)
 function UI.Swatch(parent, text, getColor, onChange, hasAlpha, getEdit)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(UI.W, 18)
@@ -498,10 +499,10 @@ function UI.Swatch(parent, text, getColor, onChange, hasAlpha, getEdit)
 end
 
 -------------------------------------------------------------------------------
--- Página con scroll vertical
+-- Page with vertical scroll
 -------------------------------------------------------------------------------
 function UI.ScrollPage(parent)
-    -- ScrollFrame del juego con nuestra barra a la derecha
+    -- The game's ScrollFrame with our bar on the right
     local sf = CreateFrame("ScrollFrame", nil, parent)
     sf:SetPoint("TOPLEFT")
     sf:SetPoint("BOTTOMRIGHT", -12, 0)
@@ -532,11 +533,11 @@ function UI.ScrollPage(parent)
 end
 
 -------------------------------------------------------------------------------
--- Columna: coloca uno debajo de otro solo los controles visibles
--- (cada control puede tener showIf = function() return bool end)
+-- Column: places only the visible controls one below the other
+-- (each control can have showIf = function() return bool end)
 -------------------------------------------------------------------------------
--- Activar / desactivar un control sin quitarlo del sitio (sin saltos de diseño):
--- desactivado se ve en gris y una capa invisible se come los clics.
+-- Enable / disable a control without removing it (no layout jumps):
+-- disabled it looks grey and an invisible layer swallows the clicks.
 function UI.SetEnabled(w, on)
     w:SetAlpha(on and 1 or 0.35)
     if not w.blocker then
@@ -549,11 +550,11 @@ function UI.SetEnabled(w, on)
     w.blocker:SetShown(not on)
 end
 
--- showIf: el control se quita (para opciones de otro tipo de indicador)
--- enableIf: el control se queda en su sitio y se desactiva (sub-opciones)
--- fill: los controles se estiran al ancho del contenido (ventana redimensionable)
--- Cada título abre una tarjeta (caja con fondo) que envuelve sus controles
--- hasta el siguiente título; todas las tarjetas de una columna, mismo ancho.
+-- showIf: the control is removed (for options of another indicator type)
+-- enableIf: the control stays in place and is disabled (sub-options)
+-- fill: the controls stretch to the content width (resizable window)
+-- Each title opens a card (box with a background) that wraps its controls
+-- up to the next title; every card of a column has the same width.
 UI.CARD_PAD = 10
 
 local function Card(header, content)
@@ -563,7 +564,7 @@ local function Card(header, content)
         UI.Backdrop(card, { 0.095, 0.095, 0.118, 1 }, { 0.19, 0.19, 0.235, 1 })
         header.card = card
     end
-    -- debajo de los controles (que están un nivel por encima del contenido)
+    -- below the controls (which are one level above the content)
     card:SetFrameLevel(content:GetFrameLevel())
     return card
 end
@@ -577,7 +578,7 @@ function UI.Stack(content, x, y, list, gap, fill)
         local afterHeader = false
         local card, cardTop
 
-        -- ancho de las tarjetas: el del control más ancho de la columna
+        -- card width: the widest control of the column
         local maxW = UI.W
         if not self.fill then
             for _, w in ipairs(self.list) do
@@ -586,7 +587,7 @@ function UI.Stack(content, x, y, list, gap, fill)
         end
         local function CloseCard()
             if not card then return end
-            local bottom = yy + self.gap -- borde inferior del último control
+            local bottom = yy + self.gap -- bottom edge of the last control
             card:SetHeight(cardTop - bottom + PAD)
             yy = bottom - PAD - self.gap
             card = nil
@@ -600,7 +601,7 @@ function UI.Stack(content, x, y, list, gap, fill)
             if visible then
                 if w.isHeader then
                     CloseCard()
-                    -- hueco extra entre tarjetas (salvo antes de la primera)
+                    -- extra gap between cards (except before the first one)
                     if not first then yy = yy - UI.SECTION_GAP end
                     card = Card(w, self.content)
                     cardTop = yy
@@ -608,8 +609,8 @@ function UI.Stack(content, x, y, list, gap, fill)
                     card:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
                     yy = yy - 4
                 end
-                -- unido al anterior: casi sin hueco (nunca pegado a un título:
-                -- si el control del que depende está oculto, va como uno normal)
+                -- attached to the previous one: almost no gap (never attached to a title:
+                -- if the control it depends on is hidden, it goes like a normal one)
                 if w.attached and not first and not afterHeader then yy = yy + self.gap - UI.ATTACH_GAP end
                 first = false
                 afterHeader = w.isHeader and true or false
@@ -620,7 +621,7 @@ function UI.Stack(content, x, y, list, gap, fill)
                     w:SetWidth(math.max(UI.W, self.content:GetWidth() - self.x - 16 - 2 * inset))
                     if w.OnWidth then w.OnWidth(w:GetWidth()) end
                 elseif w.isHeader then
-                    w:SetWidth(maxW) -- la línea del título cruza toda la tarjeta
+                    w:SetWidth(maxW) -- the title line crosses the whole card
                 end
                 if card and w.isHeader then
                     card:SetWidth((self.fill and w:GetWidth() or maxW) + 2 * PAD)
@@ -637,7 +638,7 @@ function UI.Stack(content, x, y, list, gap, fill)
     return st
 end
 
--- Ajusta la altura del contenido de una página al control más bajo
+-- Fits the height of a page's content to the lowest control
 function UI.FitContent(content, stacks, extra)
     local low = 0
     for _, st in ipairs(stacks) do low = math.min(low, st.bottom or 0) end
@@ -654,9 +655,9 @@ function UI.RefreshAll()
 end
 
 -------------------------------------------------------------------------------
--- Tooltip de hechizo solo al pasar por encima de un icono.
--- getID() devuelve el ID a enseñar; extra(tooltip) añade líneas (opcional).
--- El clic atraviesa el icono (sigue llegando a la fila o botón de debajo).
+-- Spell tooltip only when hovering an icon.
+-- getID() returns the ID to show; extra(tooltip) adds lines (optional).
+-- The click goes through the icon (it still reaches the row or button below).
 -------------------------------------------------------------------------------
 function UI.IconTip(parent, tex, getID, extra)
     local f = CreateFrame("Frame", nil, parent)
@@ -680,12 +681,14 @@ function UI.IconTip(parent, tex, getID, extra)
 end
 
 -------------------------------------------------------------------------------
--- Listas de opciones comunes
+-- Common option lists
 -------------------------------------------------------------------------------
-UI.POINTS = {
-    { "TOPLEFT", "Arriba izquierda" }, { "TOP", "Arriba" }, { "TOPRIGHT", "Arriba derecha" },
-    { "LEFT", "Izquierda" }, { "CENTER", "Centro" }, { "RIGHT", "Derecha" },
-    { "BOTTOMLEFT", "Abajo izquierda" }, { "BOTTOM", "Abajo" }, { "BOTTOMRIGHT", "Abajo derecha" },
-}
+function UI.PointList()
+    return {
+        { "TOPLEFT", L["Top left"] }, { "TOP", L["Top"] }, { "TOPRIGHT", L["Top right"] },
+        { "LEFT", L["Left"] }, { "CENTER", L["Center"] }, { "RIGHT", L["Right"] },
+        { "BOTTOMLEFT", L["Bottom left"] }, { "BOTTOM", L["Bottom"] }, { "BOTTOMRIGHT", L["Bottom right"] },
+    }
+end
 
 UI.pct = function(v) return ("%d%%"):format(v * 100 + 0.5) end

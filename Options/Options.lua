@@ -1,8 +1,9 @@
 -------------------------------------------------------------------------------
--- MendFrames - Ventana de opciones (/mf)
+-- MendFrames - Options window (/mf)
 -------------------------------------------------------------------------------
 
 local _, ns = ...
+local L = ns.L
 local UI = ns.UI
 local ACCENT = UI.ACCENT
 
@@ -10,7 +11,7 @@ local win
 local pages, navs = {}, {}
 local COL1, COL2 = 10, 290
 
--- Enlace con el perfil que se está editando
+-- Binding to the profile being edited
 local function PB(path, after)
     return UI.Bind(ns.EP, path, function(v)
         if after then after(v) end
@@ -21,21 +22,21 @@ end
 
 local function Refresh() UI.RefreshAll() end
 
--- Tras cambiar algo del perfil editado desde un bloque común
+-- After changing something of the edited profile from a shared block
 local function PAfter()
     ns.ProfileChanged()
     UI.RefreshAll()
 end
 
 -------------------------------------------------------------------------------
--- Bloques comunes: cada tipo de cosa tiene siempre las mismas opciones,
--- con los mismos nombres y en el mismo orden
---   Texto:  Mostrar · Fuente · Tamaño · Contorno · Color · Posición (X, Y)
---   Icono:  Mostrar · Tamaño · Posición (X, Y)
---   Barra:  Textura · Color (propio, brillo) · Opacidad
+-- Shared blocks: each kind of thing always has the same options,
+-- with the same names and in the same order
+--   Text:  Show · Font · Size · Outline · Color · Position (X, Y)
+--   Icon:  Show · Size · Position (X, Y)
+--   Bar:   Texture · Color (custom, brightness) · Opacity
 -------------------------------------------------------------------------------
 
--- Une controles sueltos y listas de controles en una sola lista
+-- Joins single controls and lists of controls into one list
 local function Flat(items)
     local out = {}
     for _, v in ipairs(items) do
@@ -54,7 +55,7 @@ local function Both(a, b)
     return function() return a() and b() end
 end
 
--- Añade condiciones a un control (sin perder las que ya tenga)
+-- Adds conditions to a control (keeping the ones it already has)
 local function Cond(w, showIf, enableIf)
     w.showIf = Both(w.showIf, showIf)
     w.enableIf = Both(w.enableIf, enableIf)
@@ -65,28 +66,30 @@ local function All(list, showIf, enableIf)
     return list
 end
 
-local TEXT_COLORS = { { "white", "Blanco" }, { "class", "Color de clase" }, { "custom", "Personalizado" } }
-local BAR_COLORS = {
-    { "class", "Color de clase" }, { "custom", "Un solo color" }, { "gradient", "Degradado según la vida" },
-}
-local POWER_COLORS = {
-    { "power", "Color del recurso" }, { "class", "Color de clase" }, { "custom", "Un solo color" },
-}
+local function TextColors()
+    return { { "white", L["White"] }, { "class", L["Class color"] }, { "custom", L["Custom"] } }
+end
+local function BarColors()
+    return { { "class", L["Class color"] }, { "custom", L["Single color"] }, { "gradient", L["Gradient by health"] } }
+end
+local function PowerColors()
+    return { { "power", L["Resource color"] }, { "class", L["Class color"] }, { "custom", L["Single color"] } }
+end
 
--- Posición: punto de anclaje y X/Y pegados (mismos rangos en todas partes)
+-- Position: anchor point and X/Y attached (same ranges everywhere)
 local function PositionBlock(c, root, after, o)
     o = o or {}
     return {
-        Cond(UI.Dropdown(c, "Posición", UI.POINTS, UI.Bind(root, "point", after)), o.showIf, o.enableIf),
+        Cond(UI.Dropdown(c, L["Position"], UI.PointList, UI.Bind(root, "point", after)), o.showIf, o.enableIf),
         Cond(UI.Attach(UI.Slider(c, "X", -80, 80, 1, nil, UI.Bind(root, "x", after))), o.showIf, o.enableIf),
         Cond(UI.Attach(UI.Slider(c, "Y", -60, 60, 1, nil, UI.Bind(root, "y", after))), o.showIf, o.enableIf),
     }
 end
 
--- Texto. root() devuelve su tabla de estilo.
--- o.show = { get, set } añade «Mostrar»; o.extra, controles justo después;
--- o.showIf / o.enableIf para todo el bloque (enableIf no afecta a «Mostrar»);
--- o.showCheckIf, o.colorIf, o.positionIf para partes concretas.
+-- Text. root() returns its style table.
+-- o.show = { get, set } adds "Show"; o.extra, controls right after;
+-- o.showIf / o.enableIf for the whole block (enableIf does not affect "Show");
+-- o.showCheckIf, o.colorIf, o.positionIf for specific parts.
 local function TextBlock(c, root, after, o)
     o = o or {}
     local list = {}
@@ -94,41 +97,41 @@ local function TextBlock(c, root, after, o)
         list[#list + 1] = Cond(w, Both(o.showIf, showIf), Both(o.enableIf, enableIf))
     end
     if o.show then
-        list[#list + 1] = Cond(UI.Check(c, "Mostrar", o.show[1], o.show[2]), Both(o.showIf, o.showCheckIf))
+        list[#list + 1] = Cond(UI.Check(c, L["Show"], o.show[1], o.show[2]), Both(o.showIf, o.showCheckIf))
     end
     for _, w in ipairs(o.extra or {}) do Add(w) end
     local function B(k) return UI.Bind(root, k, after) end
-    Add(UI.Dropdown(c, "Fuente", ns.FontList, B("font")))
-    Add(UI.Slider(c, "Tamaño", 6, 24, 1, nil, B("size")))
-    Add(UI.Dropdown(c, "Contorno", ns.OUTLINES, B("outline")))
-    Add(UI.Dropdown(c, "Color", TEXT_COLORS, B("colorMode")), o.colorIf)
-    Add(UI.Attach(UI.Swatch(c, "Color personalizado", function() return root().color end,
+    Add(UI.Dropdown(c, L["Font"], ns.FontList, B("font")))
+    Add(UI.Slider(c, L["Size"], 6, 24, 1, nil, B("size")))
+    Add(UI.Dropdown(c, L["Outline"], ns.OutlineList, B("outline")))
+    Add(UI.Dropdown(c, L["Color"], TextColors, B("colorMode")), o.colorIf)
+    Add(UI.Attach(UI.Swatch(c, L["Custom color"], function() return root().color end,
         function() if after then after() end end, true)),
         o.colorIf, function() return root().colorMode == "custom" end)
     for _, w in ipairs(PositionBlock(c, root, after)) do Add(w, o.positionIf) end
     return list
 end
 
--- Color de una barra: modo, color propio y brillo (los dos últimos, pegados)
+-- Color of a bar: mode, custom color and brightness (the last two, attached)
 local function BarColorBlock(c, modes, modeKey, customKey, brightKey)
     local function Mode() return UI.Bind(ns.EP, modeKey)() end
     return {
-        UI.Dropdown(c, "Color", modes, PB(modeKey)),
-        Cond(UI.Attach(UI.Swatch(c, "Color personalizado", function() return UI.Bind(ns.EP, customKey)() end,
+        UI.Dropdown(c, L["Color"], modes, PB(modeKey)),
+        Cond(UI.Attach(UI.Swatch(c, L["Custom color"], function() return UI.Bind(ns.EP, customKey)() end,
             ns.ProfileChanged, true)), nil, function() return Mode() == "custom" end),
-        Cond(UI.Attach(UI.Slider(c, "Brillo", 0.1, 1, 0.05, UI.pct, PB(brightKey))), nil,
+        Cond(UI.Attach(UI.Slider(c, L["Brightness"], 0.1, 1, 0.05, UI.pct, PB(brightKey))), nil,
             function() return Mode() ~= "custom" end),
     }
 end
 
--- cuando la búsqueda en segundo plano encuentra el ID de un nombre
+-- when the background search finds the ID of a name
 ns.OnSpellResolved = function()
     if ns.testing and ns.LayoutTest then ns.LayoutTest() end
     if win and win:IsShown() then UI.RefreshAll() end
 end
 
 -------------------------------------------------------------------------------
--- Perfiles
+-- Profiles
 -------------------------------------------------------------------------------
 local function ProfileOptions()
     local out = {}
@@ -144,7 +147,7 @@ end
 local function BuildProfiles(p)
     local _, c = UI.ScrollPage(p)
 
-    -- Cambia el perfil que se edita (en modo prueba, también el que se ve)
+    -- Changes the profile being edited (in test mode, also the one shown)
     local function SetEdit(n)
         ns.editName = n
         ns.ActivateProfile()
@@ -155,11 +158,11 @@ local function BuildProfiles(p)
             for k, v in pairs(chars) do if v == old then chars[k] = new end end
         end
     end
-    -- Tamaños de grupo de este personaje que usan un perfil
+    -- Group sizes of this character that use a profile
     local function UsedBy(name)
         local out = {}
         for _, key in ipairs(ns.SIZE_KEYS) do
-            if ns.CharProfiles()[key] == name then out[#out + 1] = ns.SIZE_NAMES[key] end
+            if ns.CharProfiles()[key] == name then out[#out + 1] = L[ns.SIZE_NAMES[key]] end
         end
         return out
     end
@@ -169,28 +172,28 @@ local function BuildProfiles(p)
     end
 
     ---------------------------------------------------------------------------
-    -- Perfil que se edita
+    -- Profile being edited
     ---------------------------------------------------------------------------
     local editDD = UI.Dropdown(c, nil, ProfileOptions, ns.EditedProfileName, SetEdit)
 
-    local feedback -- se crea más abajo
+    local feedback -- created further down
     local function Say(text)
         feedback.text:SetText(text)
         feedback.text:SetTextColor(0.4, 0.9, 0.5)
         feedback:SetHeight(feedback.text:GetStringHeight() + 2)
-        Refresh() -- recolocar: el mensaje puede ocupar otra altura
+        Refresh() -- relayout: the message can take a different height
     end
 
-    local resetBtn = ConfirmButton(editDD, "Restablecer", 90, function()
+    local resetBtn = ConfirmButton(editDD, L["Reset"], 90, function()
         local name = ns.EditedProfileName()
         ns.db.profiles[name] = ns.NewProfile()
         ns.ActivateProfile(true)
         ns.ProfileChanged()
         Refresh()
-        Say(("«%s» ha vuelto a los ajustes por defecto."):format(name))
+        Say((L["\"%s\" is back to the default settings."]):format(name))
     end)
     resetBtn:SetPoint("LEFT", editDD.button, "RIGHT", 6, 0)
-    local deleteBtn = ConfirmButton(editDD, "Borrar", 70, function()
+    local deleteBtn = ConfirmButton(editDD, L["Delete"], 70, function()
         local old = ns.EditedProfileName()
         if old == "Default" then return end
         local used = #UsedBy(old) > 0
@@ -199,8 +202,8 @@ local function BuildProfiles(p)
         ns.editName = nil
         ns.ActivateProfile(true)
         Refresh()
-        Say(used and ("«%s» borrado. Donde se usaba, ahora se usa Default."):format(old)
-            or ("«%s» borrado."):format(old))
+        Say(used and (L["\"%s\" deleted. Where it was used, Default is used now."]):format(old)
+            or (L["\"%s\" deleted."]):format(old))
     end)
     deleteBtn:SetPoint("LEFT", resetBtn, "RIGHT", 6, 0)
 
@@ -209,9 +212,9 @@ local function BuildProfiles(p)
         local name = ns.EditedProfileName()
         local used = UsedBy(name)
         if #used > 0 then
-            usage.text:SetText("Lo usa este personaje en: |cffffffff" .. table.concat(used, ", ") .. "|r.")
+            usage.text:SetText((L["Used by this character in: %s."]):format("|cffffffff" .. table.concat(used, ", ") .. "|r"))
         else
-            usage.text:SetText("|cffff8c4dNingún tamaño de grupo lo usa todavía.|r Asígnalo abajo para que se vea en juego (en modo prueba ya lo ves).")
+            usage.text:SetText(L["|cffff8c4dNo group size uses it yet.|r Assign it below to see it in game (in test mode you already see it)."])
         end
         usage:SetHeight(usage.text:GetStringHeight() + 2)
         UI.SetEnabled(deleteBtn, name ~= "Default")
@@ -219,7 +222,7 @@ local function BuildProfiles(p)
     table.insert(UI.widgets, usage)
 
     ---------------------------------------------------------------------------
-    -- Crear / duplicar / renombrar
+    -- Create / duplicate / rename
     ---------------------------------------------------------------------------
     local actions = CreateFrame("Frame", nil, c)
     actions:SetSize(520, 48)
@@ -243,31 +246,31 @@ local function BuildProfiles(p)
         SetEdit(n)
         Say(msg)
     end
-    local newBtn = Btn("Crear nuevo", 0, function()
+    local newBtn = Btn(L["Create new"], 0, function()
         local n = Name()
         ns.db.profiles[n] = ns.NewProfile()
-        Done(n, ("«%s» creado con los ajustes por defecto."):format(n))
+        Done(n, (L["\"%s\" created with the default settings."]):format(n))
     end)
-    local dupBtn = Btn("Duplicar", 106, function()
+    local dupBtn = Btn(L["Duplicate"], 106, function()
         local n, from = Name(), ns.EditedProfileName()
         ns.db.profiles[n] = ns.DeepCopy(ns.EP())
-        Done(n, ("«%s» creado como copia de «%s»."):format(n, from))
+        Done(n, (L["\"%s\" created as a copy of \"%s\"."]):format(n, from))
     end)
-    local renBtn = Btn("Renombrar", 212, function()
+    local renBtn = Btn(L["Rename"], 212, function()
         local n, old = Name(), ns.EditedProfileName()
         ns.db.profiles[n] = ns.db.profiles[old]
         ns.db.profiles[old] = nil
         Reassign(old, n)
         if ns.activeName == old then ns.activeName = n end
-        Done(n, ("«%s» ahora se llama «%s»."):format(old, n))
+        Done(n, (L["\"%s\" is now called \"%s\"."]):format(old, n))
     end)
 
-    -- los botones solo se activan con un nombre válido
+    -- the buttons are only enabled with a valid name
     local function Validate()
         local n = Name()
         local exists = n ~= "" and ns.db.profiles[n] ~= nil
         local ok = n ~= "" and not exists
-        hint:SetText(exists and "ya existe un perfil con ese nombre" or "")
+        hint:SetText(exists and L["a profile with that name already exists"] or "")
         UI.SetEnabled(newBtn, ok)
         UI.SetEnabled(dupBtn, ok)
         UI.SetEnabled(renBtn, ok and ns.EditedProfileName() ~= "Default")
@@ -277,52 +280,55 @@ local function BuildProfiles(p)
     actions.Refresh = Validate
     table.insert(UI.widgets, actions)
 
-    feedback = UI.Note(c, "«Crear nuevo» empieza con los ajustes por defecto; «Duplicar» copia el perfil que editas. Default no se puede borrar ni renombrar.", 520)
+    feedback = UI.Note(c, L["\"Create new\" starts with the default settings; \"Duplicate\" copies the profile you are editing. Default cannot be deleted or renamed."], 520)
 
     ---------------------------------------------------------------------------
     local list = {
-        UI.Header(c, "Perfil que estás editando"),
+        UI.Header(c, L["Profile you are editing"]),
         editDD,
         UI.Attach(usage),
-        UI.Header(c, "Crear o renombrar"),
+        UI.Header(c, L["Create or rename"]),
         actions,
         UI.Attach(feedback),
-        UI.Header(c, "Qué perfil usa este personaje según el grupo"),
+        UI.Header(c, L["Which profile this character uses for each group size"]),
     }
     for _, key in ipairs(ns.SIZE_KEYS) do
-        local dd = UI.Dropdown(c, ns.SIZE_NAMES[key], ProfileOptions,
+        local dd = UI.Dropdown(c, L[ns.SIZE_NAMES[key]], ProfileOptions,
             function() return ns.CharProfiles()[key] end,
             function(v)
                 ns.CharProfiles()[key] = v
                 ns.ActivateProfile()
                 Refresh()
             end)
-        local edit = UI.Button(dd, "Editar", 70, 18, function() SetEdit(ns.CharProfiles()[key]) end)
+        local edit = UI.Button(dd, L["Edit"], 70, 18, function() SetEdit(ns.CharProfiles()[key]) end)
         edit:SetPoint("LEFT", dd.button, "RIGHT", 6, 0)
         local base = dd.Refresh
         dd.Refresh = function(self)
             base(self)
             local now = ns.RealSizeKey() == key
-            dd.label:SetText(ns.SIZE_NAMES[key] .. (now and "  |cff4fc3f7· tu grupo ahora|r" or ""))
+            dd.label:SetText(L[ns.SIZE_NAMES[key]] .. (now and ("  |cff4fc3f7· " .. L["your group now"] .. "|r") or ""))
             UI.SetEnabled(edit, ns.CharProfiles()[key] ~= ns.EditedProfileName())
         end
         list[#list + 1] = dd
     end
-    list[#list + 1] = UI.Note(c, "Así puedes tener un diseño para grupo, otro para ZG/AQ20 y otro para bandas de 40. El cambio es automático al entrar o salir de un grupo (si estás en combate, se aplica al salir).", 520)
-    list[#list + 1] = UI.Header(c, "Vista previa")
-    list[#list + 1] = UI.Dropdown(c, "Simular un grupo de", {
-        { "party", "5 (grupo)" }, { "raid10", "10 (banda)" }, { "raid20", "20 (banda)" }, { "raid40", "40 (banda)" },
+    list[#list + 1] = UI.Note(c, L["This way you can have one layout for parties, another for ZG/AQ20 and another for 40-player raids. It switches automatically when you join or leave a group (in combat, it applies when combat ends)."], 520)
+    list[#list + 1] = UI.Header(c, L["Preview"])
+    list[#list + 1] = UI.Dropdown(c, L["Simulate a group of"], {
+        { "party", L["5 (party)"] }, { "raid10", L["10 (raid)"] }, { "raid20", L["20 (raid)"] }, { "raid40", L["40 (raid)"] },
     }, function() return ns.testSize or "raid20" end, function(v)
-        -- simular un tamaño enseña (y edita) el perfil asignado a ese tamaño
+        -- simulating a size shows (and edits) the profile assigned to that size
         ns.editName = ns.CharProfiles()[v]
         ns.ToggleTest(true, v)
         Refresh()
     end)
-    list[#list + 1] = UI.Note(c, "En modo prueba siempre ves el perfil que estás editando, con el número de jugadores que elijas aquí.", 520)
+    list[#list + 1] = UI.Note(c, L["In test mode you always see the profile you are editing, with the number of players chosen here."], 520)
     list[#list + 1] = UI.Header(c, "General")
-    list[#list + 1] = UI.Check(c, "Ocultar marcos de grupo y banda de Blizzard (requiere /reload)",
+    list[#list + 1] = UI.Check(c, L["Hide Blizzard party and raid frames (requires /reload)"],
         function() return ns.db.hideBlizzard end,
-        function(v) ns.db.hideBlizzard = v ns.Print("se aplica tras /reload.") end)
+        function(v) ns.db.hideBlizzard = v ns.Print(L["applies after /reload."]) end)
+    list[#list + 1] = UI.Dropdown(c, L["Language (requires /reload)"], ns.LANGUAGES,
+        function() return ns.db.language end,
+        function(v) ns.db.language = v ns.Print(L["applies after /reload."]) end)
 
     local st = UI.Stack(c, COL1, -6, list)
     UI.FitContent(c, { st })
@@ -334,122 +340,122 @@ local function BuildProfiles(p)
 end
 
 -------------------------------------------------------------------------------
--- Diseño
+-- Layout
 -------------------------------------------------------------------------------
 local function BuildLayout(p)
     local _, c = UI.ScrollPage(p)
     local function E(w, cond) w.enableIf = cond return w end
     local function petsOn() return ns.EP().pets.enabled end
-    -- en vertical las mascotas van en columnas; en horizontal, en filas
-    local perCol = UI.Slider(c, "Mascotas por columna", 1, 10, 1, nil, PB("pets.perColumn"))
+    -- vertical: pets go in columns; horizontal: in rows
+    local perCol = UI.Slider(c, L["Pets per column"], 1, 10, 1, nil, PB("pets.perColumn"))
     local baseRefresh = perCol.Refresh
     perCol.Refresh = function(self)
         baseRefresh(self)
-        perCol.label:SetText(ns.EP().layout.orientation == "horizontal" and "Mascotas por fila" or "Mascotas por columna")
+        perCol.label:SetText(ns.EP().layout.orientation == "horizontal" and L["Pets per row"] or L["Pets per column"])
     end
     local a = UI.Stack(c, COL1, -6, {
-        UI.Header(c, "Tamaño"),
-        UI.Slider(c, "Ancho", 30, 200, 1, nil, PB("layout.width")),
-        UI.Slider(c, "Alto", 16, 100, 1, nil, PB("layout.height")),
-        UI.Slider(c, "Escala", 0.5, 2, 0.05, UI.pct, PB("layout.scale")),
-        UI.Slider(c, "Espacio entre jugadores", 0, 12, 1, nil, PB("layout.spacing")),
-        UI.Slider(c, "Espacio entre grupos", 0, 40, 1, nil, PB("layout.groupSpacing")),
-        UI.Header(c, "Mascotas"),
-        UI.Check(c, "Mostrar", PB("pets.enabled")),
-        E(UI.Check(c, "Pegadas a la banda, como un grupo más", PB("pets.attach")), petsOn),
-        E(UI.Check(c, "Mismo tamaño que los jugadores", PB("pets.sameSize")), petsOn),
-        UI.Attach(E(UI.Slider(c, "Ancho", 30, 200, 1, nil, PB("pets.width")),
+        UI.Header(c, L["Size"]),
+        UI.Slider(c, L["Width"], 30, 200, 1, nil, PB("layout.width")),
+        UI.Slider(c, L["Height"], 16, 100, 1, nil, PB("layout.height")),
+        UI.Slider(c, L["Scale"], 0.5, 2, 0.05, UI.pct, PB("layout.scale")),
+        UI.Slider(c, L["Spacing between players"], 0, 12, 1, nil, PB("layout.spacing")),
+        UI.Slider(c, L["Spacing between groups"], 0, 40, 1, nil, PB("layout.groupSpacing")),
+        UI.Header(c, L["Pets"]),
+        UI.Check(c, L["Show"], PB("pets.enabled")),
+        E(UI.Check(c, L["Attached to the raid, as one more group"], PB("pets.attach")), petsOn),
+        E(UI.Check(c, L["Same size as players"], PB("pets.sameSize")), petsOn),
+        UI.Attach(E(UI.Slider(c, L["Width"], 30, 200, 1, nil, PB("pets.width")),
             function() return petsOn() and not ns.EP().pets.sameSize end)),
-        UI.Attach(E(UI.Slider(c, "Alto", 12, 100, 1, nil, PB("pets.height")),
+        UI.Attach(E(UI.Slider(c, L["Height"], 12, 100, 1, nil, PB("pets.height")),
             function() return petsOn() and not ns.EP().pets.sameSize end)),
         E(perCol, petsOn),
     })
     local list = {
-        UI.Header(c, "Organización"),
-        UI.Dropdown(c, "Orientación", {
-            { "vertical", "Vertical (cada grupo, una columna)" },
-            { "horizontal", "Horizontal (cada grupo, una fila)" },
+        UI.Header(c, L["Arrangement"]),
+        UI.Dropdown(c, L["Orientation"], {
+            { "vertical", L["Vertical (one column per group)"] },
+            { "horizontal", L["Horizontal (one row per group)"] },
         }, PB("layout.orientation")),
-        UI.Dropdown(c, "Agrupar por", {
-            { "GROUP", "Grupo de banda" },
-            { "ROLE", "Rol (tanque, sanador, daño)" },
-            { "CLASS", "Clase" },
+        UI.Dropdown(c, L["Group by"], {
+            { "GROUP", L["Raid group"] },
+            { "ROLE", L["Role (tank, healer, damage)"] },
+            { "CLASS", L["Class"] },
         }, PB("layout.groupBy")),
-        UI.Check(c, "Ordenar por nombre dentro del grupo", PB("layout.sortByName")),
-        UI.Check(c, "Mostrar en grupo (no solo en banda)", PB("layout.showParty")),
-        UI.Check(c, "Mostrarme a mí", PB("layout.showPlayer")),
-        UI.Check(c, "Mostrar estando solo", PB("layout.showSolo")),
-        UI.Header(c, "Grupos que se muestran"),
+        UI.Check(c, L["Sort by name within the group"], PB("layout.sortByName")),
+        UI.Check(c, L["Show in party (not only in raid)"], PB("layout.showParty")),
+        UI.Check(c, L["Show myself"], PB("layout.showPlayer")),
+        UI.Check(c, L["Show when solo"], PB("layout.showSolo")),
+        UI.Header(c, L["Groups shown"]),
     }
     for i = 1, 8 do
-        list[#list + 1] = UI.Check(c, "Grupo " .. i, PB("layout.groups." .. i))
+        list[#list + 1] = UI.Check(c, (L["Group %d"]):format(i), PB("layout.groups." .. i))
     end
     local b = UI.Stack(c, COL2, -6, list)
     UI.FitContent(c, { a, b })
 end
 
 -------------------------------------------------------------------------------
--- Barras
+-- Bars
 -------------------------------------------------------------------------------
 local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
     local function On(path) return function() return UI.Bind(ns.EP, path)() and true or false end end
     local function Smooth(path)
-        return Cond(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
-            or "Llenado y vaciado suave (no disponible en este cliente)", PB(path)), nil,
+        return Cond(UI.Check(c, ns.hasNativeSmooth and L["Smooth fill and drain"]
+            or L["Smooth fill and drain (not available in this client)"], PB(path)), nil,
             function() return ns.hasNativeSmooth end)
     end
     local power = On("bars.showPower")
 
     local a = UI.Stack(c, COL1, -6, Flat({
-        UI.Header(c, "Vida"),
-        UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.healthTex")),
+        UI.Header(c, L["Health"]),
+        UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.healthTex")),
         Smooth("bars.smooth"),
-        BarColorBlock(c, BAR_COLORS, "bars.healthColor", "bars.customColor", "bars.healthBrightness"),
+        BarColorBlock(c, BarColors, "bars.healthColor", "bars.customColor", "bars.healthBrightness"),
 
-        UI.Header(c, "Fondo (vida que falta)"),
-        UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.bgTex")),
-        BarColorBlock(c, BAR_COLORS, "bars.bgColor", "bars.bgCustom", "bars.bgBrightness"),
-        UI.Slider(c, "Opacidad", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
+        UI.Header(c, L["Background (missing health)"]),
+        UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.bgTex")),
+        BarColorBlock(c, BarColors, "bars.bgColor", "bars.bgCustom", "bars.bgBrightness"),
+        UI.Slider(c, L["Opacity"], 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
 
-        UI.Header(c, "Curación y escudos"),
-        UI.Check(c, "Curación entrante", PB("bars.showHealPred")),
-        Cond(UI.Attach(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.healPredTex"))), nil, On("bars.showHealPred")),
-        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.healPredColor"), ns.ProfileChanged, true)), nil,
+        UI.Header(c, L["Heals and shields"]),
+        UI.Check(c, L["Incoming heals"], PB("bars.showHealPred")),
+        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.healPredTex"))), nil, On("bars.showHealPred")),
+        Cond(UI.Attach(UI.Swatch(c, L["Color"], Col("bars.healPredColor"), ns.ProfileChanged, true)), nil,
             On("bars.showHealPred")),
-        UI.Check(c, "Escudos (absorción)", PB("bars.showAbsorb")),
-        Cond(UI.Attach(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.absorbTex"))), nil, On("bars.showAbsorb")),
-        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.absorbColor"), ns.ProfileChanged, true)), nil,
+        UI.Check(c, L["Shields (absorb)"], PB("bars.showAbsorb")),
+        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.absorbTex"))), nil, On("bars.showAbsorb")),
+        Cond(UI.Attach(UI.Swatch(c, L["Color"], Col("bars.absorbColor"), ns.ProfileChanged, true)), nil,
             On("bars.showAbsorb")),
     }))
 
     local b = UI.Stack(c, COL2, -6, Flat({
-        UI.Header(c, "Maná / energía / ira"),
-        UI.Check(c, "Mostrar", PB("bars.showPower")),
-        Cond(UI.Attach(UI.Check(c, "Solo para quien usa maná", PB("bars.powerOnlyMana"))), nil, power),
-        Cond(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.powerTex")), nil, power),
+        UI.Header(c, L["Mana / energy / rage"]),
+        UI.Check(c, L["Show"], PB("bars.showPower")),
+        Cond(UI.Attach(UI.Check(c, L["Only for mana users"], PB("bars.powerOnlyMana"))), nil, power),
+        Cond(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.powerTex")), nil, power),
         Cond(Smooth("bars.powerSmooth"), nil, power),
-        All(BarColorBlock(c, POWER_COLORS, "bars.powerColor", "bars.powerCustom", "bars.powerBrightness"), nil, power),
-        Cond(UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.powerBgAlpha")), nil, power),
-        Cond(UI.Slider(c, "Alto", 1, 12, 1, nil, PB("bars.powerHeight")), nil, power),
+        All(BarColorBlock(c, PowerColors, "bars.powerColor", "bars.powerCustom", "bars.powerBrightness"), nil, power),
+        Cond(UI.Slider(c, L["Background opacity"], 0, 1, 0.05, UI.pct, PB("bars.powerBgAlpha")), nil, power),
+        Cond(UI.Slider(c, L["Height"], 1, 12, 1, nil, PB("bars.powerHeight")), nil, power),
 
-        UI.Header(c, "Marco"),
-        UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
-        UI.Slider(c, "Opacidad fuera de rango", 0.1, 1, 0.05, UI.pct, PB("bars.rangeAlpha")),
+        UI.Header(c, L["Frame"]),
+        UI.Swatch(c, L["Border color"], Col("bars.borderColor"), ns.ProfileChanged, true),
+        UI.Slider(c, L["Out of range opacity"], 0.1, 1, 0.05, UI.pct, PB("bars.rangeAlpha")),
 
-        UI.Header(c, "Resaltados"),
-        UI.Check(c, "Resaltar mi objetivo", PB("bars.targetHighlight")),
-        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.targetColor"), ns.ProfileChanged, true)), nil,
+        UI.Header(c, L["Highlights"]),
+        UI.Check(c, L["Highlight my target"], PB("bars.targetHighlight")),
+        Cond(UI.Attach(UI.Swatch(c, L["Color"], Col("bars.targetColor"), ns.ProfileChanged, true)), nil,
             On("bars.targetHighlight")),
-        UI.Check(c, "Marcar quien tiene amenaza (aggro)", PB("bars.aggro")),
-        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.aggroColor"), ns.ProfileChanged, true)), nil, On("bars.aggro")),
+        UI.Check(c, L["Mark who has threat (aggro)"], PB("bars.aggro")),
+        Cond(UI.Attach(UI.Swatch(c, L["Color"], Col("bars.aggroColor"), ns.ProfileChanged, true)), nil, On("bars.aggro")),
     }))
     UI.FitContent(c, { a, b })
 end
 
 -------------------------------------------------------------------------------
--- Textos
+-- Texts
 -------------------------------------------------------------------------------
 local function TextSection(c, key, title, extra)
     local function root() return ns.EP().texts[key] end
@@ -465,90 +471,90 @@ end
 
 local function BuildTexts(p)
     local _, c = UI.ScrollPage(p)
-    local nameList = TextSection(c, "name", "Nombre", {
-        UI.Check(c, "Con apellido", PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
-        UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
+    local nameList = TextSection(c, "name", L["Name"], {
+        UI.Check(c, L["With surname"], PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
+        UI.Slider(c, L["Max width (% of the frame)"], 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
-    for _, w in ipairs(TextSection(c, "status", "Texto de estado")) do nameList[#nameList + 1] = w end
+    for _, w in ipairs(TextSection(c, "status", L["Status text"])) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 
-    -- avisos que salen en el texto de estado, cada uno con su color
+    -- warnings shown in the status text, each one with its color
     local S = function() return ns.EP().texts.status end
     local function statusOn() return S().show end
     local alerts = {
-        UI.Header(c, "Qué muestra el texto de estado"),
-        Cond(UI.Note(c, "Siempre: «Desconectado», «Muerto» y «Fantasma». Además, los que actives (si hay varios, sale el primero):", UI.W), nil, statusOn),
+        UI.Header(c, L["What the status text shows"]),
+        Cond(UI.Note(c, L["Always: \"Offline\", \"Dead\" and \"Ghost\". Plus the ones you enable (if there are several, the first one shows):"], UI.W), nil, statusOn),
     }
     for _, st in ipairs({
-        { "showRes", "resColor", "«Resucitando»", "Le están lanzando un resucitar." },
-        { "showCharm", "charmColor", "«Controlado»", "Bajo control mental: puede atacaros." },
-        { "showSummon", "summonColor", "«Invocación»", "Tiene una invocación pendiente, aceptada o rechazada." },
-        { "showAFK", "afkColor", "«Ausente»", "Está ausente (AFK)." },
+        { "showRes", "resColor", L["\"Resurrecting\""], L["Someone is casting a resurrection on them."] },
+        { "showCharm", "charmColor", L["\"Charmed\""], L["Mind controlled: they can attack you."] },
+        { "showSummon", "summonColor", L["\"Summon\""], L["They have a pending, accepted or declined summon."] },
+        { "showAFK", "afkColor", L["\"AFK\""], L["They are away (AFK)."] },
     }) do
         local function on() return statusOn() and S()[st[1]] end
         alerts[#alerts + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
         alerts[#alerts + 1] = Cond(UI.Attach(UI.Note(c, st[4], UI.W - 20)), nil, statusOn)
-        alerts[#alerts + 1] = Cond(UI.Attach(UI.Swatch(c, "Color", function() return S()[st[2]] end, PAfter, true)), nil, on)
+        alerts[#alerts + 1] = Cond(UI.Attach(UI.Swatch(c, L["Color"], function() return S()[st[2]] end, PAfter, true)), nil, on)
     end
-    alerts[#alerts + 1] = UI.Note(c, "Usan la fuente, el tamaño y la posición del texto de estado. Beber y comer es un indicador (pestaña Indicadores).", UI.W)
-    for _, w in ipairs(TextSection(c, "health", "Texto de vida", {
-        UI.Dropdown(c, "Formato", {
-            { "none", "Ninguno" },
-            { "deficit", "Vida que falta (-1.2k)" },
-            { "percent", "Porcentaje (85%)" },
-            { "current", "Vida actual (3.4k)" },
-            { "both", "Actual / máxima" },
+    alerts[#alerts + 1] = UI.Note(c, L["They use the font, size and position of the status text. Drinking and eating is an indicator (Indicators tab)."], UI.W)
+    for _, w in ipairs(TextSection(c, "health", L["Health text"], {
+        UI.Dropdown(c, L["Format"], {
+            { "none", L["No text"] },
+            { "deficit", L["Missing health (-1.2k)"] },
+            { "percent", L["Percentage (85%)"] },
+            { "current", L["Current health (3.4k)"] },
+            { "both", L["Current / max"] },
         }, PB("texts.health.format")),
-        UI.Check(c, "Ocultar con la vida llena", PB("texts.health.hideFull")),
+        UI.Check(c, L["Hide at full health"], PB("texts.health.hideFull")),
     })) do alerts[#alerts + 1] = w end
     local b = UI.Stack(c, COL2, -6, alerts)
     UI.FitContent(c, { a, b })
 end
 
 -------------------------------------------------------------------------------
--- Iconos de estado
+-- Status icons
 -------------------------------------------------------------------------------
 local function ElementSection(c, key, title)
     local function root() return ns.EP().elements[key] end
     local function on() return root().show end
     local list = {
         UI.Header(c, title),
-        UI.Check(c, "Mostrar", PB("elements." .. key .. ".show")),
+        UI.Check(c, L["Show"], PB("elements." .. key .. ".show")),
     }
-    -- el de listos solo existe durante la comprobación: no tiene «cuándo»
+    -- the ready check icon only exists during the check: it has no "when"
     if key ~= "ready" then
-        list[#list + 1] = Cond(UI.Attach(UI.Dropdown(c, "Cuándo", {
-            { "always", "Siempre" },
-            { "ready", "Solo en la comprobación de listos" },
-            { "ooc", "Solo fuera de combate" },
+        list[#list + 1] = Cond(UI.Attach(UI.Dropdown(c, L["When"], {
+            { "always", L["Always"] },
+            { "ready", L["Only during ready checks"] },
+            { "ooc", L["Only out of combat"] },
         }, PB("elements." .. key .. ".when"))), nil, on)
     end
     return Flat({
         list,
-        Cond(UI.Check(c, "Por encima de los indicadores", PB("elements." .. key .. ".onTop")), nil, on),
-        Cond(UI.Slider(c, "Tamaño", 6, 40, 1, nil, PB("elements." .. key .. ".size")), nil, on),
+        Cond(UI.Check(c, L["Above the indicators"], PB("elements." .. key .. ".onTop")), nil, on),
+        Cond(UI.Slider(c, L["Size"], 6, 40, 1, nil, PB("elements." .. key .. ".size")), nil, on),
         PositionBlock(c, root, PAfter, { enableIf = on }),
     })
 end
 
 local function BuildElements(p)
     local _, c = UI.ScrollPage(p)
-    local l1 = ElementSection(c, "role", "Icono de rol")
-    for _, w in ipairs(ElementSection(c, "raidIcon", "Marca de banda (calavera, etc.)")) do l1[#l1 + 1] = w end
-    local l2 = ElementSection(c, "leader", "Líder / ayudante")
-    for _, w in ipairs(ElementSection(c, "ready", "Comprobación de listos")) do l2[#l2 + 1] = w end
+    local l1 = ElementSection(c, "role", L["Role icon"])
+    for _, w in ipairs(ElementSection(c, "raidIcon", L["Raid marker (skull, etc.)"])) do l1[#l1 + 1] = w end
+    local l2 = ElementSection(c, "leader", L["Leader / assistant"])
+    for _, w in ipairs(ElementSection(c, "ready", L["Ready check"])) do l2[#l2 + 1] = w end
     local a = UI.Stack(c, COL1, -6, l1)
     local b = UI.Stack(c, COL2, -6, l2)
     UI.FitContent(c, { a, b })
 end
 
 -------------------------------------------------------------------------------
--- Indicadores
+-- Indicators
 -------------------------------------------------------------------------------
 local selInd = 1
-local KIND_LABEL = { aura = "", raiddebuff = "jefe", debuffs = "debuffs" }
-local TYPE_LABEL = { icon = "icono", icons = "iconos", square = "cuadrado", bar = "barra", text = "texto",
-    border = "borde", overlay = "tinte" }
+local KIND_LABEL = { aura = "", raiddebuff = "boss", debuffs = "debuffs" }
+local TYPE_LABEL = { icon = "icon", icons = "icons", square = "square", bar = "bar", text = "text",
+    border = "border", overlay = "tint" }
 
 local function Inds() return ns.EP().indicators end
 local function Sel()
@@ -572,13 +578,13 @@ end
 local function IB(path) return UI.Bind(Sel, path, IndChanged) end
 
 local function BuildIndicators(p)
-    -- lista de la izquierda
+    -- list on the left
     local left = CreateFrame("Frame", nil, p)
     left:SetPoint("TOPLEFT", 6, -4)
     left:SetPoint("BOTTOMLEFT", 6, 4)
     left:SetWidth(196)
-    -- la lista llega hasta abajo: caben tantas filas como deja el espacio
-    -- que ocupan los botones y la nota de debajo
+    -- the list reaches the bottom: as many rows fit as the space left by the
+    -- buttons and the note below
     local leftH = math.max(200, (p:GetHeight() or 548) - 8)
     local BELOW = 96
     local ROWS = math.max(8, math.floor((leftH - BELOW - 4) / 20))
@@ -607,6 +613,7 @@ local function BuildIndicators(p)
                 row.name:SetText(ind.name)
                 row.name:SetTextColor(ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45)
                 local tag = KIND_LABEL[ind.kind] ~= "" and KIND_LABEL[ind.kind] or TYPE_LABEL[ind.type] or ""
+                tag = tag ~= "" and L[tag] or ""
                 row.tag:SetText(tag)
                 local col = ind.color or { r = 1, g = 1, b = 1 }
                 if ind.kind ~= "aura" then
@@ -660,19 +667,19 @@ local function BuildIndicators(p)
         b:SetPoint("TOPLEFT", x, yy)
         return b
     end
-    Btn("Nuevo", 0, y, 62, function()
-        local ind = ns.FixIndicator({ name = "Nuevo indicador" })
+    Btn(L["New"], 0, y, 62, function()
+        local ind = ns.FixIndicator({ name = L["New indicator"] })
         local list = Inds()
-        -- antes de los genéricos para que quede junto a los demás
+        -- before the generic ones so it sits next to the others
         table.insert(list, ind)
         selInd = #list
         IndChanged()
     end)
-    local delInd = Btn("Borrar", 66, y, 62, function()
+    local delInd = Btn(L["Delete"], 66, y, 62, function()
         local ind = Sel()
         if not ind then return end
         if ind.kind ~= "aura" then
-            ns.Print("los indicadores integrados no se borran; desactívalos con la casilla 'Activo'.")
+            ns.Print(L["built-in indicators cannot be deleted; turn them off with the 'Enabled' box."])
             return
         end
         table.remove(Inds(), selInd)
@@ -688,13 +695,13 @@ local function BuildIndicators(p)
         if selInd < #l then l[selInd], l[selInd + 1] = l[selInd + 1], l[selInd] selInd = selInd + 1 IndChanged() end
     end)
 
-    Btn("Añadir desde el catálogo...", 0, y - 28, 196, function()
+    Btn(L["Add from the catalog..."], 0, y - 28, 196, function()
         if ns.OpenCatalog then ns.OpenCatalog() end
     end)
-    local hint = UI.Note(left, "El orden de la lista es el orden de dibujo: los de abajo quedan por encima.", 196)
+    local hint = UI.Note(left, L["The list order is the drawing order: the ones below are drawn on top."], 196)
     hint:SetPoint("TOPLEFT", 0, y - 56)
 
-    -- editor de la derecha
+    -- editor on the right
     local right = CreateFrame("Frame", nil, p)
     right:SetPoint("TOPLEFT", 212, -4)
     right:SetPoint("BOTTOMRIGHT", -4, 4)
@@ -703,7 +710,7 @@ local function BuildIndicators(p)
     local function K() local s = Sel() return s and s.kind end
     local function T() local s = Sel() return s and EffType(s) end
     local function isAura() return K() == "aura" end
-    -- borde del marco / tinte sobre la vida: cubren el marco entero (sin posición ni tamaño)
+    -- frame border / tint over health: they cover the whole frame (no position or size)
     local function frameT() local t = T() return t == "border" or t == "overlay" end
     local function notDispel() return not frameT() end
     local function iconLike() local t = T() return t == "icon" or t == "icons" end
@@ -711,11 +718,11 @@ local function BuildIndicators(p)
     local function iconsT() return T() == "icons" end
     local function colored() local t = T() return isAura() and (t == "square" or t == "bar" or t == "text") end
     local function isMissing() local s = Sel() return isAura() and s.mode == "missing" end
-    -- tiene duración (no es "le falta" ni disipable)
-    -- barra que mide escudos o curación entrante: no vigila auras ni tiene tiempo
+    -- has a duration (it is not "missing" nor dispellable)
+    -- bar that measures shields or incoming heals: does not watch auras nor has time
     local function unitBar() return isAura() and ns.IndicatorUnitMeasure(Sel()) end
     local function watchAuras() return isAura() and not unitBar() end
-    -- vigila los hechizos de su lista (no «los que puedo disipar»)
+    -- watches the spells in its list (not "the ones I can dispel")
     local function dispWatch() return watchAuras() and (Sel().watch == "dispellable" or Sel().watch == "debuffTypes") end
     local function listWatch() return watchAuras() and not dispWatch() end
     local function timed()
@@ -724,18 +731,18 @@ local function BuildIndicators(p)
         return notDispel() and not isMissing()
     end
     local function hasText() return timed() end
-    -- borde o tinte que enseña debuffs (los que tienen tipo)
+    -- border or tint that shows debuffs (the ones with a type)
     local function typeIconT() return frameT() and ns.IndicatorTyped(Sel()) end
     local function typeIconOn() return Sel().typeIcon end
 
     local function W(widget, cond) widget.showIf = cond return widget end
-    -- WE: se ve según el tipo y se desactiva (sin moverse) según una sub-opción
+    -- WE: shown based on the type and disabled (without moving) based on a sub-option
     local function WE(widget, show, enable) widget.showIf = show widget.enableIf = enable return widget end
 
-    -- nombre
+    -- name
     local nameW = CreateFrame("Frame", nil, c)
     nameW:SetSize(UI.W, 36)
-    local nl = UI.Label(nameW, "Nombre")
+    local nl = UI.Label(nameW, L["Name"])
     nl:SetPoint("TOPLEFT")
     local nameBox = UI.EditBox(nameW, UI.W)
     nameBox:SetPoint("TOPLEFT", 0, -14)
@@ -749,10 +756,10 @@ local function BuildIndicators(p)
     nameW.Refresh = function() local s = Sel() nameBox:SetText(s and s.name or "") end
     table.insert(UI.widgets, nameW)
 
-    -- texto propio del tipo «Texto»
+    -- custom text of the "Text" type
     local customW = CreateFrame("Frame", nil, c)
     customW:SetSize(UI.W, 36)
-    local cl = UI.Label(customW, "Texto")
+    local cl = UI.Label(customW, L["Text"])
     cl:SetPoint("TOPLEFT")
     local customBox = UI.EditBox(customW, UI.W)
     customBox:SetPoint("TOPLEFT", 0, -14)
@@ -769,11 +776,11 @@ local function BuildIndicators(p)
     end
     table.insert(UI.widgets, customW)
 
-    -- lista de bufos del indicador
-    -- Cada hechizo puede desplegar sus IDs ("Ver IDs"). Sin ninguno marcado
-    -- cuentan todos; si se marca alguno, solo los marcados.
+    -- buff list of the indicator
+    -- Each spell can expand its IDs ("Show IDs"). With none checked they all
+    -- count; if some are checked, only those.
     local MAXS = 12
-    local expanded = {}   -- [indicador] = { [clave] = true }
+    local expanded = {}   -- [indicator] = { [key] = true }
 
     local function IsOpen(s, key) return expanded[s] and expanded[s][key] end
 
@@ -782,7 +789,7 @@ local function BuildIndicators(p)
         wdg:SetSize(360, 40)
         local rows, subPool = {}, {}
 
-        -- casilla de un ID (fila sangrada)
+        -- checkbox for one ID (indented row)
         local function SubRow(n)
             local sr = subPool[n]
             if sr then return sr end
@@ -800,7 +807,7 @@ local function BuildIndicators(p)
             sr.icon:SetSize(14, 14)
             sr.icon:SetPoint("LEFT", 18, 0)
             sr.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            -- tooltip del hechizo solo sobre su icono
+            -- spell tooltip only over its icon
             UI.IconTip(sr, sr.icon, function() return sr.icon:IsShown() and sr.spellID end)
             sr.id = UI.Label(sr, "")
             sr.id:SetPoint("LEFT", 38, 0)
@@ -834,13 +841,13 @@ local function BuildIndicators(p)
             r.icon:SetSize(16, 16)
             r.icon:SetPoint("LEFT")
             r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            -- tooltip del hechizo solo sobre el icono
+            -- spell tooltip only over the icon
             UI.IconTip(r, r.icon, function() return r.tipID end)
             r.name = UI.Label(r, "")
             r.name:SetPoint("LEFT", 20, 0)
             r.name:SetWidth(108)
             r.name:SetWordWrap(false)
-            r.ids = UI.Button(r, "Ver IDs", 76, 16, function()
+            r.ids = UI.Button(r, L["Show IDs"], 76, 16, function()
                 local s = Sel()
                 local key = s[field][i]
                 if key == nil then return end
@@ -860,11 +867,11 @@ local function BuildIndicators(p)
         end
 
         local addBox = UI.EditBox(wdg, 200)
-        local addBtn = UI.Button(wdg, addLabel or "Añadir hechizo", 110, 20, function()
+        local addBtn = UI.Button(wdg, addLabel or L["Add spell"], 110, 20, function()
             local key = ns.ParseSpellInput(addBox:GetText())
             if not key then return end
             local l = Sel()[field]
-            if #l >= MAXS then ns.Print("máximo " .. MAXS .. " hechizos en la lista.") return end
+            if #l >= MAXS then ns.Print((L["at most %d spells in the list."]):format(MAXS)) return end
             table.insert(l, key)
             addBox:SetText("")
             addBox:ClearFocus()
@@ -886,12 +893,12 @@ local function BuildIndicators(p)
                     local all = ns.KeyIDs(key)
                     r.icon:SetTexture(icon or 134400)
                     r.tipID = all[1]
-                    -- el nombre avisa si hay IDs elegidos a mano
+                    -- the name warns when there are IDs chosen by hand
                     local n = 0
                     if pick then for _ in pairs(pick) do n = n + 1 end end
                     r.name:SetText(n > 0 and ("%s |cff4fc3f7(%d)|r"):format(name, n) or name)
                     local open = IsOpen(s, key)
-                    r.ids.text:SetText(open and "Ocultar IDs" or "Ver IDs")
+                    r.ids.text:SetText(open and L["Hide IDs"] or L["Show IDs"])
                     r:ClearAllPoints()
                     r:SetPoint("TOPLEFT", 0, y)
                     r:Show()
@@ -905,7 +912,7 @@ local function BuildIndicators(p)
                             sr.icon:Hide()
                             sr.box:Hide()
                             sr.id:SetWidth(200)
-                            sr.id:SetText("buscando IDs...")
+                            sr.id:SetText(L["looking up IDs..."])
                             sr.sub:SetText("")
                             sr:EnableMouse(false)
                             sr:ClearAllPoints()
@@ -939,7 +946,7 @@ local function BuildIndicators(p)
                             sr.box:Hide()
                             sr:EnableMouse(false)
                             sr.id:SetText("")
-                            sr.sub:SetText(n > 0 and "Solo cuentan los marcados." or "Ninguno marcado: cuentan todos.")
+                            sr.sub:SetText(n > 0 and L["Only the checked ones count."] or L["None checked: all of them count."])
                             sr:ClearAllPoints()
                             sr:SetPoint("TOPLEFT", 24, y)
                             sr:Show()
@@ -959,16 +966,16 @@ local function BuildIndicators(p)
     end
     local spellsW = SpellList("spells")
 
-    -- tamaño cuadrado (icono)
-    local sizeW = UI.Slider(c, "Tamaño", 4, 50, 1, nil,
+    -- square size (icon)
+    local sizeW = UI.Slider(c, L["Size"], 4, 50, 1, nil,
         function() local s = Sel() return s and s.width end,
         function(v) local s = Sel() s.width, s.height = v, v IndChanged() end)
 
     ---------------------------------------------------------------------------
-    -- Muestra del marco: es un marco de verdad (el mismo código que el modo
-    -- prueba) con todos los indicadores del perfil a la vez y todas sus
-    -- opciones. El indicador elegido se puede arrastrar: al soltarlo se elige
-    -- el punto de anclaje más cercano (de los 9) y el desplazamiento X/Y exacto.
+    -- Frame preview: it is a real frame (the same code as test mode) with every
+    -- indicator of the profile at once and all their options. The chosen
+    -- indicator can be dragged: when dropped, the closest anchor point (of the 9)
+    -- and the exact X/Y offset are picked.
     ---------------------------------------------------------------------------
     local SAMPLE_W, SAMPLE_H = 340, 110
     local posSample = CreateFrame("Frame", nil, c)
@@ -978,7 +985,7 @@ local function BuildIndicators(p)
     psBg:SetPoint("TOPRIGHT")
     psBg:SetHeight(SAMPLE_H)
     psBg:SetColorTexture(0.03, 0.03, 0.04, 1)
-    local psHint = UI.Label(posSample, "Arrastra el indicador para colocarlo donde quieras.")
+    local psHint = UI.Label(posSample, L["Drag the indicator to place it wherever you want."])
     psHint:SetPoint("BOTTOMLEFT", 0, 2)
     psHint:SetWidth(SAMPLE_W)
     psHint:SetTextColor(0.65, 0.65, 0.65)
@@ -986,7 +993,7 @@ local function BuildIndicators(p)
     local pb = CreateFrame("Frame", nil, posSample)
     ns.BuildVisuals(pb)
 
-    -- asa invisible encima del indicador elegido (para arrastrarlo)
+    -- invisible handle over the chosen indicator (to drag it)
     local handle = CreateFrame("Button", nil, pb)
     handle:SetFrameLevel(pb:GetFrameLevel() + 400)
     handle.hl = handle:CreateTexture(nil, "HIGHLIGHT")
@@ -1013,7 +1020,7 @@ local function BuildIndicators(p)
         self:StopMovingOrSizing()
         local s = Sel()
         if not s then return end
-        -- tercio del marco en el que cae el centro -> punto de anclaje
+        -- third of the frame where the center lands -> anchor point
         local cx = (self:GetLeft() + self:GetRight()) / 2
         local cy = (self:GetTop() + self:GetBottom()) / 2
         local fx = (cx - pb:GetLeft()) / pb:GetWidth()
@@ -1030,8 +1037,8 @@ local function BuildIndicators(p)
 
     posSample.Refresh = function()
         if not ns.P then return end
-        -- el marco de muestra usa el perfil que se está viendo; si editas otro,
-        -- se avisa (en modo prueba, el que se ve es siempre el que editas)
+        -- the preview frame uses the profile being shown; if you edit another one,
+        -- a warning is shown (in test mode the one shown is always the one you edit)
         local same = ns.EditedProfileName() == ns.activeName
         local L = ns.P.layout
         local W, H = L.width, L.height
@@ -1040,7 +1047,7 @@ local function BuildIndicators(p)
         pb:SetSize(W, H)
         pb:ClearAllPoints()
         pb:SetPoint("CENTER", psBg, "CENTER", 0, 0)
-        -- solo el indicador que se edita (si es del perfil que se ve)
+        -- only the indicator being edited (if it belongs to the profile shown)
         ns.FillPreviewButton(pb, same and selInd or nil)
 
         local s = Sel()
@@ -1051,73 +1058,73 @@ local function BuildIndicators(p)
         if w then
             handle:SetAllPoints(w)
             handle:Show()
-            psHint:SetText("Arrastra el indicador para colocarlo donde quieras.")
+            psHint:SetText(L["Drag the indicator to place it wherever you want."])
         else
             handle:Hide()
-            psHint:SetText(same and "" or ("Se ve el perfil activo («%s»). Activa el modo prueba para ver el que editas.")
+            psHint:SetText(same and "" or (L["You are seeing the active profile (\"%s\"). Turn on test mode to see the one you are editing."])
                 :format(tostring(ns.activeName)))
         end
     end
     table.insert(UI.widgets, posSample)
 
-    -- colores por tipo (comunes a todos los indicadores del perfil)
+    -- colors per type (shared by every indicator of the profile)
     local function DispelSwatches()
         local function typed() return ns.IndicatorTyped(Sel()) and (frameT() or iconLike()) end
         local function on() return Sel().dispelColor end
         local list = {}
         for _, d in ipairs({
-            { "Magic", "Magia" }, { "Curse", "Maldición" }, { "Disease", "Enfermedad" }, { "Poison", "Veneno" },
-            { "none", "Sin tipo (borde y tinte)" },
+            { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
+            { "none", L["No type (border and tint)"] },
         }) do
             list[#list + 1] = WE(UI.Attach(UI.Swatch(c, ns.DispelLabel(d[1], d[2]), function() return ns.EP().dispelColors[d[1]] end,
                 IndChanged)), function() return typed() and (d[1] ~= "none" or frameT()) end, on)
         end
-        list[#list + 1] = WE(UI.Attach(UI.Note(c, "Son los mismos para todos los indicadores del perfil. «Sin tipo» es para los debuffs que no tienen tipo.", 340)),
+        list[#list + 1] = WE(UI.Attach(UI.Note(c, L["They are the same for every indicator in the profile. \"No type\" is for debuffs that have no type."], 340)),
             typed, on)
         return list
     end
 
     local st = UI.Stack(c, 4, -4, Flat({
-        UI.Header(c, "Indicador"),
+        UI.Header(c, L["Indicator"]),
         nameW,
-        UI.Check(c, "Activo", IB("enabled")),
-        W(UI.Dropdown(c, "Tipo", {
-            { "square", "Cuadrado de color" }, { "icon", "Icono" }, { "icons", "Varios iconos" },
-            { "bar", "Barra" }, { "text", "Texto" },
-            { "border", "Borde del marco" }, { "overlay", "Tinte sobre la vida" },
+        UI.Check(c, L["Enabled"], IB("enabled")),
+        W(UI.Dropdown(c, L["Type"], {
+            { "square", L["Color square"] }, { "icon", L["Icon"] }, { "icons", L["Several icons"] },
+            { "bar", L["Bar"] }, { "text", L["Text"] },
+            { "border", L["Frame border"] }, { "overlay", L["Tint over health"] },
         }, IB("type")), isAura),
-        W(UI.Attach(UI.Dropdown(c, "Qué mide", {
-            { "time", "Tiempo restante del aura" },
-            { "stacks", "Cargas del aura" },
-            { "absorb", "Escudos del jugador (absorción)" },
-            { "heal", "Curación entrante del jugador" },
+        W(UI.Attach(UI.Dropdown(c, L["What it measures"], {
+            { "time", L["Aura time left"] },
+            { "stacks", L["Aura stacks"] },
+            { "absorb", L["Player shields (absorb)"] },
+            { "heal", L["Player incoming heals"] },
         }, IB("barMeasure"))), function() return isAura() and T() == "bar" end),
-        W(UI.Attach(UI.Slider(c, "Máximo de cargas", 1, 20, 1, nil, IB("barMaxStacks"))),
+        W(UI.Attach(UI.Slider(c, L["Max stacks"], 1, 20, 1, nil, IB("barMaxStacks"))),
             function() return isAura() and T() == "bar" and Sel().barMeasure == "stacks" end),
-        W(UI.Attach(UI.Note(c, "Se compara con su vida máxima. No vigila auras: se ve siempre que haya algo.", 340)),
+        W(UI.Attach(UI.Note(c, L["Compared with their max health. It does not watch auras: it shows whenever there is something."], 340)),
             unitBar),
-        W(UI.Attach(UI.Dropdown(c, "Qué muestra", {
-            { "time", "Tiempo restante" },
-            { "custom", "Un texto propio" },
-            { "name", "Nombre del hechizo" },
-            { "stacks", "Cargas" },
-            { "caster", "Quién lo lanzó" },
+        W(UI.Attach(UI.Dropdown(c, L["What it shows"], {
+            { "time", L["Time left"] },
+            { "custom", L["Custom text"] },
+            { "name", L["Spell name"] },
+            { "stacks", L["Stacks"] },
+            { "caster", L["Who cast it"] },
         }, IB("textShow"))), function() return isAura() and T() == "text" end),
         W(UI.Attach(customW), function() return isAura() and T() == "text" and Sel().textShow == "custom" end),
 
-        W(UI.Header(c, "Qué vigila"), watchAuras),
-        W(UI.Dropdown(c, "Vigila", {
-            { "spells", "Los bufos de su lista" },
-            { "dispellable", "Los debuffs que puedo disipar" },
-            { "debuffTypes", "Debuffs por tipo (cualquier clase)" },
+        W(UI.Header(c, L["What it watches"]), watchAuras),
+        W(UI.Dropdown(c, L["Watches"], {
+            { "spells", L["The buffs in its list"] },
+            { "dispellable", L["Debuffs I can dispel"] },
+            { "debuffTypes", L["Debuffs by type (any class)"] },
         }, IB("watch")), watchAuras),
-        W(UI.Attach(UI.Note(c, "El juego decide cuáles puedes disipar tú (según tu clase y talentos).", 340)), function() return dispWatch() and Sel().watch == "dispellable" end),
-        W(UI.Attach(UI.Note(c, "Muestra los tipos marcados aunque tu clase no pueda disiparlos.", 340)), function() return dispWatch() and Sel().watch == "debuffTypes" end),
-        W(UI.Attach(UI.Check(c, ns.DispelLabel("Magic", "Magia"), IB("dispelTypes.Magic"))), dispWatch),
-        W(UI.Attach(UI.Check(c, ns.DispelLabel("Curse", "Maldición"), IB("dispelTypes.Curse"))), dispWatch),
-        W(UI.Attach(UI.Check(c, ns.DispelLabel("Disease", "Enfermedad"), IB("dispelTypes.Disease"))), dispWatch),
-        W(UI.Attach(UI.Check(c, ns.DispelLabel("Poison", "Veneno"), IB("dispelTypes.Poison"))), dispWatch),
-        W(UI.Dropdown(c, "De quién", { { "mine", "Solo las mías" }, { "others", "Solo las de los demás" }, { "any", "De cualquiera" } },
+        W(UI.Attach(UI.Note(c, L["The game decides which ones you can dispel (based on your class and talents)."], 340)), function() return dispWatch() and Sel().watch == "dispellable" end),
+        W(UI.Attach(UI.Note(c, L["Shows the checked types even if your class cannot dispel them."], 340)), function() return dispWatch() and Sel().watch == "debuffTypes" end),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Magic", L["Magic"]), IB("dispelTypes.Magic"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Curse", L["Curse"]), IB("dispelTypes.Curse"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Disease", L["Disease"]), IB("dispelTypes.Disease"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Poison", L["Poison"]), IB("dispelTypes.Poison"))), dispWatch),
+        W(UI.Dropdown(c, L["From whom"], { { "mine", L["Only mine"] }, { "others", L["Only others'"] }, { "any", L["From anyone"] } },
             function()
                 local s = Sel()
                 if s.others then return "others" end
@@ -1129,91 +1136,91 @@ local function BuildIndicators(p)
                 s.others = v == "others"
                 IndChanged()
             end), listWatch),
-        W(UI.Dropdown(c, "Mostrar cuando", { { "present", "Lo tiene" }, { "missing", "Le falta" } }, IB("mode")), listWatch),
-        W(UI.Attach(UI.Note(c, "«Le falta» solo funciona fuera de combate: en combate el juego no deja comprobar qué bufos tiene un jugador.", 340)), isMissing),
-        W(UI.Check(c, "Solo fuera de combate", IB("onlyOOC")), watchAuras),
-        W(UI.Note(c, "Bufos (por ID o nombre; vale cualquier rango). Sin hechizos = todos los bufos. El orden lo decide el juego.", 340), listWatch),
+        W(UI.Dropdown(c, L["Show when"], { { "present", L["Has it"] }, { "missing", L["Missing"] } }, IB("mode")), listWatch),
+        W(UI.Attach(UI.Note(c, L["\"Missing\" only works out of combat: in combat the game does not let addons check which buffs a player has."], 340)), isMissing),
+        W(UI.Check(c, L["Only out of combat"], IB("onlyOOC")), watchAuras),
+        W(UI.Note(c, L["Buffs (by ID or name; any rank works). No spells = all buffs. The game decides the order."], 340), listWatch),
         W(spellsW, listWatch),
 
-        W(UI.Header(c, "Qué vigila"), function() return K() == "raiddebuff" end),
-        W(UI.Note(c, "Muestra el debuff de jefe más importante que tenga el jugador. Cuáles son de jefe lo decide el juego.", 340),
+        W(UI.Header(c, L["What it watches"]), function() return K() == "raiddebuff" end),
+        W(UI.Note(c, L["Shows the most important boss debuff on the player. The game decides which ones are boss debuffs."], 340),
             function() return K() == "raiddebuff" end),
 
-        W(UI.Header(c, "Qué vigila"), function() return K() == "debuffs" end),
-        W(UI.Check(c, "Solo los que yo puedo disipar", IB("onlyDispellable")),
+        W(UI.Header(c, L["What it watches"]), function() return K() == "debuffs" end),
+        W(UI.Check(c, L["Only the ones I can dispel"], IB("onlyDispellable")),
             function() return K() == "debuffs" end),
 
-        UI.Header(c, "Posición y tamaño"),
+        UI.Header(c, L["Position and size"]),
         posSample,
         PositionBlock(c, Sel, IndChanged, { showIf = function()
             return notDispel() and not (T() == "bar" and ns.STRIP_SIDE[Sel().span])
         end }),
         W(sizeW, iconLike),
-        W(UI.Slider(c, "Ancho", 1, 120, 1, nil, IB("width")), rect),
-        W(UI.Attach(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height"))), rect),
-        W(UI.Dropdown(c, "Ocupar", {
-            { "none", "No (su ancho y alto)" },
-            { "width", "Todo el ancho, encima del marco" },
-            { "height", "Todo el alto, encima del marco" },
-            { "stripTop", "Franja propia arriba" },
-            { "stripBottom", "Franja propia abajo" },
-            { "stripLeft", "Franja propia a la izquierda" },
-            { "stripRight", "Franja propia a la derecha" },
+        W(UI.Slider(c, L["Width"], 1, 120, 1, nil, IB("width")), rect),
+        W(UI.Attach(UI.Slider(c, L["Height"], 1, 60, 1, nil, IB("height"))), rect),
+        W(UI.Dropdown(c, L["Span"], {
+            { "none", L["No (its own width and height)"] },
+            { "width", L["Full width, over the frame"] },
+            { "height", L["Full height, over the frame"] },
+            { "stripTop", L["Own strip on top"] },
+            { "stripBottom", L["Own strip at the bottom"] },
+            { "stripLeft", L["Own strip on the left"] },
+            { "stripRight", L["Own strip on the right"] },
         }, IB("span")), function() return T() == "bar" end),
-        W(UI.Attach(UI.Note(c, "Con franja propia, la vida se acorta para dejarle sitio (como la barra de maná). Arriba y abajo usan el alto; izquierda y derecha, el ancho.", 340)),
+        W(UI.Attach(UI.Note(c, L["With its own strip, the health bar shrinks to make room (like the mana bar). Top and bottom use the height; left and right, the width."], 340)),
             function() return T() == "bar" and ns.STRIP_SIDE[Sel().span] ~= nil end),
-        W(UI.Dropdown(c, "Orientación de la barra", { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
+        W(UI.Dropdown(c, L["Bar orientation"], { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
             IB("barOrient")), function() return T() == "bar" end),
-        W(UI.Attach(UI.Check(c, "Vaciar al revés", IB("barReverse"))), function() return T() == "bar" end),
+        W(UI.Attach(UI.Check(c, L["Drain in reverse"], IB("barReverse"))), function() return T() == "bar" end),
 
-        W(UI.Slider(c, "Máximo de iconos", 1, 8, 1, nil, IB("max")), iconsT),
-        W(UI.Dropdown(c, "Crecen hacia", { { "LEFT", "Izquierda" }, { "RIGHT", "Derecha" }, { "UP", "Arriba" }, { "DOWN", "Abajo" } },
+        W(UI.Slider(c, L["Max icons"], 1, 8, 1, nil, IB("max")), iconsT),
+        W(UI.Dropdown(c, L["Grow towards"], { { "LEFT", L["Left"] }, { "RIGHT", L["Right"] }, { "UP", L["Top"] }, { "DOWN", L["Bottom"] } },
             IB("grow")), iconsT),
-        W(UI.Slider(c, "Espacio entre iconos", 0, 10, 1, nil, IB("spacing")), iconsT),
+        W(UI.Slider(c, L["Spacing between icons"], 0, 10, 1, nil, IB("spacing")), iconsT),
 
-        W(UI.Header(c, "Borde del marco"), function() return T() == "border" end),
-        W(UI.Slider(c, "Grosor", 1, 6, 1, nil, IB("width")), function() return T() == "border" end),
-        W(UI.Check(c, "Por dentro del marco", IB("borderInside")), function() return T() == "border" end),
-        W(UI.Header(c, "Tinte sobre la vida"), function() return T() == "overlay" end),
-        W(UI.Dropdown(c, "Forma", {
-            { "up", "Degradado de abajo arriba" },
-            { "down", "Degradado de arriba abajo" },
-            { "solid", "Liso" },
+        W(UI.Header(c, L["Frame border"]), function() return T() == "border" end),
+        W(UI.Slider(c, L["Thickness"], 1, 6, 1, nil, IB("width")), function() return T() == "border" end),
+        W(UI.Check(c, L["Inside the frame"], IB("borderInside")), function() return T() == "border" end),
+        W(UI.Header(c, L["Tint over health"]), function() return T() == "overlay" end),
+        W(UI.Dropdown(c, L["Shape"], {
+            { "up", L["Gradient from bottom to top"] },
+            { "down", L["Gradient from top to bottom"] },
+            { "solid", L["Solid"] },
         }, IB("tintShape")), function() return T() == "overlay" end),
-        W(UI.Slider(c, "Intensidad", 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")), function() return T() == "overlay" end),
+        W(UI.Slider(c, L["Intensity"], 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")), function() return T() == "overlay" end),
 
-        -- borde / tinte de debuffs: icono nativo del tipo encima
-        W(UI.Header(c, "Icono del tipo"), typeIconT),
-        W(UI.Check(c, ns.DispelLabel("Poison", "Mostrar el icono del tipo"), IB("typeIcon")), typeIconT),
-        WE(UI.Slider(c, "Tamaño", 8, 32, 1, nil, IB("typeIconSize")), typeIconT, typeIconOn),
+        -- debuff border / tint: native type icon on top
+        W(UI.Header(c, L["Type icon"]), typeIconT),
+        W(UI.Check(c, ns.DispelLabel("Poison", L["Show the type icon"]), IB("typeIcon")), typeIconT),
+        WE(UI.Slider(c, L["Size"], 8, 32, 1, nil, IB("typeIconSize")), typeIconT, typeIconOn),
         PositionBlock(c, function() return Sel().typeIconPos end, IndChanged, { showIf = typeIconT, enableIf = typeIconOn }),
 
-        UI.Header(c, "Aspecto"),
-        W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")), function()
+        UI.Header(c, L["Look"]),
+        W(UI.Check(c, L["Color by type (magic, poison...)"], IB("dispelColor")), function()
             return ns.IndicatorTyped(Sel()) and (frameT() or iconLike())
         end),
         DispelSwatches(),
-        WE(UI.Attach(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true)),
+        WE(UI.Attach(UI.Swatch(c, L["Color"], function() return Sel().color end, IndChanged, true)),
             function() return colored() or frameT() end,
             function() return colored() or not Sel().dispelColor end),
-        W(UI.Check(c, "Borde negro", IB("showBorder")),
+        W(UI.Check(c, L["Black border"], IB("showBorder")),
             function() local t = T() return notDispel() and t ~= "text" end),
-        W(UI.Check(c, "Barrido del tiempo", IB("swipe")),
+        W(UI.Check(c, L["Time sweep"], IB("swipe")),
             function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end),
-        WE(UI.Attach(UI.Dropdown(c, "Estilo del barrido", {
-            { "clock", "Reloj" },
-            { "clockReverse", "Reloj inverso (se llena)" },
-            { "clockEdge", "Reloj con borde" },
-            { "drainV", "Llenado vertical (de abajo arriba)" },
-            { "drainH", "Llenado horizontal (de izquierda a derecha)" },
-            { "bar", "Barra fina abajo (crece)" },
+        WE(UI.Attach(UI.Dropdown(c, L["Sweep style"], {
+            { "clock", L["Clock"] },
+            { "clockReverse", L["Reverse clock (fills up)"] },
+            { "clockEdge", L["Clock with edge"] },
+            { "drainV", L["Vertical fill (bottom to top)"] },
+            { "drainH", L["Horizontal fill (left to right)"] },
+            { "bar", L["Thin bar at the bottom (grows)"] },
         }, function() return Sel().swipeStyle or "clock" end, function(v) Sel().swipeStyle = v IndChanged() end)),
             function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end,
             function() return Sel().swipe ~= false end),
 
-        -- en el tipo «Texto», este es el propio texto: va donde el indicador y con su color
-        W(UI.Header(c, "Texto del tiempo"), function() return hasText() and T() ~= "text" end),
-        W(UI.Header(c, "Texto"), function() return isAura() and T() == "text" end),
+        -- in the "Text" type, this is the text itself: it goes where the indicator is, with its color
+        W(UI.Header(c, L["Time text"]), function() return hasText() and T() ~= "text" end),
+        W(UI.Header(c, L["Text"]), function() return isAura() and T() == "text" end),
         TextBlock(c, function() return Sel().timerText end, IndChanged, {
             show = { IB("timer") },
             showCheckIf = function() return T() ~= "text" end,
@@ -1222,7 +1229,7 @@ local function BuildIndicators(p)
             colorIf = function() return T() ~= "text" end,
             positionIf = function() return T() ~= "text" end,
         }),
-        W(UI.Header(c, "Texto de las cargas"), hasText),
+        W(UI.Header(c, L["Stacks text"]), hasText),
         TextBlock(c, function() return Sel().stacksText end, IndChanged, {
             show = { IB("stacks") },
             showIf = hasText,
@@ -1240,12 +1247,12 @@ local function BuildIndicators(p)
 end
 
 -------------------------------------------------------------------------------
--- Catálogo: agrupación -> clases y hechizos -> añadir como indicador
+-- Catalog: group -> classes and spells -> add as indicator
 -------------------------------------------------------------------------------
 local catGroup = "hots"
 local catSel, catOrigin, catMode = {}, {}, {}
 
--- casilla con icono y texto (para clases y hechizos)
+-- checkbox with icon and text (for classes and spells)
 local function Toggle(parent, width)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width, 20)
@@ -1270,7 +1277,7 @@ local function Toggle(parent, width)
     b.hl = b:CreateTexture(nil, "HIGHLIGHT")
     b.hl:SetAllPoints()
     b.hl:SetColorTexture(1, 1, 1, 0.05)
-    -- state: true, false o "partial"
+    -- state: true, false or "partial"
     b.SetState = function(self, state)
         self.mark:SetShown(state and true or false)
         self.mark:SetAlpha(state == "partial" and 0.4 or 1)
@@ -1306,19 +1313,19 @@ local function BuildCatalog(p)
     local function Sel(g)
         g = g or Group()
         if not catSel[g.key] then
-            -- al abrir una agrupación por primera vez: lo recomendado para mi clase
+            -- when a group is opened for the first time: the recommendations for my class
             catSel[g.key] = {}
             for _, e in ipairs(ns.CatalogRecommended(g, myClass)) do catSel[g.key][e] = true end
         end
         return catSel[g.key]
     end
 
-    -- 1. agrupación
-    local h1 = UI.Header(c, "1. Agrupación")
+    -- 1. group
+    local h1 = UI.Header(c, L["1. Group"])
     h1:SetWidth(570)
     local groupBtns = {}
     for i, g in ipairs(ns.Catalog) do
-        local b = UI.Button(c, g.name, 186, 22, function()
+        local b = UI.Button(c, L[g.name], 186, 22, function()
             catGroup = g.key
             Rebuild()
         end)
@@ -1328,47 +1335,47 @@ local function BuildCatalog(p)
     local desc = UI.Note(c, "", 570)
     desc.text:SetTextColor(0.75, 0.75, 0.75)
 
-    -- 2. clases y hechizos
-    local h2 = UI.Header(c, "2. Clases y hechizos")
+    -- 2. classes and spells
+    local h2 = UI.Header(c, L["2. Classes and spells"])
     h2:SetWidth(570)
-    local recBtn = UI.Button(c, "Recomendado para mi clase", 180, 20, function()
+    local recBtn = UI.Button(c, L["Recommended for my class"], 180, 20, function()
         local g = Group()
         wipe(Sel(g))
         for _, e in ipairs(ns.CatalogRecommended(g, myClass)) do Sel(g)[e] = true end
         Rebuild()
     end)
-    local allBtn = UI.Button(c, "Marcar todo", 100, 20, function()
+    local allBtn = UI.Button(c, L["Check all"], 100, 20, function()
         for _, e in ipairs(Group().spells) do Sel()[e] = true end
         Rebuild()
     end)
-    local noneBtn = UI.Button(c, "Quitar todo", 100, 20, function()
+    local noneBtn = UI.Button(c, L["Uncheck all"], 100, 20, function()
         wipe(Sel())
         Rebuild()
     end)
     local classPool, itemPool = {}, {}
 
-    -- 3. añadir
-    local h3 = UI.Header(c, "3. Añadir como indicador")
+    -- 3. add
+    local h3 = UI.Header(c, L["3. Add as indicator"])
     h3:SetWidth(570)
-    local originDD = UI.Dropdown(c, "De quién", {
-        { "mine", "Solo los míos" }, { "others", "Solo los de los demás" }, { "any", "De cualquiera" },
+    local originDD = UI.Dropdown(c, L["From whom"], {
+        { "mine", L["Mine only"] }, { "others", L["Others' only"] }, { "any", L["From anyone"] },
     }, function() return catOrigin[catGroup] or Group().origin end, function(v) catOrigin[catGroup] = v end, 220)
-    local modeDD = UI.Dropdown(c, "Mostrar cuando", {
-        { "present", "Lo tiene" }, { "missing", "Le falta (un aviso por bufo)" },
+    local modeDD = UI.Dropdown(c, L["Show when"], {
+        { "present", L["Has it"] }, { "missing", L["Missing (one warning per buff)"] },
     }, function() return catMode[catGroup] or Group().mode or "present" end, function(v) catMode[catGroup] = v end, 220)
     local result = UI.Note(c, "", 570)
-    local goBtn = UI.Button(c, "Ver en Indicadores", 140, 22, function()
+    local goBtn = UI.Button(c, L["See in Indicators"], 140, 22, function()
         if ns.OpenIndicators then ns.OpenIndicators() end
     end)
     goBtn:Hide()
-    local addBtn = UI.Button(c, "Añadir como indicador", 220, 26, function()
+    local addBtn = UI.Button(c, L["Add as indicator"], 220, 26, function()
         local g = Group()
         local entries = {}
         for _, e in ipairs(g.spells) do
             if Sel(g)[e] then table.insert(entries, e) end
         end
         if #entries == 0 then
-            result.text:SetText("|cffff7755Marca al menos un hechizo en el paso 2.|r")
+            result.text:SetText(L["|cffff7755Check at least one spell in step 2.|r"])
             goBtn:Hide()
             Rebuild()
             return
@@ -1380,11 +1387,11 @@ local function BuildCatalog(p)
         local names = {}
         for _, ind in ipairs(new) do
             table.insert(list, ind)
-            table.insert(names, "«" .. ind.name .. "»")
+            table.insert(names, (L["\"%s\""]):format(ind.name))
         end
         selInd = #list - #new + 1
         ns.ProfileChanged()
-        result.text:SetText(("|cff55ff55Añadido:|r %s al perfil %s. Muévelo y ajústalo en Indicadores."):format(
+        result.text:SetText((L["|cff55ff55Added:|r %s to profile %s. Move and adjust it in Indicators."]):format(
             table.concat(names, ", "), ns.EditedProfileName()))
         goBtn:Show()
         UI.RefreshAll()
@@ -1410,7 +1417,7 @@ local function BuildCatalog(p)
             b:SetBackdropColor(on and 0.12 or 0.15, on and 0.3 or 0.15, on and 0.42 or 0.18, 1)
         end
         y = y - math.ceil(#groupBtns / 3) * 26 - 4
-        desc.text:SetText(g.desc .. "  |cff888888(" .. (g.auraType == "HARMFUL" and "debufos" or "bufos") .. ")|r")
+        desc.text:SetText(L[g.desc] .. "  |cff888888(" .. (g.auraType == "HARMFUL" and L["debuffs"] or L["buffs"]) .. ")|r")
         desc:SetHeight(desc.text:GetStringHeight() + 2)
         Place(desc, 10, y)
         y = y - desc:GetHeight() - 10
@@ -1422,7 +1429,7 @@ local function BuildCatalog(p)
         Place(noneBtn, 302, y)
         y = y - 28
 
-        -- clases que aportan algo a esta agrupación
+        -- classes that bring something to this group
         for _, f in ipairs(classPool) do f:Hide() end
         for _, f in ipairs(itemPool) do f:Hide() end
         local ci, ii = 0, 0
@@ -1436,9 +1443,9 @@ local function BuildCatalog(p)
                 local n = 0
                 for _, e in ipairs(entries) do if sel[e] then n = n + 1 end end
                 local col = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-                local cname = ns.CLASS_NAMES[class] or class
+                local cname = ns.CLASS_NAMES[class] and L[ns.CLASS_NAMES[class]] or class
                 if col then cname = ("|cff%02x%02x%02x%s|r"):format(col.r * 255, col.g * 255, col.b * 255, cname) end
-                ct:SetContent(cname .. ((class == myClass) and "  |cff888888(tu clase)|r" or ""))
+                ct:SetContent(cname .. ((class == myClass) and ("  |cff888888(" .. L["your class"] .. ")|r") or ""))
                 ct:SetState(n == #entries or (n > 0 and "partial"))
                 ct:SetScript("OnClick", function()
                     local all = n == #entries
@@ -1452,7 +1459,7 @@ local function BuildCatalog(p)
                     local it = itemPool[ii]
                     if not it then it = Toggle(c, 270) it:SetHeight(30) itemPool[ii] = it end
                     local name, icon = ns.SpellKeyInfo(ns.CatalogKey(e))
-                    it:SetContent(name, icon or 134400, e.note)
+                    it:SetContent(name, icon or 134400, e.note and L[e.note])
                     it:SetState(sel[e])
                     it:SetScript("OnClick", function()
                         sel[e] = (not sel[e]) or nil
@@ -1495,7 +1502,7 @@ local function BuildCatalog(p)
 end
 
 -------------------------------------------------------------------------------
--- Ventana
+-- Window
 -------------------------------------------------------------------------------
 local function SelectPage(i)
     UI.CloseMenu()
@@ -1536,7 +1543,7 @@ local function CreateWindow()
     win.testBtn = UI.Button(win, "", 100, 20, function() ns.ToggleTest() end)
     win.testBtn:SetPoint("TOPRIGHT", win.lockBtn, "TOPLEFT", -6, 0)
 
-    local names = { "Perfiles", "Diseño", "Barras", "Textos", "Iconos de estado", "Indicadores", "Catálogo" }
+    local names = { L["Profiles"], L["Layout"], L["Bars"], L["Texts"], L["Status icons"], L["Indicators"], L["Catalog"] }
     local builders = { BuildProfiles, BuildLayout, BuildBars, BuildTexts, BuildElements, BuildIndicators, BuildCatalog }
     for i, n in ipairs(names) do
         local nb = UI.Button(win, n, 130, 26, function() SelectPage(i) end)
@@ -1553,7 +1560,7 @@ local function CreateWindow()
     end
 
     UI.OnRefresh = function()
-        win.profileLabel:SetText(("editando: |cffffffff%s|r · activo: |cffffffff%s|r"):format(
+        win.profileLabel:SetText((L["editing: |cffffffff%s|r · active: |cffffffff%s|r"]):format(
             ns.EditedProfileName(), tostring(ns.activeName)))
         if UI.OnRefreshIndicators then UI.OnRefreshIndicators() end
         local cur = win.current and pages[win.current]
@@ -1563,10 +1570,10 @@ local function CreateWindow()
     ns.OpenIndicators = function() SelectPage(6) end
     ns.OpenCatalog = function() SelectPage(7) end
     ns.OnLockChanged = function()
-        win.lockBtn.text:SetText(ns.db.locked and "Desbloquear" or "Bloquear")
+        win.lockBtn.text:SetText(ns.db.locked and L["Unlock"] or L["Lock"])
     end
     ns.OnTestChanged = function()
-        win.testBtn.text:SetText(ns.testing and "Ocultar prueba" or "Modo prueba")
+        win.testBtn.text:SetText(ns.testing and L["Hide test"] or L["Test mode"])
     end
     ns.OnProfileChanged = function()
         if win:IsShown() then UI.RefreshAll() end
@@ -1576,7 +1583,7 @@ local function CreateWindow()
     SelectPage(1)
 end
 
--- Abrir (sin cerrar si ya está abierta)
+-- Open (without closing it if it is already open)
 function ns.OpenOptions()
     if win and win:IsShown() then return end
     ns.ToggleOptions()
@@ -1585,7 +1592,7 @@ end
 function ns.ToggleOptions()
     if not win then
         CreateWindow()
-        win:Hide() -- CreateFrame la deja visible: sin esto el primer /mf la cerraba
+        win:Hide() -- CreateFrame leaves it visible: without this the first /mf closed it
     end
     if win:IsShown() then
         win:Hide()
