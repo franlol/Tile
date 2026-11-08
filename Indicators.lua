@@ -90,6 +90,18 @@ end
 -------------------------------------------------------------------------------
 local timers = {}   -- [widget] = { exp, dur, cfg }
 
+-- Barras que miden algo del jugador (no de un aura): escudos o curación entrante
+local function UnitMeasure(cfg)
+    local m = cfg.type == "bar" and cfg.barMeasure
+    return m == "absorb" or m == "heal"
+end
+ns.IndicatorUnitMeasure = UnitMeasure
+
+local function V(v)
+    if S(v) then return v end
+    return v or 0
+end
+
 -- ¿Este widget escribe el tiempo restante? (el tipo «Texto» puede mostrar otra cosa)
 function ns.ShowsTime(w, cfg)
     if w.wtype == "text" then return (cfg.textShow or "time") == "time" end
@@ -126,7 +138,7 @@ local function TickTimer(w, e, now)
     end
     local cfg = e.cfg
     if w.timerText and ns.ShowsTime(w, cfg) then w.timerText:SetText(FormatTime(remain)) end
-    if w.bar then w.bar:SetValue(remain / e.dur) end
+    if w.bar and (cfg.barMeasure or "time") == "time" then w.bar:SetValue(remain / e.dur) end
     if w.drainOn then w.drain:SetValue(1 - remain / e.dur) end
     local warn = cfg.warnAt > 0 and remain <= cfg.warnAt
     if warn ~= e.warned then
@@ -488,12 +500,24 @@ local function LayoutWidget(w, cfg, b)
         w:SetSize(math.max(10, size * 2.5), size + 2)
     else
         w:SetSize(cfg.width, cfg.height)
+        -- ocupar un lado entero del marco (como la línea de amenaza)
+        if t == "bar" and cfg.span and cfg.span ~= "none" then
+            local L = ns.P.layout
+            local fw, fh = L.width, L.height
+            if b.isPet then fw, fh = ns.PetSize() end
+            if cfg.span == "width" then w:SetWidth(math.max(1, fw - 2)) else w:SetHeight(math.max(1, fh - 2)) end
+        end
     end
     w.baseW, w.baseH = w:GetSize()
     if w.border then w.border:SetShown(cfg.showBorder ~= false) end
     if t == "bar" then
         w.bar:SetOrientation(cfg.barOrient == "VERTICAL" and "VERTICAL" or "HORIZONTAL")
         w.bar:SetReverseFill(cfg.barReverse and true or false)
+        local m = cfg.barMeasure or "time"
+        if m == "stacks" then w.bar:SetMinMaxValues(0, math.max(1, cfg.barMaxStacks or 5))
+        elseif m == "time" then w.bar:SetMinMaxValues(0, 1) end
+        -- escudos / curación: sin fondo, para que vacía no se vea
+        w.bg:SetShown(not UnitMeasure(cfg))
     end
 
     if t == "icons" then
@@ -627,7 +651,7 @@ local function ApplyTimer(w, unit, aura, cfg)
     else
         timers[w] = nil
         if w.timerText then w.timerText:SetText("") end
-        if w.bar then
+        if w.bar and (cfg.barMeasure or "time") == "time" then
             local ok = unit and aura.auraInstanceID and GetAuraDuration and w.bar.SetTimerDuration and pcall(function()
                 w.bar:SetTimerDuration(GetAuraDuration(unit, aura.auraInstanceID))
             end)
@@ -700,6 +724,11 @@ function ns.ShowAura(w, unit, aura, cfg)
     ApplyCount(w, unit, aura, cfg)
     ApplyTimer(w, unit, aura, cfg)   -- puede ocultarlo ("solo si quedan menos de")
     ApplyTextContent(w, unit, aura, cfg)
+    -- barra que mide las cargas del aura en vez del tiempo
+    if w.wtype == "bar" and cfg.barMeasure == "stacks" then
+        timers[w] = nil
+        w.bar:SetValue(V(aura.applications))
+    end
 end
 
 -- Indicador en modo "le falta": se muestra fijo, sin tiempo
@@ -842,6 +871,34 @@ end
 -------------------------------------------------------------------------------
 -- Actualizar todos los indicadores de un botón
 -------------------------------------------------------------------------------
+-- Barra de escudos o de curación entrante del jugador (datos de la unidad)
+local function ShowUnitBar(w, unit, cfg)
+    timers[w] = nil
+    local max = UnitHealthMax(unit)
+    local value
+    if cfg.barMeasure == "absorb" then value = UnitGetTotalAbsorbs and UnitGetTotalAbsorbs(unit)
+    else value = UnitGetIncomingHeals and UnitGetIncomingHeals(unit) end
+    w.bar:SetMinMaxValues(0, V(max))
+    w.bar:SetValue(V(value))
+    if w.SetMainColor then w:SetMainColor(cfg.color) end
+    if w.timerText then w.timerText:SetText("") end
+    if w.count then w.count:SetText("") end
+    w:Show()
+end
+
+-- Tras cambiar los escudos, la curación entrante o la vida máxima
+function ns.UpdateUnitBars(b)
+    local unit = b.unit
+    if not unit or not b.ind then return end
+    local inCombat = InCombatLockdown()
+    for _, c in ipairs(ns.compiled) do
+        local w = b.ind[c.index]
+        if w and c.kind == "aura" and UnitMeasure(c.cfg) then
+            if c.cfg.onlyOOC and inCombat then HideWidget(w) else ShowUnitBar(w, unit, c.cfg) end
+        end
+    end
+end
+
 function ns.UpdateAuras(b)
     local unit = b.unit
     if not unit or not b.ind then return end
@@ -853,6 +910,8 @@ function ns.UpdateAuras(b)
         local cfg, w = c.cfg, b.ind[c.index]
         if not w then
             -- nada
+        elseif c.kind == "aura" and UnitMeasure(cfg) then
+            if cfg.onlyOOC and inCombat then HideWidget(w) else ShowUnitBar(w, unit, cfg) end
         elseif c.kind == "aura" then
             if cfg.onlyOOC and inCombat then
                 HideWidget(w)
@@ -977,7 +1036,12 @@ function ns.TestAuras(b, i)
             end
             HideWidget(w)
             local focus = pv and pv.cfg == cfg
-            if c.kind == "aura" then
+            if c.kind == "aura" and UnitMeasure(cfg) then
+                w.bar:SetMinMaxValues(0, 100)
+                w.bar:SetValue((i % 3 == 0 or focus) and (15 + (i * 13) % 40) or 0)
+                if w.SetMainColor then w:SetMainColor(cfg.color) end
+                w:Show()
+            elseif c.kind == "aura" then
                 if cfg.mode == "missing" then
                     if i % 4 == 1 or (focus and i % 3 == 1) then
                         ns.ShowMissing(w, cfg)

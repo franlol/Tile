@@ -359,6 +359,8 @@ function ns.UpdatePrediction(b, max)
     else
         b.absorb:Hide()
     end
+    -- indicadores de barra que miden escudos o curación entrante
+    ns.UpdateUnitBars(b)
 end
 
 -- Fija el máximo de una barra solo si ha cambiado. Devuelve true si cambió.

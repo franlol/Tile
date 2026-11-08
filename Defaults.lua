@@ -216,6 +216,10 @@ ns.indicatorDefaults = {
     showBorder = true,       -- borde negro de iconos, cuadrados y barras
     barOrient = "HORIZONTAL",
     barReverse = false,
+    -- barra: qué mide (time | stacks | absorb | heal) y si ocupa un lado entero
+    barMeasure = "time",
+    barMaxStacks = 5,
+    span = "none",          -- none | width | height
     overlayAlpha = 0.6,      -- intensidad del tinte (Disipable)
     showBelow = 0,           -- solo mostrar si quedan menos de N s (0 = siempre)
     blacklist = {},          -- Debuffs: hechizos que no se muestran

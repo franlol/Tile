@@ -943,7 +943,13 @@ local function BuildIndicators(p)
     local function colored() local t = T() return isAura() and (t == "square" or t == "bar" or t == "text") end
     local function isMissing() local s = Sel() return isAura() and s.mode == "missing" end
     -- tiene duración (no es "le falta" ni disipable)
-    local function timed() return notDispel() and not isMissing() end
+    -- barra que mide escudos o curación entrante: no vigila auras ni tiene tiempo
+    local function unitBar() return isAura() and ns.IndicatorUnitMeasure(Sel()) end
+    local function watchAuras() return isAura() and not unitBar() end
+    local function timed()
+        if T() == "bar" and (Sel().barMeasure or "time") ~= "time" then return false end
+        return notDispel() and not isMissing()
+    end
     local function hasText() return timed() end
 
     local function W(widget, cond) widget.showIf = cond return widget end
@@ -1409,8 +1415,18 @@ local function BuildIndicators(p)
         UI.Check(c, "Activo", IB("enabled")),
         W(UI.Dropdown(c, "Tipo", {
             { "square", "Cuadrado de color" }, { "icon", "Icono" }, { "icons", "Varios iconos" },
-            { "bar", "Barra de tiempo" }, { "text", "Texto" },
+            { "bar", "Barra" }, { "text", "Texto" },
         }, IB("type")), isAura),
+        W(UI.Attach(UI.Dropdown(c, "Qué mide", {
+            { "time", "Tiempo restante del aura" },
+            { "stacks", "Cargas del aura" },
+            { "absorb", "Escudos del jugador (absorción)" },
+            { "heal", "Curación entrante del jugador" },
+        }, IB("barMeasure"))), function() return isAura() and T() == "bar" end),
+        W(UI.Attach(UI.Slider(c, "Máximo de cargas", 1, 20, 1, nil, IB("barMaxStacks"))),
+            function() return isAura() and T() == "bar" and Sel().barMeasure == "stacks" end),
+        W(UI.Attach(UI.Note(c, "Se compara con su vida máxima. No vigila auras: se ve siempre que haya algo.", 340)),
+            unitBar),
         W(UI.Attach(UI.Dropdown(c, "Qué muestra", {
             { "time", "Tiempo restante" },
             { "custom", "Un texto propio" },
@@ -1424,8 +1440,8 @@ local function BuildIndicators(p)
         W(UI.Dropdown(c, "Tipo", { { "border", "Borde de color" }, { "overlay", "Tinte sobre la vida" } },
             IB("type")), function() return K() == "dispel" end),
 
-        W(UI.Header(c, "Qué vigila"), isAura),
-        W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), isAura),
+        W(UI.Header(c, "Qué vigila"), watchAuras),
+        W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), watchAuras),
         W(UI.Dropdown(c, "De quién", { { "mine", "Solo las mías" }, { "others", "Solo las de los demás" }, { "any", "De cualquiera" } },
             function()
                 local s = Sel()
@@ -1437,11 +1453,11 @@ local function BuildIndicators(p)
                 s.mine = v == "mine"
                 s.others = v == "others"
                 IndChanged()
-            end), isAura),
-        W(UI.Dropdown(c, "Mostrar cuando", { { "present", "Lo tiene" }, { "missing", "Le falta" } }, IB("mode")), isAura),
-        W(UI.Check(c, "Solo fuera de combate", IB("onlyOOC")), isAura),
-        W(UI.Note(c, "Hechizos (por ID o nombre; vale cualquier rango). Sin hechizos = todas las auras de ese tipo. El orden decide cuál se ve primero.", 340), isAura),
-        W(spellsW, isAura),
+            end), watchAuras),
+        W(UI.Dropdown(c, "Mostrar cuando", { { "present", "Lo tiene" }, { "missing", "Le falta" } }, IB("mode")), watchAuras),
+        W(UI.Check(c, "Solo fuera de combate", IB("onlyOOC")), watchAuras),
+        W(UI.Note(c, "Hechizos (por ID o nombre; vale cualquier rango). Sin hechizos = todas las auras de ese tipo. El orden decide cuál se ve primero.", 340), watchAuras),
+        W(spellsW, watchAuras),
 
         W(UI.Header(c, "Qué vigila"), function() return K() == "raiddebuff" end),
         W(UI.Note(c, "Muestra el debuff de mayor prioridad de la lista de la instancia (pestaña Debuffs de banda).", 340),
@@ -1463,6 +1479,8 @@ local function BuildIndicators(p)
         W(sizeW, iconLike),
         W(UI.Slider(c, "Ancho", 1, 120, 1, nil, IB("width")), rect),
         W(UI.Attach(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height"))), rect),
+        W(UI.Dropdown(c, "Ocupar", { { "none", "No (su ancho y alto)" }, { "width", "Todo el ancho del marco" },
+            { "height", "Todo el alto del marco" } }, IB("span")), function() return T() == "bar" end),
         W(UI.Dropdown(c, "Orientación de la barra", { { "HORIZONTAL", "Horizontal" }, { "VERTICAL", "Vertical" } },
             IB("barOrient")), function() return T() == "bar" end),
         W(UI.Attach(UI.Check(c, "Vaciar al revés", IB("barReverse"))), function() return T() == "bar" end),
