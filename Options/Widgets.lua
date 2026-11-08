@@ -233,6 +233,47 @@ function UI.Slider(parent, text, minV, maxV, step, fmt, get, set)
 end
 
 -------------------------------------------------------------------------------
+-- Barra de desplazamiento con el estilo del addon: se arrastra, y la rueda
+-- del ratón de su lista o página la mueve. La usan páginas, listas y
+-- desplegables. onScroll(v) recibe la posición (0..máximo) al moverla.
+-------------------------------------------------------------------------------
+function UI.ScrollBar(parent, onScroll)
+    local bar = CreateFrame("Slider", nil, parent, "BackdropTemplate")
+    bar:SetOrientation("VERTICAL")
+    bar:SetWidth(8)
+    UI.Backdrop(bar, { 0.03, 0.03, 0.04, 1 }, { 0.2, 0.2, 0.25, 1 })
+    local thumb = bar:CreateTexture(nil, "OVERLAY")
+    thumb:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.9)
+    thumb:SetSize(6, 16)
+    bar:SetThumbTexture(thumb)
+    bar.thumb = thumb
+    bar:SetMinMaxValues(0, 0)
+    bar:SetValueStep(1)
+    bar:SetObeyStepOnDrag(true)
+    bar:SetValue(0)
+    bar.cur = 0
+    bar:SetScript("OnValueChanged", function(self, v)
+        v = math.floor(v + 0.5)
+        if v == self.cur then return end
+        self.cur = v
+        onScroll(v)
+    end)
+    -- max: hasta dónde se puede desplazar; frac: parte visible (0..1)
+    function bar:SetRange(max, frac)
+        max = math.max(0, math.floor((max or 0) + 0.5))
+        self:SetMinMaxValues(0, max)
+        self.thumb:SetHeight(math.max(16, (self:GetHeight() - 2) * math.min(1, frac or 1)))
+        self:SetShown(max > 0)
+    end
+    -- colocarla sin avisar (cuando la posición cambia por otro lado)
+    function bar:SetPos(v)
+        self.cur = math.floor((v or 0) + 0.5)
+        self:SetValue(self.cur)
+    end
+    return bar
+end
+
+-------------------------------------------------------------------------------
 -- Desplegable (con scroll si hay muchas opciones)
 -------------------------------------------------------------------------------
 local openMenu
@@ -339,7 +380,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
         local function ScrollTo(v)
             offset = math.max(0, math.min(maxOffset, math.floor(v + 0.5)))
             Fill()
-            if bar and math.floor(bar:GetValue() + 0.5) ~= offset then bar:SetValue(offset) end
+            if bar then bar:SetPos(offset) end
         end
         -- con barra de desplazamiento, las opciones dejan sitio a la derecha
         local itemW = list:GetWidth() - 4 - (scrollable and 12 or 0)
@@ -366,22 +407,10 @@ function UI.Dropdown(parent, text, options, get, set, width)
         end
         if scrollable then
             -- barra de desplazamiento arrastrable
-            bar = CreateFrame("Slider", nil, list, "BackdropTemplate")
-            bar:SetOrientation("VERTICAL")
+            bar = UI.ScrollBar(list, ScrollTo)
             bar:SetPoint("TOPRIGHT", -3, -3)
             bar:SetPoint("BOTTOMRIGHT", -3, 3)
-            bar:SetWidth(8)
-            UI.Backdrop(bar, { 0.03, 0.03, 0.04, 1 }, { 0.2, 0.2, 0.25, 1 })
-            local thumb = bar:CreateTexture(nil, "OVERLAY")
-            thumb:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.9)
-            -- el tamaño del tirador refleja la parte visible de la lista
-            thumb:SetSize(6, math.max(16, (list:GetHeight() - 6) * shown / #opts))
-            bar:SetThumbTexture(thumb)
-            bar:SetMinMaxValues(0, maxOffset)
-            bar:SetValueStep(1)
-            bar:SetObeyStepOnDrag(true)
-            bar:SetValue(0)
-            bar:SetScript("OnValueChanged", function(_, v) ScrollTo(v) end)
+            bar:SetRange(maxOffset, shown / #opts)
             list:EnableMouseWheel(true)
             list:SetScript("OnMouseWheel", function(_, d) ScrollTo(offset - d) end)
             -- al abrir, enseñar la opción seleccionada
@@ -461,29 +490,31 @@ end
 -- Página con scroll vertical
 -------------------------------------------------------------------------------
 function UI.ScrollPage(parent)
+    -- ScrollFrame del juego con nuestra barra a la derecha
     local sf = CreateFrame("ScrollFrame", nil, parent)
-    sf:SetAllPoints()
+    sf:SetPoint("TOPLEFT")
+    sf:SetPoint("BOTTOMRIGHT", -12, 0)
     local content = CreateFrame("Frame", nil, sf)
     content:SetSize(560, 10)
     sf:SetScrollChild(content)
     sf:EnableMouseWheel(true)
-    local bar = sf:CreateTexture(nil, "OVERLAY")
-    bar:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.5)
-    bar:SetWidth(3)
+    local bar = UI.ScrollBar(parent, function(v) sf:SetVerticalScroll(v) end)
+    bar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -2, -2)
+    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -2, 2)
     local function UpdateBar()
         local h, view = content:GetHeight(), sf:GetHeight()
-        if h <= view + 1 then bar:Hide() return end
-        local frac = view / h
-        bar:SetHeight(math.max(20, view * frac))
-        bar:ClearAllPoints()
-        bar:SetPoint("TOPRIGHT", sf, "TOPRIGHT", -1, -(sf:GetVerticalScroll() / h) * view)
-        bar:Show()
+        local max = math.max(0, h - view)
+        if sf:GetVerticalScroll() > max then sf:SetVerticalScroll(max) end
+        bar:SetRange(max, h > 0 and view / h or 1)
+        bar:SetPos(sf:GetVerticalScroll())
     end
     sf:SetScript("OnMouseWheel", function(self, d)
         local max = math.max(0, content:GetHeight() - self:GetHeight())
-        self:SetVerticalScroll(math.min(max, math.max(0, self:GetVerticalScroll() - d * 40)))
-        UpdateBar()
+        local v = math.min(max, math.max(0, self:GetVerticalScroll() - d * 40))
+        self:SetVerticalScroll(v)
+        bar:SetPos(v)
     end)
+    sf:SetScript("OnSizeChanged", UpdateBar)
     content.UpdateBar = UpdateBar
     sf.content = content
     return sf, content

@@ -628,7 +628,7 @@ local function BuildSide()
     holder:SetPoint("TOPLEFT", 6, -96)
     holder:SetPoint("BOTTOMRIGHT", -6, 70)
     local _, c = UI.ScrollPage(holder)
-    c:SetWidth(270)
+    c:SetWidth(262)
     local function Changed()
         if sideCtx and sideCtx.onChange then sideCtx.onChange() end
         if ns.testing then ns.LayoutTest() end
@@ -827,10 +827,16 @@ local function BuildIndicators(p)
     listBg:SetSize(196, ROWS * 20 + 4)
     UI.Backdrop(listBg, { 0.04, 0.04, 0.05, 1 })
     listBg:EnableMouseWheel(true)
+    local RefreshList
+    local listBar = UI.ScrollBar(listBg, function(v) offset = v RefreshList() end)
+    listBar:SetPoint("TOPRIGHT", -3, -3)
+    listBar:SetPoint("BOTTOMRIGHT", -3, 3)
 
-    local function RefreshList()
+    RefreshList = function()
         local list = Inds()
         offset = math.max(0, math.min(offset, #list - ROWS))
+        listBar:SetRange(#list - ROWS, #list > 0 and ROWS / #list or 1)
+        listBar:SetPos(offset)
         for i, row in ipairs(rows) do
             local idx = i + offset
             local ind = list[idx]
@@ -860,7 +866,7 @@ local function BuildIndicators(p)
 
     for i = 1, ROWS do
         local row = CreateFrame("Button", nil, listBg)
-        row:SetSize(192, 19)
+        row:SetSize(180, 19)
         row:SetPoint("TOPLEFT", 2, -2 - (i - 1) * 20)
         row.sel = row:CreateTexture(nil, "BACKGROUND")
         row.sel:SetAllPoints()
@@ -873,7 +879,7 @@ local function BuildIndicators(p)
         row.swatch:SetPoint("LEFT", 4, 0)
         row.name = UI.Label(row, "")
         row.name:SetPoint("LEFT", 16, 0)
-        row.name:SetWidth(120)
+        row.name:SetWidth(108)
         row.name:SetWordWrap(false)
         row.tag = UI.Label(row, "")
         row.tag:SetPoint("RIGHT", -4, 0)
@@ -932,7 +938,7 @@ local function BuildIndicators(p)
     right:SetPoint("TOPLEFT", 212, -4)
     right:SetPoint("BOTTOMRIGHT", -4, 4)
     local _, c = UI.ScrollPage(right)
-    c:SetWidth(380)
+    c:SetWidth(370)
     local function K() local s = Sel() return s and s.kind end
     local function T() local s = Sel() return s and EffType(s) end
     local function isAura() return K() == "aura" end
@@ -1881,11 +1887,14 @@ local function BuildRaid(p)
         listOffset = math.max(0, listOffset - d)
         RefreshRaid()
     end)
+    local listBar = UI.ScrollBar(listArea, function(v) listOffset = v RefreshRaid() end)
+    listBar:SetPoint("TOPRIGHT", -2, 0)
+    listBar:SetPoint("BOTTOMRIGHT", -2, 0)
 
     local listRows = {}
     for i = 1, LIST_ROWS do
         local row = CreateFrame("Frame", nil, listArea)
-        row:SetSize(570, 19)
+        row:SetSize(554, 19)
         row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints()
@@ -2000,10 +2009,13 @@ local function BuildRaid(p)
         seenOffset = math.max(0, seenOffset - d)
         RefreshRaid()
     end)
+    local seenBar = UI.ScrollBar(seenArea, function(v) seenOffset = v RefreshRaid() end)
+    seenBar:SetPoint("TOPRIGHT", -2, 0)
+    seenBar:SetPoint("BOTTOMRIGHT", -2, 0)
     local seenRows = {}
     for i = 1, SEEN_ROWS do
         local row = CreateFrame("Frame", nil, seenArea)
-        row:SetSize(570, 19)
+        row:SetSize(554, 19)
         row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetSize(17, 17)
@@ -2036,6 +2048,8 @@ local function BuildRaid(p)
     RefreshRaid = function()
         local list = SortedList()
         listOffset = math.max(0, math.min(listOffset, #list - LIST_ROWS))
+        listBar:SetRange(#list - LIST_ROWS, #list > 0 and LIST_ROWS / #list or 1)
+        listBar:SetPos(listOffset)
         for i, row in ipairs(listRows) do
             local en = list[i + listOffset]
             row.entry = en
@@ -2075,7 +2089,7 @@ local function BuildRaid(p)
             end
         end
         if #list > LIST_ROWS then
-            scrollInfo:SetText(("%d-%d de %d (rueda)"):format(listOffset + 1, math.min(#list, listOffset + LIST_ROWS), #list))
+            scrollInfo:SetText(("%d-%d de %d"):format(listOffset + 1, math.min(#list, listOffset + LIST_ROWS), #list))
         else
             scrollInfo:SetText(#list == 0 and "lista vacía" or (#list .. " debuffs"))
         end
@@ -2086,6 +2100,8 @@ local function BuildRaid(p)
         end
         table.sort(seen, function(a, b) return a.count > b.count end)
         seenOffset = math.max(0, math.min(seenOffset, #seen - SEEN_ROWS))
+        seenBar:SetRange(#seen - SEEN_ROWS, #seen > 0 and SEEN_ROWS / #seen or 1)
+        seenBar:SetPos(seenOffset)
         for i, row in ipairs(seenRows) do
             local s = seen[i + seenOffset]
             if s then
