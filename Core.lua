@@ -559,6 +559,14 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.ToggleDemo()
     elseif msg == "nativos" then
         -- diagnóstico temporal: ¿tiene este cliente los componentes nativos de Blizzard?
+        -- Todo lo que se imprime se guarda también en MendFramesDB.diag (se
+        -- escribe en disco al hacer /reload o al salir)
+        ns.db.diag = {}
+        local realPrint = ns.Print
+        ns.Print = function(text)
+            table.insert(ns.db.diag, (tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")))
+            realPrint(text)
+        end
         local function T(kind, tmpl)
             local ok = pcall(CreateFrame, kind, nil, UIParent, tmpl)
             return ok and "|cff55ff55sí|r" or "|cffff5555no|r"
@@ -597,6 +605,8 @@ SlashCmdList.MENDFRAMES = function(msg)
             table.sort(fns)
             ns.Print("C_CurveUtil: " .. table.concat(fns, ", "))
         end
+        ns.Print = realPrint
+        realPrint("guardado. Haz /reload para que se escriba en disco.")
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then
