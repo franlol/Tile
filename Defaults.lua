@@ -74,6 +74,12 @@ ns.profileDefaults = {
         healthTex = FLAT,
         bgTex = FLAT,                 -- textura del fondo
         powerTex = FLAT,
+        healPredTex = FLAT,           -- curación entrante
+        absorbTex = FLAT,             -- escudos
+        powerColor = "power",         -- maná/energía/ira: power | class | custom
+        powerCustom = C(0.3, 0.5, 1),
+        powerBrightness = 1,
+        powerBgAlpha = 0.8,           -- opacidad del fondo de la barra de recurso
         healthColor = "class",        -- barra: class | custom | gradient
         customColor = C(0.2, 0.75, 0.3),
         bgColor = "class",            -- fondo: mismas opciones que la barra: class | custom | gradient
@@ -178,7 +184,6 @@ ns.indicatorDefaults = {
     stacks = true,
     swipe = true,
     swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
-    fontSize = 9,
     max = 3,
     grow = "LEFT",
     spacing = 1,
@@ -186,9 +191,11 @@ ns.indicatorDefaults = {
     dispelColor = true,     -- borde según tipo de magia
     onlyDispellable = true,
     excludeClaimed = true,
-    font = FONT,             -- fuente del tiempo y las cargas
-    timerPoint = "CENTER",   -- dónde va el tiempo dentro del elemento
-    stacksPoint = "BOTTOMRIGHT",
+    -- textos del tiempo y de las cargas (mismo estilo que el resto de textos)
+    timerText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+        point = "CENTER", x = 0, y = 0 },
+    stacksText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+        point = "BOTTOMRIGHT", x = 0, y = 0 },
     showBorder = true,       -- borde negro de iconos, cuadrados y barras
     barOrient = "HORIZONTAL",
     barReverse = false,
@@ -237,6 +244,15 @@ function ns.DeepCopy(t)
 end
 
 function ns.FixIndicator(ind)
+    -- antiguo: una fuente y un tamaño para los dos textos, y solo el punto
+    if ind.timerText == nil and (ind.fontSize or ind.font or ind.timerPoint or ind.stacksPoint) then
+        local f, sz = ind.font or FONT, ind.fontSize or 9
+        ind.timerText = { font = f, size = sz, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+            point = ind.timerPoint or "CENTER", x = 0, y = 0 }
+        ind.stacksText = { font = f, size = sz, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+            point = ind.stacksPoint or "BOTTOMRIGHT", x = 0, y = 0 }
+    end
+    ind.font, ind.fontSize, ind.timerPoint, ind.stacksPoint = nil, nil, nil, nil
     ns.CopyDefaults(ns.indicatorDefaults, ind)
     return ind
 end
@@ -313,6 +329,11 @@ function ns.FixProfile(p)
             b.bgColor = b.healthColor or "class"
             b.bgBrightness = 0.25
         end
+    end
+    -- curación entrante y escudos usaban la textura de la vida
+    if b and b.healthTex then
+        if b.healPredTex == nil then b.healPredTex = b.healthTex end
+        if b.absorbTex == nil then b.absorbTex = b.healthTex end
     end
     ns.CopyDefaults(ns.profileDefaults, p)
     if type(inds) ~= "table" then

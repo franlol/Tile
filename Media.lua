@@ -92,3 +92,38 @@ function ns.SetFont(fs, font, size, outline)
         fs:SetFont(STANDARD_TEXT_FONT, size, outline)
     end
 end
+
+-------------------------------------------------------------------------------
+-- Estilo común de cualquier texto (nombre, vida, estado, tiempo, cargas):
+-- { font, size, outline, colorMode = white|class|custom, color, point, x, y }
+-------------------------------------------------------------------------------
+-- dx, dy: ajuste extra (p. ej. para que el texto no se salga de un icono)
+function ns.StyleText(fs, t, anchor, dx, dy)
+    ns.SetFont(fs, t.font, t.size or 10, t.outline or "")
+    fs:ClearAllPoints()
+    local p = t.point or "CENTER"
+    fs:SetPoint(p, anchor, p, (t.x or 0) + (dx or 0), (t.y or 0) + (dy or 0))
+    fs:SetJustifyH(p:find("LEFT") and "LEFT" or (p:find("RIGHT") and "RIGHT" or "CENTER"))
+end
+
+-- r, g, b: color de clase de la unidad (si se conoce)
+function ns.ColorText(fs, t, r, g, b)
+    if t.colorMode == "class" and r then
+        fs:SetTextColor(r, g, b, 1)
+    elseif t.colorMode == "custom" and t.color then
+        local c = t.color
+        fs:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    else
+        fs:SetTextColor(1, 1, 1, 1)
+    end
+end
+
+-- Color de clase de una unidad (si el juego lo deja leer)
+function ns.ClassColorOf(unit)
+    if not unit then return nil end
+    local _, c = UnitClass(unit)
+    c = ns.R and ns.R(c) or c
+    local cc = c and RAID_CLASS_COLORS and RAID_CLASS_COLORS[c]
+    if cc then return cc.r, cc.g, cc.b end
+    return nil
+end

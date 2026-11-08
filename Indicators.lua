@@ -390,37 +390,54 @@ local INSET = {
     BOTTOMLEFT = { 1, -1 }, BOTTOM = { 0, -1 }, BOTTOMRIGHT = { 2, -1 },
 }
 
+local function TextCfg(cfg)
+    return cfg.timerText or ns.indicatorDefaults.timerText, cfg.stacksText or ns.indicatorDefaults.stacksText
+end
+
+-- Color de los textos del tiempo y las cargas. En el tipo «Texto», el color
+-- del tiempo es el del indicador (y el de aviso), como el resto de tipos.
+local function ColorTexts(w, cfg, unit)
+    local tt, st = TextCfg(cfg)
+    local r, g, b
+    if tt.colorMode == "class" or st.colorMode == "class" then r, g, b = ns.ClassColorOf(unit) end
+    if w.timerText and w.wtype ~= "text" then
+        ns.ColorText(w.timerText, tt, r, g, b)
+        local fs = w.cd and w.cd.GetCountdownFontString and w.cd:GetCountdownFontString()
+        if fs then ns.ColorText(fs, tt, r, g, b) end
+    end
+    if w.count then ns.ColorText(w.count, st, r, g, b) end
+end
+
 local function StyleTexts(w, cfg)
-    local size = cfg.fontSize or 9
-    local font = cfg.font or STANDARD_TEXT_FONT
+    local tt, st = TextCfg(cfg)
     if w.timerText then
-        ns.SetFont(w.timerText, font, size, "OUTLINE")
-        w.timerText:SetText("")
-        w.timerText:ClearAllPoints()
         if w.wtype == "text" then
+            -- el propio indicador es el texto: va en su sitio
+            ns.SetFont(w.timerText, tt.font, tt.size or 9, tt.outline or "")
+            w.timerText:ClearAllPoints()
             w.timerText:SetPoint("CENTER")
         else
-            local p = cfg.timerPoint or "CENTER"
-            local o = INSET[p] or INSET.CENTER
-            w.timerText:SetPoint(p, w, p, o[1], o[2])
+            local o = INSET[tt.point or "CENTER"] or INSET.CENTER
+            ns.StyleText(w.timerText, tt, w, o[1], o[2])
         end
+        w.timerText:SetText("")
     end
     if w.count then
-        ns.SetFont(w.count, font, size, "OUTLINE")
-        w.count:SetText("")
-        w.count:ClearAllPoints()
         if w.wtype == "text" then
+            ns.SetFont(w.count, st.font, st.size or 9, st.outline or "")
+            w.count:ClearAllPoints()
             w.count:SetPoint("LEFT", w.timerText, "RIGHT", 1, 0)
         else
-            local p = cfg.stacksPoint or "BOTTOMRIGHT"
-            local o = INSET[p] or INSET.CENTER
-            w.count:SetPoint(p, w, p, o[1], o[2])
+            local o = INSET[st.point or "BOTTOMRIGHT"] or INSET.CENTER
+            ns.StyleText(w.count, st, w, o[1], o[2])
         end
+        w.count:SetText("")
     end
     if w.cd and w.cd.GetCountdownFontString then
         local fs = w.cd:GetCountdownFontString()
-        if fs then pcall(ns.SetFont, fs, font, size, "OUTLINE") end
+        if fs then pcall(ns.SetFont, fs, tt.font, tt.size or 9, tt.outline or "") end
     end
+    ColorTexts(w, cfg, nil)
 end
 
 local function GrowOffset(cfg, i)
@@ -450,7 +467,8 @@ local function LayoutWidget(w, cfg, b)
 
     w:SetPoint(cfg.point, b, cfg.point, cfg.x, cfg.y)
     if t == "text" then
-        w:SetSize(math.max(10, cfg.fontSize * 2.5), cfg.fontSize + 2)
+        local size = TextCfg(cfg).size or 9
+        w:SetSize(math.max(10, size * 2.5), size + 2)
     else
         w:SetSize(cfg.width, cfg.height)
     end
@@ -615,6 +633,8 @@ function ns.ShowAura(w, unit, aura, cfg)
     if w.tex and w.wtype ~= "square" then w.tex:SetTexture(aura.icon) end
     if w.SetMainColor then w:SetMainColor(cfg.color) end
     if w.wtype == "icon" then DispelBorder(w, aura, cfg) end
+    local tt, st = TextCfg(cfg)
+    if tt.colorMode == "class" or st.colorMode == "class" then ColorTexts(w, cfg, unit) end
     w:Show()
     ApplyCooldown(w, unit, aura, cfg)
     ApplyDrain(w, unit, aura)

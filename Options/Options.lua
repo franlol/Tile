@@ -21,6 +21,106 @@ end
 
 local function Refresh() UI.RefreshAll() end
 
+-- Tras cambiar algo del perfil editado desde un bloque común
+local function PAfter()
+    ns.ProfileChanged()
+    UI.RefreshAll()
+end
+
+-------------------------------------------------------------------------------
+-- Bloques comunes: cada tipo de cosa tiene siempre las mismas opciones,
+-- con los mismos nombres y en el mismo orden
+--   Texto:  Mostrar · Fuente · Tamaño · Contorno · Color · Posición (X, Y)
+--   Icono:  Mostrar · Tamaño · Posición (X, Y)
+--   Barra:  Textura · Color (propio, brillo) · Opacidad
+-------------------------------------------------------------------------------
+
+-- Une controles sueltos y listas de controles en una sola lista
+local function Flat(items)
+    local out = {}
+    for _, v in ipairs(items) do
+        if v.GetObjectType then
+            out[#out + 1] = v
+        else
+            for _, w in ipairs(v) do out[#out + 1] = w end
+        end
+    end
+    return out
+end
+
+local function Both(a, b)
+    if not a then return b end
+    if not b then return a end
+    return function() return a() and b() end
+end
+
+-- Añade condiciones a un control (sin perder las que ya tenga)
+local function Cond(w, showIf, enableIf)
+    w.showIf = Both(w.showIf, showIf)
+    w.enableIf = Both(w.enableIf, enableIf)
+    return w
+end
+local function All(list, showIf, enableIf)
+    for _, w in ipairs(list) do Cond(w, showIf, enableIf) end
+    return list
+end
+
+local TEXT_COLORS = { { "white", "Blanco" }, { "class", "Color de clase" }, { "custom", "Personalizado" } }
+local BAR_COLORS = {
+    { "class", "Color de clase" }, { "custom", "Un solo color" }, { "gradient", "Degradado según la vida" },
+}
+local POWER_COLORS = {
+    { "power", "Color del recurso" }, { "class", "Color de clase" }, { "custom", "Un solo color" },
+}
+
+-- Posición: punto de anclaje y X/Y pegados (mismos rangos en todas partes)
+local function PositionBlock(c, root, after, o)
+    o = o or {}
+    return {
+        Cond(UI.Dropdown(c, "Posición", UI.POINTS, UI.Bind(root, "point", after)), o.showIf, o.enableIf),
+        Cond(UI.Attach(UI.Slider(c, "X", -80, 80, 1, nil, UI.Bind(root, "x", after))), o.showIf, o.enableIf),
+        Cond(UI.Attach(UI.Slider(c, "Y", -60, 60, 1, nil, UI.Bind(root, "y", after))), o.showIf, o.enableIf),
+    }
+end
+
+-- Texto. root() devuelve su tabla de estilo.
+-- o.show = { get, set } añade «Mostrar»; o.extra, controles justo después;
+-- o.showIf / o.enableIf para todo el bloque (enableIf no afecta a «Mostrar»);
+-- o.showCheckIf, o.colorIf, o.positionIf para partes concretas.
+local function TextBlock(c, root, after, o)
+    o = o or {}
+    local list = {}
+    local function Add(w, showIf, enableIf)
+        list[#list + 1] = Cond(w, Both(o.showIf, showIf), Both(o.enableIf, enableIf))
+    end
+    if o.show then
+        list[#list + 1] = Cond(UI.Check(c, "Mostrar", o.show[1], o.show[2]), Both(o.showIf, o.showCheckIf))
+    end
+    for _, w in ipairs(o.extra or {}) do Add(w) end
+    local function B(k) return UI.Bind(root, k, after) end
+    Add(UI.Dropdown(c, "Fuente", ns.FontList, B("font")))
+    Add(UI.Slider(c, "Tamaño", 6, 24, 1, nil, B("size")))
+    Add(UI.Dropdown(c, "Contorno", ns.OUTLINES, B("outline")))
+    Add(UI.Dropdown(c, "Color", TEXT_COLORS, B("colorMode")), o.colorIf)
+    Add(UI.Attach(UI.Swatch(c, "Color personalizado", function() return root().color end,
+        function() if after then after() end end, true)),
+        o.colorIf, function() return root().colorMode == "custom" end)
+    for _, w in ipairs(PositionBlock(c, root, after)) do Add(w, o.positionIf) end
+    return list
+end
+
+-- Color de una barra: modo, color propio y brillo (los dos últimos, pegados)
+local function BarColorBlock(c, modes, modeKey, customKey, brightKey)
+    local function Mode() return UI.Bind(ns.EP, modeKey)() end
+    return {
+        UI.Dropdown(c, "Color", modes, PB(modeKey)),
+        Cond(UI.Attach(UI.Swatch(c, "Color personalizado", function() return UI.Bind(ns.EP, customKey)() end,
+            ns.ProfileChanged, true)), nil, function() return Mode() == "custom" end),
+        Cond(UI.Attach(UI.Slider(c, "Brillo", 0.1, 1, 0.05, UI.pct, PB(brightKey))), nil,
+            function() return Mode() ~= "custom" end),
+    }
+end
+
 -- cuando la búsqueda en segundo plano encuentra el ID de un nombre
 ns.OnSpellResolved = function()
     if ns.testing and ns.LayoutTest then ns.LayoutTest() end
@@ -308,63 +408,62 @@ end
 local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
-    local function E(w, cond) w.enableIf = cond return w end
-    local barSwatch = UI.Attach(UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged))
-    barSwatch.enableIf = function() return ns.EP().bars.healthColor == "custom" end
-    local bgSwatch = UI.Attach(UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged))
-    bgSwatch.enableIf = function() return ns.EP().bars.bgColor == "custom" end
+    local function On(path) return function() return UI.Bind(ns.EP, path)() and true or false end end
+    local function Smooth(path)
+        return Cond(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
+            or "Llenado y vaciado suave (no disponible en este cliente)", PB(path)), nil,
+            function() return ns.hasNativeSmooth end)
+    end
+    local power = On("bars.showPower")
 
-    local a = UI.Stack(c, COL1, -6, {
+    local a = UI.Stack(c, COL1, -6, Flat({
         UI.Header(c, "Vida"),
-        UI.Dropdown(c, "Textura de la vida", ns.TextureList, PB("bars.healthTex")),
-        E(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
-            or "Llenado y vaciado suave (no disponible en este cliente)", PB("bars.smooth")),
-            function() return ns.hasNativeSmooth end),
-        UI.Dropdown(c, "Color de la barra", {
-            { "class", "Color de clase" },
-            { "custom", "Un solo color" },
-            { "gradient", "Degradado según la vida" },
-        }, PB("bars.healthColor")),
-        barSwatch,
-        E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
-            function() return ns.EP().bars.healthColor ~= "custom" end),
-        UI.Dropdown(c, "Textura del fondo (vida que falta)", ns.TextureList, PB("bars.bgTex")),
-        UI.Dropdown(c, "Color del fondo", {
-            { "class", "Color de clase" },
-            { "custom", "Un solo color" },
-            { "gradient", "Degradado según la vida" },
-        }, PB("bars.bgColor")),
-        bgSwatch,
-        E(UI.Attach(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness"))),
-            function() return ns.EP().bars.bgColor ~= "custom" end),
-        UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
-        UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
-        UI.Header(c, "Maná / energía / ira"),
-        UI.Check(c, "Mostrar barra", PB("bars.showPower")),
-        E(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
-            or "Llenado y vaciado suave (no disponible en este cliente)", PB("bars.powerSmooth")),
-            function() return ns.hasNativeSmooth end),
-        UI.Check(c, "Solo para quien usa maná", PB("bars.powerOnlyMana")),
-        UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.powerTex")),
-        UI.Slider(c, "Alto", 1, 12, 1, nil, PB("bars.powerHeight")),
-    })
-    local b = UI.Stack(c, COL2, -6, {
+        UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.healthTex")),
+        Smooth("bars.smooth"),
+        BarColorBlock(c, BAR_COLORS, "bars.healthColor", "bars.customColor", "bars.healthBrightness"),
+
+        UI.Header(c, "Fondo (vida que falta)"),
+        UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.bgTex")),
+        BarColorBlock(c, BAR_COLORS, "bars.bgColor", "bars.bgCustom", "bars.bgBrightness"),
+        UI.Slider(c, "Opacidad", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
+
         UI.Header(c, "Curación y escudos"),
         UI.Check(c, "Curación entrante", PB("bars.showHealPred")),
-        UI.Attach(UI.Swatch(c, "Color de curación entrante", Col("bars.healPredColor"), ns.ProfileChanged, true)),
+        Cond(UI.Attach(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.healPredTex"))), nil, On("bars.showHealPred")),
+        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.healPredColor"), ns.ProfileChanged, true)), nil,
+            On("bars.showHealPred")),
         UI.Check(c, "Escudos (absorción)", PB("bars.showAbsorb")),
-        UI.Attach(UI.Swatch(c, "Color de escudos", Col("bars.absorbColor"), ns.ProfileChanged, true)),
-        UI.Header(c, "Resaltados"),
+        Cond(UI.Attach(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.absorbTex"))), nil, On("bars.showAbsorb")),
+        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.absorbColor"), ns.ProfileChanged, true)), nil,
+            On("bars.showAbsorb")),
+    }))
+
+    local b = UI.Stack(c, COL2, -6, Flat({
+        UI.Header(c, "Maná / energía / ira"),
+        UI.Check(c, "Mostrar", PB("bars.showPower")),
+        Cond(UI.Attach(UI.Check(c, "Solo para quien usa maná", PB("bars.powerOnlyMana"))), nil, power),
+        Cond(UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.powerTex")), nil, power),
+        Cond(Smooth("bars.powerSmooth"), nil, power),
+        All(BarColorBlock(c, POWER_COLORS, "bars.powerColor", "bars.powerCustom", "bars.powerBrightness"), nil, power),
+        Cond(UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.powerBgAlpha")), nil, power),
+        Cond(UI.Slider(c, "Alto", 1, 12, 1, nil, PB("bars.powerHeight")), nil, power),
+
+        UI.Header(c, "Marco"),
+        UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
         UI.Slider(c, "Opacidad fuera de rango", 0.1, 1, 0.05, UI.pct, PB("bars.rangeAlpha")),
+
+        UI.Header(c, "Resaltados"),
         UI.Check(c, "Resaltar mi objetivo", PB("bars.targetHighlight")),
-        UI.Attach(UI.Swatch(c, "Color del objetivo", Col("bars.targetColor"), ns.ProfileChanged, true)),
+        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.targetColor"), ns.ProfileChanged, true)), nil,
+            On("bars.targetHighlight")),
         UI.Check(c, "Marcar quien tiene amenaza (aggro)", PB("bars.aggro")),
-        UI.Attach(UI.Swatch(c, "Color de amenaza", Col("bars.aggroColor"), ns.ProfileChanged, true)),
+        Cond(UI.Attach(UI.Swatch(c, "Color", Col("bars.aggroColor"), ns.ProfileChanged, true)), nil, On("bars.aggro")),
+
         UI.Header(c, "Tooltips"),
         UI.Dropdown(c, "Tooltip al pasar por un icono de aura", {
             { "always", "Siempre" }, { "ooc", "Solo fuera de combate" }, { "never", "Nunca" },
         }, PB("bars.auraTooltip")),
-    })
+    }))
     UI.FitContent(c, { a, b })
 end
 
@@ -372,28 +471,15 @@ end
 -- Textos
 -------------------------------------------------------------------------------
 local function TextSection(c, key, title, extra)
-    local base = "texts." .. key
-    local function isCustom() return ns.EP().texts[key].colorMode == "custom" end
-    local sw = UI.Attach(UI.Swatch(c, "Color", function() return ns.EP().texts[key].color end, ns.ProfileChanged))
-    sw.enableIf = isCustom
-    local list = {
+    local function root() return ns.EP().texts[key] end
+    return Flat({
         UI.Header(c, title),
-        UI.Check(c, "Mostrar", PB(base .. ".show")),
-    }
-    for _, w in ipairs(extra or {}) do list[#list + 1] = w end
-    for _, w in ipairs({
-        UI.Dropdown(c, "Fuente", ns.FontList, PB(base .. ".font")),
-        UI.Slider(c, "Tamaño", 6, 24, 1, nil, PB(base .. ".size")),
-        UI.Dropdown(c, "Contorno", ns.OUTLINES, PB(base .. ".outline")),
-        UI.Dropdown(c, "Color", {
-            { "white", "Blanco" }, { "class", "Color de clase" }, { "custom", "Personalizado" },
-        }, PB(base .. ".colorMode")),
-        sw,
-        UI.Dropdown(c, "Posición", UI.POINTS, PB(base .. ".point")),
-        UI.Attach(UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x"))),
-        UI.Attach(UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y"))),
-    }) do list[#list + 1] = w end
-    return list
+        TextBlock(c, root, PAfter, {
+            show = { PB("texts." .. key .. ".show") },
+            extra = extra,
+            enableIf = function() return root().show end,
+        }),
+    })
 end
 
 local function BuildTexts(p)
@@ -401,8 +487,7 @@ local function BuildTexts(p)
     local nameList = TextSection(c, "name", "Nombre", {
         UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
-    local statusList = TextSection(c, "status", "Estado (muerto, desconectado...)")
-    for _, w in ipairs(statusList) do nameList[#nameList + 1] = w end
+    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)")) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 
     local b = UI.Stack(c, COL2, -6, TextSection(c, "health", "Texto de vida", {
@@ -422,15 +507,14 @@ end
 -- Iconos de estado
 -------------------------------------------------------------------------------
 local function ElementSection(c, key, title)
-    local base = "elements." .. key
-    return {
+    local function root() return ns.EP().elements[key] end
+    local function on() return root().show end
+    return Flat({
         UI.Header(c, title),
-        UI.Check(c, "Mostrar", PB(base .. ".show")),
-        UI.Dropdown(c, "Posición", UI.POINTS, PB(base .. ".point")),
-        UI.Attach(UI.Slider(c, "Desplazamiento X", -60, 60, 1, nil, PB(base .. ".x"))),
-        UI.Attach(UI.Slider(c, "Desplazamiento Y", -40, 40, 1, nil, PB(base .. ".y"))),
-        UI.Slider(c, "Tamaño", 6, 40, 1, nil, PB(base .. ".size")),
-    }
+        UI.Check(c, "Mostrar", PB("elements." .. key .. ".show")),
+        Cond(UI.Slider(c, "Tamaño", 6, 40, 1, nil, PB("elements." .. key .. ".size")), nil, on),
+        PositionBlock(c, root, PAfter, { enableIf = on }),
+    })
 end
 
 local function BuildElements(p)
@@ -1218,7 +1302,8 @@ local function BuildIndicators(p)
                 local g = Ghost(n)
                 local gt = EffType(ind)
                 if gt == "text" then
-                    g:SetSize(math.max(10, (ind.fontSize or 10) * 2.5), (ind.fontSize or 10) + 2)
+                    local fsz = (ind.timerText and ind.timerText.size) or 9
+                    g:SetSize(math.max(10, fsz * 2.5), fsz + 2)
                 else
                     g:SetSize(ind.width or 10, ind.height or 10)
                 end
@@ -1231,7 +1316,8 @@ local function BuildIndicators(p)
 
         local t = EffType(s)
         if t == "text" then
-            el:SetSize(math.max(10, s.fontSize * 2.5), s.fontSize + 2)
+            local fsz = (s.timerText and s.timerText.size) or 9
+            el:SetSize(math.max(10, fsz * 2.5), fsz + 2)
         else
             el:SetSize(math.max(2, s.width), math.max(2, s.height))
         end
@@ -1260,7 +1346,7 @@ local function BuildIndicators(p)
     end
     table.insert(UI.widgets, posSample)
 
-    local st = UI.Stack(c, 4, -4, {
+    local st = UI.Stack(c, 4, -4, Flat({
         UI.Header(c, "Indicador"),
         nameW,
         UI.Check(c, "Activo", IB("enabled")),
@@ -1306,9 +1392,7 @@ local function BuildIndicators(p)
 
         W(UI.Header(c, "Posición y tamaño"), notDispel),
         W(posSample, notDispel),
-        W(UI.Dropdown(c, "Punto de anclaje", UI.POINTS, IB("point")), notDispel),
-        W(UI.Attach(UI.Slider(c, "Desplazamiento X", -80, 80, 1, nil, IB("x"))), notDispel),
-        W(UI.Attach(UI.Slider(c, "Desplazamiento Y", -60, 60, 1, nil, IB("y"))), notDispel),
+        PositionBlock(c, Sel, IndChanged, { showIf = notDispel }),
         W(sizeW, iconLike),
         W(UI.Slider(c, "Ancho", 1, 120, 1, nil, IB("width")), rect),
         W(UI.Attach(UI.Slider(c, "Alto", 1, 60, 1, nil, IB("height"))), rect),
@@ -1349,15 +1433,23 @@ local function BuildIndicators(p)
         WE(UI.Attach(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true)),
             timed, function() return Sel().warnAt > 0 end),
 
-        W(UI.Header(c, "Textos"), hasText),
-        W(UI.Check(c, "Mostrar tiempo restante", IB("timer")), function() return hasText() and T() ~= "text" end),
-        WE(UI.Attach(UI.Dropdown(c, "Posición del tiempo", UI.POINTS, IB("timerPoint"))),
-            function() return hasText() and T() ~= "text" end, function() return Sel().timer end),
-        W(UI.Check(c, "Mostrar cargas", IB("stacks")), hasText),
-        WE(UI.Attach(UI.Dropdown(c, "Posición de las cargas", UI.POINTS, IB("stacksPoint"))),
-            function() return hasText() and T() ~= "text" end, function() return Sel().stacks end),
-        W(UI.Dropdown(c, "Fuente", ns.FontList, IB("font")), hasText),
-        W(UI.Slider(c, "Tamaño del texto", 6, 24, 1, nil, IB("fontSize")), hasText),
+        -- el tipo «Texto» es el propio tiempo: va donde el indicador y con su color
+        W(UI.Header(c, "Texto del tiempo"), hasText),
+        TextBlock(c, function() return Sel().timerText end, IndChanged, {
+            show = { IB("timer") },
+            showCheckIf = function() return T() ~= "text" end,
+            showIf = hasText,
+            enableIf = function() return T() == "text" or Sel().timer end,
+            colorIf = function() return T() ~= "text" end,
+            positionIf = function() return T() ~= "text" end,
+        }),
+        W(UI.Header(c, "Texto de las cargas"), hasText),
+        TextBlock(c, function() return Sel().stacksText end, IndChanged, {
+            show = { IB("stacks") },
+            showIf = hasText,
+            enableIf = function() return Sel().stacks end,
+            positionIf = function() return T() ~= "text" end,
+        }),
 
         UI.Header(c, "Resaltado"),
         hlSummary,
@@ -1365,7 +1457,7 @@ local function BuildIndicators(p)
         W(UI.Note(c, "Excepciones: en la lista de hechizos, el botón «brillo» de cada uno le da un resaltado propio que sustituye a este.", 340), isAura),
         W(UI.Note(c, "Excepciones: en la pestaña «Debuffs de banda», haz clic en un debuff para darle un resaltado propio en esa instancia.", 340),
             function() return K() == "raiddebuff" end),
-    })
+    }))
 
     p.OnShow = function() end
     UI.OnRefreshIndicators = function()

@@ -113,11 +113,7 @@ function ns.BuildVisuals(b)
 end
 
 local function PlaceText(fs, t, b)
-    ns.SetFont(fs, t.font, t.size, t.outline)
-    fs:ClearAllPoints()
-    fs:SetPoint(t.point, b, t.point, t.x, t.y)
-    local j = t.point:find("LEFT") and "LEFT" or (t.point:find("RIGHT") and "RIGHT" or "CENTER")
-    fs:SetJustifyH(j)
+    ns.StyleText(fs, t, b)
     fs:SetShown(t.show)
 end
 
@@ -147,9 +143,10 @@ function ns.LayoutButton(b, isPet)
     b.bg:SetColorTexture(B.borderColor.r, B.borderColor.g, B.borderColor.b, B.borderColor.a or 1)
     b.health:SetStatusBarTexture(B.healthTex)
     b.health.bg:SetTexture(B.bgTex)
-    b.pred:SetStatusBarTexture(B.healthTex)
-    b.absorb:SetStatusBarTexture(B.healthTex)
+    b.pred:SetStatusBarTexture(B.healPredTex or B.healthTex)
+    b.absorb:SetStatusBarTexture(B.absorbTex or B.healthTex)
     b.power:SetStatusBarTexture(B.powerTex)
+    b.power.bg:SetColorTexture(0, 0, 0, B.powerBgAlpha or 0.8)
     local pc, ac = B.healPredColor, B.absorbColor
     b.pred:SetStatusBarColor(pc.r, pc.g, pc.b, pc.a)
     b.absorb:SetStatusBarColor(ac.r, ac.g, ac.b, ac.a)
@@ -198,11 +195,7 @@ local function UnitColor(unit, isPet, testClass)
     return 0.5, 0.5, 0.5
 end
 
-local function TextColor(fs, t, r, g, bl)
-    if t.colorMode == "class" then fs:SetTextColor(r, g, bl)
-    elseif t.colorMode == "custom" then fs:SetTextColor(t.color.r, t.color.g, t.color.b)
-    else fs:SetTextColor(1, 1, 1) end
-end
+local TextColor = ns.ColorText
 
 -- Degradado rojo -> amarillo -> verde según el porcentaje de vida (0..1)
 local function Gradient(pct)
@@ -224,12 +217,26 @@ end
 -- Color para un modo (class | custom | gradient). El brillo solo oscurece el
 -- color de clase y el degradado; un color elegido a mano se ve tal cual.
 -- Si el juego oculta la vida, el degradado usa el color de clase.
+-- Devuelve r, g, b, a. Lo usan la vida, su fondo y la barra de recurso.
 local function ModeColor(mode, custom, brightness, cr, cg, cb, pct)
-    if mode == "custom" then return custom.r, custom.g, custom.b end
+    if mode == "custom" then return custom.r, custom.g, custom.b, custom.a or 1 end
     local r, g, bl = cr, cg, cb
     if mode == "gradient" and pct then r, g, bl = Gradient(pct) end
     local k = brightness or 1
-    return r * k, g * k, bl * k
+    return r * k, g * k, bl * k, 1
+end
+
+-- Barra de recurso: color del recurso, de clase o uno elegido (con brillo)
+local function PowerColor(b, pr, pg, pb, testClass)
+    local B = ns.P.bars
+    local mode = B.powerColor or "power"
+    if mode == "class" then
+        local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
+        b.power:SetStatusBarColor(ModeColor("class", nil, B.powerBrightness, cr, cg, cb))
+    else
+        b.power:SetStatusBarColor(ModeColor(mode == "custom" and "custom" or "class", B.powerCustom,
+            B.powerBrightness, pr, pg, pb))
+    end
 end
 
 -- Color de la barra de vida y de su fondo (la vida que falta): mismas opciones
@@ -239,8 +246,8 @@ function ns.UpdateBarColor(b, testClass, testPct)
     local pct
     if B.healthColor == "gradient" or B.bgColor == "gradient" then pct = HealthPct(b, testPct) end
     b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
-    local r, g, bl = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
-    b.health.bg:SetVertexColor(r, g, bl, B.bgAlpha)
+    local r, g, bl, a = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
+    b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
 function ns.UpdateColors(b, testClass, testPct)
@@ -386,7 +393,7 @@ function ns.UpdatePower(b)
     b.lastPowerUnit = u
     token = R(token)
     local c = token and PowerBarColor and PowerBarColor[token]
-    if c then b.power:SetStatusBarColor(c.r, c.g, c.b) else b.power:SetStatusBarColor(0.3, 0.5, 1) end
+    if c then PowerColor(b, c.r, c.g, c.b) else PowerColor(b, 0.3, 0.5, 1) end
 end
 
 function ns.UpdateName(b)
@@ -867,7 +874,7 @@ local function FillTest(b)
     b.power:SetValue(60)
     local pc = (class == "WARRIOR" and PowerBarColor and PowerBarColor.RAGE)
         or (class == "ROGUE" and PowerBarColor and PowerBarColor.ENERGY)
-    if pc then b.power:SetStatusBarColor(pc.r, pc.g, pc.b) else b.power:SetStatusBarColor(0, 0.55, 1) end
+    if pc then PowerColor(b, pc.r, pc.g, pc.b, class) else PowerColor(b, 0, 0.55, 1, class) end
 
     local dead = (i == 7)
     b.status:SetText((dead and T.status.show) and "Muerto" or "")
