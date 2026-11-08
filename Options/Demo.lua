@@ -164,7 +164,8 @@ local function Segmented(parent, labels, sel, onChange)
 end
 
 -- Deslizador con la parte llena de color y el valor al lado
-local function Slider(parent, value, onChange)
+local function Slider(parent, value, onChange, maxV, fmt)
+    maxV = maxV or 100
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(170, 20)
     local s = CreateFrame("Slider", nil, f)
@@ -182,7 +183,7 @@ local function Slider(parent, value, onChange)
     thumb:SetColorTexture(0.95, 0.95, 0.97, 1)
     thumb:SetSize(8, 14)
     s:SetThumbTexture(thumb)
-    s:SetMinMaxValues(0, 100)
+    s:SetMinMaxValues(0, maxV)
     s:SetValueStep(1)
     s:SetObeyStepOnDrag(true)
     local val = Txt(f, "", 11.5, { 0.79, 0.80, 0.84 })
@@ -190,8 +191,8 @@ local function Slider(parent, value, onChange)
     val:SetJustifyH("RIGHT")
     s:SetScript("OnValueChanged", function(_, v)
         v = math.floor(v + 0.5)
-        fill:SetWidth(math.max(1, 126 * v / 100))
-        val:SetText(v .. "%")
+        fill:SetWidth(math.max(1, 126 * v / maxV))
+        val:SetText(fmt and fmt(v) or (v .. "%"))
         if onChange then onChange(v) end
     end)
     s:SetValue(value)
@@ -207,11 +208,12 @@ local function Swatch(parent, r, g, b)
     return f
 end
 
-local function Dropdown(parent, text, w)
+local function Dropdown(parent, text, w, noStripe)
     local b = Btn(parent, "", w or 150, 26)
     local stripe = Fill(b, A, 1, "ARTWORK")
     stripe:SetSize(40, 8)
     stripe:SetPoint("LEFT", 9, 0)
+    if noStripe then stripe:SetWidth(1) stripe:SetAlpha(0) end
     b.text:ClearAllPoints()
     b.text:SetPoint("LEFT", stripe, "RIGHT", 8, 0)
     b.text:SetText(text)
@@ -274,6 +276,14 @@ local function Section(parent, x, y, w, title)
         control:ClearAllPoints()
         control:SetPoint("TOPLEFT", 14, self.y - 30)
         self.y = self.y - 64
+    end
+    -- hueco libre para contenido propio (fichas, rejillas, listas)
+    function s:Block(h)
+        local b = CreateFrame("Frame", nil, self)
+        b:SetPoint("TOPLEFT", 14, self.y - 6)
+        b:SetSize(self:GetWidth() - 28, h)
+        self.y = self.y - h - 12
+        return b
     end
     function s:Finish()
         self:SetHeight(-self.y + 8)
@@ -468,6 +478,328 @@ end
 -------------------------------------------------------------------------------
 -- Ventana
 -------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+-- Más pantallas de muestra
+-------------------------------------------------------------------------------
+local function Chip(parent, icon, text)
+    local c = Box(parent, 10, 24, C.raised, C.line2)
+    local ic = Icon(c, icon, 16)
+    ic:SetPoint("LEFT", 4, 0)
+    local t = Txt(c, text, 11.5)
+    t:SetPoint("LEFT", ic, "RIGHT", 6, 0)
+    local x = Txt(c, "x", 11, C.dim)
+    x:SetPoint("LEFT", t, "RIGHT", 8, 0)
+    c:SetWidth(math.floor(t:GetStringWidth() + 46))
+    return c
+end
+
+-- Fila de botones-ficha que se colocan seguidas y saltan de línea
+local function Flow(block, items, w, gap)
+    local x, y = 0, 0
+    for _, it in ipairs(items) do
+        local iw = it:GetWidth()
+        if x > 0 and x + iw > w then x, y = 0, y - it:GetHeight() - gap end
+        it:SetParent(block)
+        it:ClearAllPoints()
+        it:SetPoint("TOPLEFT", x, y)
+        x = x + iw + gap
+    end
+end
+
+local function BuildProfilesPage(pg, CW)
+    local FW = CW - 48
+    local s1 = Section(pg, 24, 0, FW, "Perfil que estás editando")
+    local tiles = s1:Block(60)
+    local names = {
+        { "Banda 40", "En uso ahora", "Interface\\Icons\\INV_Misc_Head_Dragon_01" },
+        { "Grupo", "1-5 jugadores", "Interface\\Icons\\Ability_Warrior_BattleShout" },
+        { "ZG / AQ20", "Hasta 20", "Interface\\Icons\\INV_Misc_Head_Troll_01" },
+        { "Default", "Sin asignar", "Interface\\Icons\\INV_Misc_QuestionMark" },
+    }
+    local tw = math.floor((FW - 28 - 3 * 10) / 4)
+    local all = {}
+    local function Pick(i)
+        for k, t in ipairs(all) do
+            if k == i then
+                t:SetBackdropColor(A[1] * 0.16, A[2] * 0.16, A[3] * 0.16, 1)
+                t:SetBackdropBorderColor(A[1], A[2], A[3], 1)
+            else
+                t:SetBackdropColor(C.raised[1], C.raised[2], C.raised[3], 1)
+                t:SetBackdropBorderColor(C.line2[1], C.line2[2], C.line2[3], 1)
+            end
+        end
+    end
+    for i, n in ipairs(names) do
+        local t = CreateFrame("Button", nil, tiles, "BackdropTemplate")
+        t:SetSize(tw, 56)
+        t:SetPoint("TOPLEFT", (i - 1) * (tw + 10), 0)
+        t:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, edgeSize = 1 })
+        local ic = Icon(t, n[3], 30)
+        ic:SetPoint("LEFT", 10, 0)
+        local a = Txt(t, n[1], 13)
+        a:SetPoint("TOPLEFT", ic, "TOPRIGHT", 10, -1)
+        local b = Txt(t, n[2], 11, C.dim)
+        b:SetPoint("BOTTOMLEFT", ic, "BOTTOMRIGHT", 10, 1)
+        t:SetScript("OnClick", function() Pick(i) end)
+        all[i] = t
+    end
+    Pick(1)
+    local acts = s1:Block(28)
+    local b1 = Btn(acts, "Duplicar", 96, 26)
+    b1:SetPoint("LEFT")
+    local b2 = Btn(acts, "Renombrar", 96, 26)
+    b2:SetPoint("LEFT", b1, "RIGHT", 8, 0)
+    local b3 = Btn(acts, "Restablecer", 96, 26)
+    b3:SetPoint("LEFT", b2, "RIGHT", 8, 0)
+    local b4 = Btn(acts, "Borrar", 80, 26)
+    b4:SetPoint("LEFT", b3, "RIGHT", 8, 0)
+    b4.text:SetTextColor(1, 0.45, 0.35)
+    local nb = Btn(acts, "+ Nuevo perfil", 120, 26, A)
+    nb.text:SetTextColor(INK[1], INK[2], INK[3])
+    nb:SetPoint("RIGHT")
+    local y1 = s1:Finish()
+
+    local s2 = Section(pg, 24, y1 - 22, FW, "Qué perfil usa este personaje según el grupo")
+    local sizes = {
+        { "5", "Grupo / solo", "Grupo" }, { "10", "Banda de hasta 10", "Default" },
+        { "20", "Banda de hasta 20", "ZG / AQ20" }, { "40", "Banda de hasta 40", "Banda 40", true },
+    }
+    for _, sz in ipairs(sizes) do
+        local blk = s2:Block(30)
+        local badge = Box(blk, 34, 24, sz[4] and A or C.raised, sz[4] and A or C.line2)
+        badge:SetPoint("LEFT")
+        local bt = Txt(badge, sz[1], 12, sz[4] and INK or C.text)
+        bt:SetPoint("CENTER")
+        local l = Txt(blk, sz[2], 12.5)
+        l:SetPoint("LEFT", badge, "RIGHT", 12, 0)
+        if sz[4] then
+            local now = Txt(blk, "tu grupo ahora", 11, A)
+            now:SetPoint("LEFT", l, "RIGHT", 10, 0)
+        end
+        local dd = Dropdown(blk, sz[3], 170, true)
+        dd:SetPoint("RIGHT", -86, 0)
+        local ed = Btn(blk, "Editar", 76, 26)
+        ed:SetPoint("RIGHT")
+    end
+    s2:Finish()
+end
+
+local function BuildLayoutPage(pg, CW)
+    local colW = (CW - 48 - 14) / 2
+    local x1, x2 = 24, 24 + colW + 14
+    local px = function(v) return v .. " px" end
+    local s1 = Section(pg, x1, 0, colW, "Tamaño de cada marco")
+    s1:Row("Ancho", nil, Slider(s1, 72, nil, 200, px))
+    s1:Row("Alto", nil, Slider(s1, 42, nil, 100, px))
+    s1:Row("Escala", nil, Slider(s1, 100, nil, 200))
+    s1:Row("Entre jugadores", nil, Slider(s1, 2, nil, 12, px))
+    s1:Sub("Entre grupos", Slider(s1, 8, nil, 40, px))
+    local y1 = s1:Finish()
+    local s2 = Section(pg, x1, y1 - 22, colW, "Mascotas")
+    s2:Row("Mostrar mascotas", nil, Toggle(s2, true))
+    s2:Row("Pegadas a la banda", "Como un grupo más", Toggle(s2, false))
+    s2:Row("Mismo tamaño que los jugadores", nil, Toggle(s2, true))
+    s2:Finish()
+
+    local s3 = Section(pg, x2, 0, colW, "Organización")
+    s3:Stacked("Orientación", Segmented(s3, { "Columnas", "Filas" }, 1))
+    s3:Stacked("Agrupar por", Segmented(s3, { "Grupo", "Rol", "Clase" }, 2))
+    s3:Row("Ordenar por nombre", nil, Toggle(s3, false))
+    s3:Row("Mostrarme a mí", nil, Toggle(s3, true))
+    local y3 = s3:Finish()
+    local s4 = Section(pg, x2, y3 - 22, colW, "Grupos que se muestran")
+    local blk = s4:Block(62)
+    local cw = math.floor((colW - 28 - 3 * 6) / 4)
+    for i = 1, 8 do
+        local on = i <= 5
+        local b = CreateFrame("Button", nil, blk, "BackdropTemplate")
+        b:SetSize(cw, 28)
+        b:SetPoint("TOPLEFT", ((i - 1) % 4) * (cw + 6), -math.floor((i - 1) / 4) * 34)
+        b:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, edgeSize = 1 })
+        b.t = Txt(b, "Grupo " .. i, 11.5)
+        b.t:SetPoint("CENTER")
+        local function Paint()
+            if b.on then
+                b:SetBackdropColor(A[1] * 0.2, A[2] * 0.2, A[3] * 0.2, 1)
+                b:SetBackdropBorderColor(A[1], A[2], A[3], 1)
+                b.t:SetTextColor(1, 1, 1)
+            else
+                b:SetBackdropColor(C.win[1], C.win[2], C.win[3], 1)
+                b:SetBackdropBorderColor(C.line2[1], C.line2[2], C.line2[3], 1)
+                b.t:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
+            end
+        end
+        b.on = on
+        Paint()
+        b:SetScript("OnClick", function() b.on = not b.on Paint() end)
+    end
+    s4:Finish()
+end
+
+local function BuildIndicatorsPage(pg, CW)
+    -- lista de indicadores a la izquierda
+    local LW = 200
+    local list = Box(pg, LW, 470, C.card, C.line)
+    list:SetPoint("TOPLEFT", 24, 0)
+    local lh = Txt(list, "TUS INDICADORES", 10.5, A)
+    lh:SetPoint("TOPLEFT", 12, -12)
+    local items = {
+        { "Rejuvenecimiento", "Icono · arriba dcha.", "Interface\\Icons\\Spell_Nature_Rejuvenation" },
+        { "Recrecimiento", "Cuadrado · arriba dcha.", "Interface\\Icons\\Spell_Nature_ResistNature" },
+        { "Crecimiento salvaje", "Barra · abajo", "Interface\\Icons\\Spell_Nature_Regeneration" },
+        { "Debuffs de banda", "Icono grande · centro", "Interface\\Icons\\Spell_Shadow_AntiShadow" },
+        { "Disipar", "Borde de color", "Interface\\Icons\\Spell_Holy_DispelMagic" },
+        { "Debuffs", "Varios iconos · abajo izq.", "Interface\\Icons\\Spell_Shadow_CurseOfSargeras" },
+    }
+    local rows = {}
+    local function Pick(i)
+        for k, r in ipairs(rows) do
+            r.bg:SetShown(k == i)
+            r.mark:SetShown(k == i)
+        end
+    end
+    for i, it in ipairs(items) do
+        local r = CreateFrame("Button", nil, list)
+        r:SetSize(LW - 12, 42)
+        r:SetPoint("TOPLEFT", 6, -32 - (i - 1) * 44)
+        r.bg = Fill(r, A, 0.13, "BACKGROUND")
+        r.bg:SetAllPoints()
+        r.mark = Fill(r, A, 1, "ARTWORK")
+        r.mark:SetPoint("TOPLEFT", 0, -8)
+        r.mark:SetPoint("BOTTOMLEFT", 0, 8)
+        r.mark:SetWidth(3)
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.04)
+        local ic = Icon(r, it[3], 26)
+        ic:SetPoint("LEFT", 10, 0)
+        local n = Txt(r, it[1], 12)
+        n:SetPoint("TOPLEFT", ic, "TOPRIGHT", 9, 0)
+        local d = Txt(r, it[2], 10.5, C.dim)
+        d:SetPoint("BOTTOMLEFT", ic, "BOTTOMRIGHT", 9, 0)
+        r:SetScript("OnClick", function() Pick(i) end)
+        rows[i] = r
+    end
+    Pick(1)
+    local add = Btn(list, "+ Añadir indicador", LW - 24, 30, A)
+    add.text:SetTextColor(INK[1], INK[2], INK[3])
+    add:SetPoint("BOTTOM", 0, 12)
+
+    -- editor a la derecha
+    local RX = 24 + LW + 14
+    local RW = CW - RX - 24
+    local s1 = Section(pg, RX, 0, RW, "Rejuvenecimiento · qué vigila")
+    s1:Stacked("Tipo", Segmented(s1, { "Icono", "Cuadrado", "Barra", "Texto" }, 1))
+    s1:Stacked("De quién", Segmented(s1, { "Solo mías", "De otros", "De cualquiera" }, 1))
+    local spells = s1:Block(56)
+    Flow(spells, {
+        Chip(spells, "Interface\\Icons\\Spell_Nature_Rejuvenation", "Rejuvenecimiento"),
+        Chip(spells, "Interface\\Icons\\Spell_Nature_ResistNature", "Recrecimiento"),
+        Btn(spells, "+ Hechizo", 84, 24),
+    }, RW - 28, 6)
+    local y1 = s1:Finish()
+
+    local s2 = Section(pg, RX, y1 - 22, RW, "Posición")
+    local blk = s2:Block(96)
+    -- rejilla de anclaje 3x3 y muestra del marco con el indicador
+    local sample = CreateFrame("Frame", nil, blk, "BackdropTemplate")
+    sample:SetSize(150, 58)
+    sample:SetPoint("LEFT", 110, 0)
+    sample:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, edgeSize = 1 })
+    sample:SetBackdropColor(0.1, 0.06, 0.02, 1)
+    sample:SetBackdropBorderColor(0, 0, 0, 1)
+    local hp = Fill(sample, { 1, 0.49, 0.04 }, 0.85, "BORDER")
+    hp:SetPoint("TOPLEFT", 1, -1)
+    hp:SetPoint("BOTTOMLEFT", 1, 1)
+    hp:SetWidth(104)
+    local sn = Txt(sample, "Elowen", 12, { 1, 1, 1 })
+    sn:SetShadowOffset(1, -1)
+    sn:SetPoint("LEFT", 8, 0)
+    local mark = Icon(sample, "Interface\\Icons\\Spell_Nature_Rejuvenation", 16)
+    local cells = {}
+    local POS = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
+    local function PickCell(i)
+        for k, c in ipairs(cells) do
+            if k == i then c.t:SetColorTexture(A[1], A[2], A[3], 1) else c.t:SetColorTexture(C.off[1], C.off[2], C.off[3], 1) end
+        end
+        local p = POS[i]
+        local ox = p:find("LEFT") and 3 or (p:find("RIGHT") and -3 or 0)
+        local oy = p:find("TOP") and -3 or (p:find("BOTTOM") and 3 or 0)
+        mark:ClearAllPoints()
+        mark:SetPoint(p, sample, p, ox, oy)
+    end
+    for i = 1, 9 do
+        local c = CreateFrame("Button", nil, blk)
+        c:SetSize(26, 26)
+        c:SetPoint("TOPLEFT", ((i - 1) % 3) * 30, -6 - math.floor((i - 1) / 3) * 30)
+        c.t = c:CreateTexture(nil, "ARTWORK")
+        c.t:SetAllPoints()
+        local hl = c:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.15)
+        c:SetScript("OnClick", function() PickCell(i) end)
+        cells[i] = c
+    end
+    PickCell(3)
+    local px = function(v) return v .. " px" end
+    s2:Row("Tamaño", nil, Slider(s2, 16, nil, 50, px))
+    s2:Row("Desplazamiento", nil, Slider(s2, 2, nil, 40, px))
+    s2:Finish()
+end
+
+local function BuildRaidPage(pg, CW)
+    local FW = CW - 48
+    local tabs = Segmented(pg, { "Núcleo de Magma", "Guarida Alanegra", "Zul'Gurub", "AQ40", "Naxxramas" }, 2)
+    tabs:SetPoint("TOPLEFT", 24, 0)
+
+    local s1 = Section(pg, 24, -40, FW, "Guarida Alanegra · por prioridad")
+    local list = {
+        { "Adrenalina ardiente", "Vaelastrasz", "Interface\\Icons\\Spell_Fire_Fire", true },
+        { "Fuego de sombra", "Nefarian", "Interface\\Icons\\Spell_Shadow_ShadowBolt", true },
+        { "Afligido: bronce", "Chromaggus", "Interface\\Icons\\Spell_Nature_Drowsy", false },
+        { "Fuerza impía", "Chromaggus", "Interface\\Icons\\Spell_Shadow_UnholyStrength", false },
+        { "Escarcha", "Chromaggus", "Interface\\Icons\\Spell_Frost_FrostShock", false },
+    }
+    for i, d in ipairs(list) do
+        local blk = s1:Block(32)
+        local n = Box(blk, 24, 24, i == 1 and A or C.raised, i == 1 and A or C.line2)
+        n:SetPoint("LEFT")
+        local nt = Txt(n, tostring(i), 11.5, i == 1 and INK or C.text)
+        nt:SetPoint("CENTER")
+        local ic = Icon(blk, d[3], 26)
+        ic:SetPoint("LEFT", n, "RIGHT", 10, 0)
+        local nm = Txt(blk, d[1], 12.5)
+        nm:SetPoint("LEFT", ic, "RIGHT", 10, 0)
+        local bo = Txt(blk, d[2], 11, C.dim)
+        bo:SetPoint("LEFT", nm, "RIGHT", 10, 0)
+        local grip = Txt(blk, "=", 14, C.dim)
+        grip:SetPoint("RIGHT", -4, 0)
+        local tg = Toggle(blk, d[4])
+        tg:SetPoint("RIGHT", grip, "LEFT", -16, 0)
+        local gl = Txt(blk, "Brillo", 11, C.muted)
+        gl:SetPoint("RIGHT", tg, "LEFT", -8, 0)
+    end
+    local y1 = s1:Finish()
+
+    local s2 = Section(pg, 24, y1 - 62, FW, "Vistos en esta instancia (no están en la lista)")
+    local seen = {
+        { "Veneno de la cría", "visto 14 veces", "Interface\\Icons\\Spell_Nature_CorrosiveBreath" },
+        { "Llama gélida", "visto 6 veces", "Interface\\Icons\\Spell_Frost_FrostBolt02" },
+    }
+    for _, d in ipairs(seen) do
+        local blk = s2:Block(30)
+        local ic = Icon(blk, d[3], 24)
+        ic:SetPoint("LEFT")
+        local nm = Txt(blk, d[1], 12.5)
+        nm:SetPoint("LEFT", ic, "RIGHT", 10, 0)
+        local ct = Txt(blk, d[2], 11, C.dim)
+        ct:SetPoint("LEFT", nm, "RIGHT", 10, 0)
+        local add = Btn(blk, "+ Añadir", 84, 24)
+        add:SetPoint("RIGHT")
+    end
+    s2:Finish()
+end
+
 local NAV = {
     { "Perfiles", "Interface\\Icons\\INV_Misc_Note_01" },
     { "Diseño", "Interface\\Icons\\INV_Misc_Map_01" },
@@ -573,6 +905,7 @@ local function Build()
 
     local navs = {}
     local pageTitle, pageSub, bars, other
+    local pages = {}
     local SUBS = {
         "Un diseño para cada tamaño de grupo.",
         "Tamaño, orden y grupos que se muestran.",
@@ -594,8 +927,8 @@ local function Build()
         end
         pageTitle:SetText(NAV[i][1])
         pageSub:SetText(SUBS[i])
-        bars:SetShown(i == 3)
-        other:SetShown(i ~= 3)
+        for k, pg in pairs(pages) do pg:SetShown(k == i) end
+        other:SetShown(pages[i] == nil)
     end
     for i, n in ipairs(NAV) do
         local b = CreateFrame("Button", nil, f)
@@ -667,7 +1000,7 @@ local function Build()
 
     other = Box(f, CW - 48, 200, C.win, C.line2)
     other:SetPoint("TOPLEFT", CX + 24, -140)
-    local ot = Txt(other, "En esta muestra solo está hecha la sección «Barras»; el resto seguiría el mismo estilo.", 12.5, C.muted)
+    local ot = Txt(other, "Esta sección no está en la muestra; seguiría el mismo estilo.", 12.5, C.muted)
     ot:SetPoint("CENTER", 0, 16)
     local ob = Btn(other, "Ver Barras", 110, 30, A)
     ob.text:SetTextColor(INK[1], INK[2], INK[3])
@@ -712,6 +1045,19 @@ local function Build()
     local tipt = Txt(tip, "El color de acento sigue la clase de tu personaje.", 11, C.muted)
     tipt:SetPoint("TOPLEFT", 12, -12)
     tipt:SetWidth(238)
+
+    local function Page(build)
+        local pg = CreateFrame("Frame", nil, f)
+        pg:SetPoint("TOPLEFT", CX, -128)
+        pg:SetSize(CW, H - 140)
+        build(pg, CW)
+        return pg
+    end
+    pages[1] = Page(BuildProfilesPage)
+    pages[2] = Page(BuildLayoutPage)
+    pages[3] = bars
+    pages[6] = Page(BuildIndicatorsPage)
+    pages[8] = Page(BuildRaidPage)
 
     welcome = BuildWelcome(f)
     SelectNav(3)
