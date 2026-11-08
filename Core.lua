@@ -555,6 +555,8 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.SetLocked(true)
     elseif msg == "unlock" or msg == "mover" or msg == "desbloquear" then
         ns.SetLocked(false)
+    elseif msg == "demo" or msg == "muestra" then
+        ns.ToggleDemo()
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then

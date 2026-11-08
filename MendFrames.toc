@@ -17,3 +17,4 @@ Indicators.lua
 Frames.lua
 Options\Widgets.lua
 Options\Options.lua
+Options\Demo.lua
