@@ -209,19 +209,29 @@ end
 local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
-    local function isCustom() return ns.EP().bars.colorMode == "custom" end
-    local customSwatch = UI.Swatch(c, "Color de la vida", Col("bars.customColor"), ns.ProfileChanged)
-    customSwatch.showIf = isCustom
+    local barSwatch = UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged)
+    barSwatch.showIf = function() return ns.EP().bars.healthColor == "custom" end
+    local bgSwatch = UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged)
+    bgSwatch.showIf = function() return ns.EP().bars.bgColor == "custom" end
+    local gradNote = UI.Note(c, "Si en combate el juego oculta la vida, se usa el color de clase.")
+    gradNote.showIf = function() return ns.EP().bars.healthColor == "gradient" end
 
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
         UI.Dropdown(c, "Textura de la vida", ns.TextureList, PB("bars.healthTex")),
-        UI.Dropdown(c, "Color", {
+        UI.Dropdown(c, "Color de la barra", {
             { "class", "Color de clase" },
-            { "dark", "Oscuro (lo que falta en color de clase)" },
             { "custom", "Un solo color" },
-        }, PB("bars.colorMode")),
-        customSwatch,
+            { "gradient", "Degradado según la vida" },
+        }, PB("bars.healthColor")),
+        barSwatch,
+        gradNote,
+        UI.Dropdown(c, "Color del fondo (vida que falta)", {
+            { "dark", "Color de la barra, oscurecido" },
+            { "class", "Color de clase" },
+            { "custom", "Un solo color" },
+        }, PB("bars.bgColor")),
+        bgSwatch,
         UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
         UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
         UI.Header(c, "Maná / energía / ira"),

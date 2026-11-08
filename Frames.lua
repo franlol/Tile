@@ -179,20 +179,48 @@ local function TextColor(fs, t, r, g, bl)
     else fs:SetTextColor(1, 1, 1) end
 end
 
-function ns.UpdateColors(b, testClass)
-    local B, T = ns.P.bars, ns.P.texts
-    local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
-    if B.colorMode == "dark" then
-        b.health:SetStatusBarColor(0.18, 0.18, 0.18)
-        b.health.bg:SetVertexColor(r, g, bl, B.bgAlpha)
-    elseif B.colorMode == "custom" then
-        local c = B.customColor
-        b.health:SetStatusBarColor(c.r, c.g, c.b)
-        b.health.bg:SetVertexColor(c.r * 0.25, c.g * 0.25, c.b * 0.25, B.bgAlpha)
+-- Degradado rojo -> amarillo -> verde según el porcentaje de vida (0..1)
+local function Gradient(pct)
+    pct = math.max(0, math.min(1, pct))
+    if pct < 0.5 then return 1, pct * 2, 0 end
+    return 2 - pct * 2, 1, 0
+end
+
+-- Porcentaje de vida legible, o nil si el juego lo oculta
+local function HealthPct(b, testPct)
+    if testPct then return testPct end
+    if not b.unit then return nil end
+    local cur, max = UnitHealth(b.unit), UnitHealthMax(b.unit)
+    if AnyS(cur, max) or not max or max <= 0 then return nil end
+    return cur / max
+end
+
+-- Color de la barra de vida y de su fondo (la vida que falta)
+function ns.UpdateBarColor(b, testClass, testPct)
+    local B = ns.P.bars
+    local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
+    local r, g, bl = cr, cg, cb
+    if B.healthColor == "custom" then
+        r, g, bl = B.customColor.r, B.customColor.g, B.customColor.b
+    elseif B.healthColor == "gradient" then
+        local pct = HealthPct(b, testPct)
+        if pct then r, g, bl = Gradient(pct) end   -- si está oculta: color de clase
+    end
+    b.health:SetStatusBarColor(r, g, bl)
+    if B.bgColor == "class" then
+        b.health.bg:SetVertexColor(cr, cg, cb, B.bgAlpha)
+    elseif B.bgColor == "custom" then
+        local c = B.bgCustom
+        b.health.bg:SetVertexColor(c.r, c.g, c.b, B.bgAlpha)
     else
-        b.health:SetStatusBarColor(r, g, bl)
         b.health.bg:SetVertexColor(r * 0.25, g * 0.25, bl * 0.25, B.bgAlpha)
     end
+end
+
+function ns.UpdateColors(b, testClass, testPct)
+    local T = ns.P.texts
+    local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
+    ns.UpdateBarColor(b, testClass, testPct)
     TextColor(b.name, T.name, r, g, bl)
     TextColor(b.status, T.status, r, g, bl)
     TextColor(b.hpText, T.health, r, g, bl)
@@ -238,6 +266,7 @@ function ns.UpdateHealth(b)
     local max, cur = UnitHealthMax(u), UnitHealth(u)
     b.health:SetMinMaxValues(0, V(max))
     b.health:SetValue(V(cur))
+    if B.healthColor == "gradient" then ns.UpdateBarColor(b) end
 
     if B.showHealPred and UnitGetIncomingHeals then
         b.pred:SetMinMaxValues(0, V(max))
@@ -746,6 +775,7 @@ local function FillTest(b)
     if i == 4 then hp = 1 end
     b.health:SetMinMaxValues(0, 10000)
     b.health:SetValue(hp * 10000)
+    ns.UpdateBarColor(b, class, (i == 7) and 0 or hp)   -- para el degradado
     b.pred:SetMinMaxValues(0, 10000)
     b.pred:SetValue((i % 3 == 0 and B.showHealPred) and 1500 or 0)
     b.pred:SetShown(B.showHealPred)

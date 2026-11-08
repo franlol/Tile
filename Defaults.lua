@@ -72,8 +72,10 @@ ns.profileDefaults = {
     bars = {
         healthTex = FLAT,
         powerTex = FLAT,
-        colorMode = "class",          -- class | dark | custom
+        healthColor = "class",        -- barra: class | custom | gradient
         customColor = C(0.2, 0.75, 0.3),
+        bgColor = "dark",             -- fondo: dark (barra oscurecida) | class | custom
+        bgCustom = C(0.15, 0.15, 0.15),
         bgAlpha = 0.75,
         borderColor = C(0, 0, 0, 1),
         showPower = true,
@@ -278,6 +280,19 @@ end
 function ns.FixProfile(p)
     local inds = p.indicators
     p.indicators = nil
+    -- antiguo "Color" único -> color de barra + color de fondo
+    local b = p.bars
+    if b and b.colorMode and b.healthColor == nil then
+        if b.colorMode == "dark" then
+            b.healthColor, b.bgColor = "custom", "class"
+            b.customColor = C(0.18, 0.18, 0.18)
+        elseif b.colorMode == "custom" then
+            b.healthColor, b.bgColor = "custom", "dark"
+        else
+            b.healthColor, b.bgColor = "class", "dark"
+        end
+        b.colorMode = nil
+    end
     ns.CopyDefaults(ns.profileDefaults, p)
     if type(inds) ~= "table" then
         local _, class = UnitClass("player")
