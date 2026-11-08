@@ -206,7 +206,9 @@ function ns.UpdateBarColor(b, testClass, testPct)
         local pct = HealthPct(b, testPct)
         if pct then r, g, bl = Gradient(pct) end   -- si está oculta: color de clase
     end
-    local hb = B.healthBrightness or 1
+    -- el brillo solo oscurece el color de clase y el degradado; un color
+    -- elegido a mano se ve tal cual
+    local hb = (B.healthColor == "custom") and 1 or (B.healthBrightness or 1)
     b.health:SetStatusBarColor(r * hb, g * hb, bl * hb)
     local br, bg2, bb
     if B.bgColor == "class" then
@@ -216,7 +218,7 @@ function ns.UpdateBarColor(b, testClass, testPct)
     else
         br, bg2, bb = r * 0.25, g * 0.25, bl * 0.25
     end
-    local bk = B.bgBrightness or 1
+    local bk = (B.bgColor == "custom") and 1 or (B.bgBrightness or 1)
     b.health.bg:SetVertexColor(br * bk, bg2 * bk, bb * bk, B.bgAlpha)
 end
 

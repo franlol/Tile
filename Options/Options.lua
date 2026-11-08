@@ -209,6 +209,7 @@ end
 local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
+    local function E(w, cond) w.enableIf = cond return w end
     local barSwatch = UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged)
     barSwatch.enableIf = function() return ns.EP().bars.healthColor == "custom" end
     local bgSwatch = UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged)
@@ -226,14 +227,16 @@ local function BuildBars(p)
         }, PB("bars.healthColor")),
         barSwatch,
         gradNote,
-        UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness")),
+        E(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness")),
+            function() return ns.EP().bars.healthColor ~= "custom" end),
         UI.Dropdown(c, "Color del fondo (vida que falta)", {
             { "dark", "Color de la barra, oscurecido" },
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
         }, PB("bars.bgColor")),
         bgSwatch,
-        UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness")),
+        E(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness")),
+            function() return ns.EP().bars.bgColor ~= "custom" end),
         UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
         UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
         UI.Header(c, "Maná / energía / ira"),
