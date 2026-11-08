@@ -586,13 +586,22 @@ function ns.UpdateRange(b)
     local u = b.unit
     local alpha = ns.P.bars.rangeAlpha
     if R(UnitIsUnit("player", u)) == true then b:SetAlpha(1) return end
+    -- too far to be seen at all (another zone, far away): faded
+    if R(UnitIsVisible(u)) == false then b:SetAlpha(alpha) return end
+    -- like the Blizzard raid frames: only fade when the game checked the range
+    -- and the unit is out of it. The game does not check pets' range.
     local inRange, checked = UnitInRange(u)
-    if S(inRange) or S(checked) then
+    if S(checked) then
+        if b.isPet then b:SetAlpha(1) return end
         if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, 1, alpha) end
         return
     end
-    if R(UnitIsVisible(u)) == false then b:SetAlpha(alpha) return end
-    b:SetAlpha(((not checked) or inRange) and 1 or alpha)
+    if not checked then b:SetAlpha(1) return end
+    if S(inRange) then
+        if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, 1, alpha) end
+        return
+    end
+    b:SetAlpha(inRange and 1 or alpha)
 end
 
 function ns.UpdateButton(b)
