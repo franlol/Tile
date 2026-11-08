@@ -219,7 +219,7 @@ end
 function ns.RestIndicator()
     return Ind { name = L["Drinking / eating"], kind = "aura", type = "icon",
         mine = false, others = false, mode = "present", onlyOOC = true,
-        spells = { "n:Drink", "n:Food", "n:Food & Drink", "n:Refreshment" },
+        spells = { "n:Drink", "n:Food", "n:Refreshment" },
         point = "LEFT", x = 2, y = 0, width = 14, height = 14,
         timer = false, stacks = false }
 end
