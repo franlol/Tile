@@ -147,11 +147,11 @@ function ns.LayoutButton(b, isPet)
 
     b.isPet = isPet
     b.bg:SetColorTexture(B.borderColor.r, B.borderColor.g, B.borderColor.b, B.borderColor.a or 1)
-    b.health:SetStatusBarTexture(B.healthTex)
-    b.health.bg:SetTexture(B.bgTex)
-    b.pred:SetStatusBarTexture(B.healPredTex or B.healthTex)
-    b.absorb:SetStatusBarTexture(B.absorbTex or B.healthTex)
-    b.power:SetStatusBarTexture(B.powerTex)
+    ns.SetBarTexture(b.health, B.healthTex)
+    ns.SetBgTexture(b.health.bg, B.bgTex)
+    ns.SetBarTexture(b.pred, B.healPredTex or B.healthTex)
+    ns.SetBarTexture(b.absorb, B.absorbTex or B.healthTex)
+    ns.SetBarTexture(b.power, B.powerTex)
     b.power.bg:SetColorTexture(0, 0, 0, B.powerBgAlpha or 0.8)
     local pc, ac = B.healPredColor, B.absorbColor
     b.pred:SetStatusBarColor(pc.r, pc.g, pc.b, pc.a)

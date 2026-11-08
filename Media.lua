@@ -70,10 +70,29 @@ function ns.FontList()
     return list
 end
 -- En las texturas, el 4º campo es la textura que se enseña de muestra detrás
+-- «Ninguna» (valor "none"): esa parte no se dibuja
 function ns.TextureList()
     local list = Merge(TEXTURES, "statusbar")
     for _, o in ipairs(list) do o[4] = o[1] end
+    table.insert(list, 1, { "none", "Ninguna" })
     return list
+end
+
+local FLAT = "Interface\\Buttons\\WHITE8X8"
+
+-- Textura de una barra; con «Ninguna» la barra sigue ahí pero no se ve
+function ns.SetBarTexture(bar, path)
+    local none = path == "none" or path == nil or path == ""
+    bar:SetStatusBarTexture(none and FLAT or path)
+    local t = bar:GetStatusBarTexture()
+    if t then t:SetAlpha(none and 0 or 1) end
+end
+
+-- Textura de un fondo (textura suelta)
+function ns.SetBgTexture(tex, path)
+    local none = path == "none" or path == nil or path == ""
+    tex:SetTexture(none and FLAT or path)
+    tex:SetShown(not none)
 end
 
 ns.OUTLINES = {
