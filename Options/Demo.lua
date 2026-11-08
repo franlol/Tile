@@ -647,7 +647,7 @@ local function BuildIndicatorsPage(pg, CW)
         { "Rejuvenecimiento", "Icono · arriba dcha.", "Interface\\Icons\\Spell_Nature_Rejuvenation" },
         { "Recrecimiento", "Cuadrado · arriba dcha.", "Interface\\Icons\\Spell_Nature_ResistNature" },
         { "Crecimiento salvaje", "Barra · abajo", "Interface\\Icons\\Spell_Nature_Regeneration" },
-        { "Debuffs de banda", "Icono grande · centro", "Interface\\Icons\\Spell_Shadow_AntiShadow" },
+        { "Debuff de jefe", "Icono grande · centro", "Interface\\Icons\\Spell_Shadow_AntiShadow" },
         { "Disipar", "Borde de color", "Interface\\Icons\\Spell_Holy_DispelMagic" },
         { "Debuffs", "Varios iconos · abajo izq.", "Interface\\Icons\\Spell_Shadow_CurseOfSargeras" },
     }
@@ -747,59 +747,6 @@ local function BuildIndicatorsPage(pg, CW)
     s2:Finish()
 end
 
-local function BuildRaidPage(pg, CW)
-    local FW = CW - 48
-    local tabs = Segmented(pg, { "Núcleo de Magma", "Guarida Alanegra", "Zul'Gurub", "AQ40", "Naxxramas" }, 2)
-    tabs:SetPoint("TOPLEFT", 24, 0)
-
-    local s1 = Section(pg, 24, -40, FW, "Guarida Alanegra · por prioridad")
-    local list = {
-        { "Adrenalina ardiente", "Vaelastrasz", "Interface\\Icons\\Spell_Fire_Fire", true },
-        { "Fuego de sombra", "Nefarian", "Interface\\Icons\\Spell_Shadow_ShadowBolt", true },
-        { "Afligido: bronce", "Chromaggus", "Interface\\Icons\\Spell_Nature_Drowsy", false },
-        { "Fuerza impía", "Chromaggus", "Interface\\Icons\\Spell_Shadow_UnholyStrength", false },
-        { "Escarcha", "Chromaggus", "Interface\\Icons\\Spell_Frost_FrostShock", false },
-    }
-    for i, d in ipairs(list) do
-        local blk = s1:Block(32)
-        local n = Box(blk, 24, 24, i == 1 and A or C.raised, i == 1 and A or C.line2)
-        n:SetPoint("LEFT")
-        local nt = Txt(n, tostring(i), 11.5, i == 1 and INK or C.text)
-        nt:SetPoint("CENTER")
-        local ic = Icon(blk, d[3], 26)
-        ic:SetPoint("LEFT", n, "RIGHT", 10, 0)
-        local nm = Txt(blk, d[1], 12.5)
-        nm:SetPoint("LEFT", ic, "RIGHT", 10, 0)
-        local bo = Txt(blk, d[2], 11, C.dim)
-        bo:SetPoint("LEFT", nm, "RIGHT", 10, 0)
-        local grip = Txt(blk, "=", 14, C.dim)
-        grip:SetPoint("RIGHT", -4, 0)
-        local tg = Toggle(blk, d[4])
-        tg:SetPoint("RIGHT", grip, "LEFT", -16, 0)
-        local gl = Txt(blk, "Brillo", 11, C.muted)
-        gl:SetPoint("RIGHT", tg, "LEFT", -8, 0)
-    end
-    local y1 = s1:Finish()
-
-    local s2 = Section(pg, 24, y1 - 62, FW, "Vistos en esta instancia (no están en la lista)")
-    local seen = {
-        { "Veneno de la cría", "visto 14 veces", "Interface\\Icons\\Spell_Nature_CorrosiveBreath" },
-        { "Llama gélida", "visto 6 veces", "Interface\\Icons\\Spell_Frost_FrostBolt02" },
-    }
-    for _, d in ipairs(seen) do
-        local blk = s2:Block(30)
-        local ic = Icon(blk, d[3], 24)
-        ic:SetPoint("LEFT")
-        local nm = Txt(blk, d[1], 12.5)
-        nm:SetPoint("LEFT", ic, "RIGHT", 10, 0)
-        local ct = Txt(blk, d[2], 11, C.dim)
-        ct:SetPoint("LEFT", nm, "RIGHT", 10, 0)
-        local add = Btn(blk, "+ Añadir", 84, 24)
-        add:SetPoint("RIGHT")
-    end
-    s2:Finish()
-end
-
 local NAV = {
     { "Perfiles", "Interface\\Icons\\INV_Misc_Note_01" },
     { "Diseño", "Interface\\Icons\\INV_Misc_Map_01" },
@@ -808,7 +755,6 @@ local NAV = {
     { "Iconos de estado", "Interface\\Icons\\Spell_ChargePositive" },
     { "Indicadores", "Interface\\Icons\\Spell_Nature_Rejuvenation" },
     { "Catálogo", "Interface\\Icons\\INV_Misc_Book_11" },
-    { "Debuffs de banda", "Interface\\Icons\\Spell_Shadow_AntiShadow" },
 }
 
 local function Build()
@@ -914,7 +860,6 @@ local function Build()
         "Rol, marca de banda, líder y listos.",
         "Tus HoTs, escudos y debuffs, donde tú quieras.",
         "Hechizos de cada clase listos para añadir.",
-        "Los debuffs importantes de cada instancia.",
     }
     local function SelectNav(i)
         for k, b in ipairs(navs) do
@@ -1057,7 +1002,6 @@ local function Build()
     pages[2] = Page(BuildLayoutPage)
     pages[3] = bars
     pages[6] = Page(BuildIndicatorsPage)
-    pages[8] = Page(BuildRaidPage)
 
     welcome = BuildWelcome(f)
     SelectNav(3)

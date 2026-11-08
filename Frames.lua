@@ -651,12 +651,7 @@ local function SetButtonUnit(b, unit)
     if b.unit == unit then return end
     b:UnregisterAllEvents()
     b.unit = unit
-    for _, w in pairs(b.ind or {}) do
-        if w.nativeDispel then
-            w.nativeDispel:Hide()
-            w.nativeDispel:SetUnit(unit or "none")
-        end
-    end
+    ns.SetIndicatorsUnit(b, unit)
     if unit then
         for _, e in ipairs(UNIT_EVENTS) do
             pcall(b.RegisterUnitEvent, b, e, unit)

@@ -20,17 +20,6 @@ ns.dbDefaults = {
     profiles = {},
     chars = {},
     spellIndex = {},     -- índice nombre -> IDs (se rehace si cambia la versión del cliente)
-    raid = {
-        recorder = true,
-        custom = {},     -- [instancia] = { [spellID | "n:Nombre"] = prioridad }
-        disabled = {},   -- [instancia] = { [clave] = true }
-        seen = {},       -- [instancia] = { [spellID] = { name, icon, count } }
-        names = {},      -- [instancia] = nombre visto en el juego
-        styles = {},     -- [instancia] = { [clave] = estilo de resaltado }
-        boss = {},       -- [instancia] = { [clave] = jefe elegido a mano (false = sin jefe) }
-        ignored = {},    -- [instancia] = { [spellID] = { name, icon } } vistos que no se quieren
-        learned = {},    -- [instancia] = { "Jefe", ... } jefes que el juego dio al empezar un encuentro
-    },
 }
 
 -- Perfil asignado a cada tamaño de grupo (por personaje)
@@ -105,7 +94,6 @@ ns.profileDefaults = {
         targetColor = C(1, 1, 1, 1),
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
-        auraTooltip = "ooc",          -- tooltip de auras: always | ooc | never
     },
     texts = {
         name = {
@@ -148,34 +136,8 @@ ns.profileDefaults = {
 }
 
 -------------------------------------------------------------------------------
--- Resaltado (brillo, borde/tinte del marco, latido, tamaño, sonido).
--- Lo tienen los indicadores y, como excepción, hechizos concretos.
--------------------------------------------------------------------------------
-ns.STYLE_DEFAULTS = {
-    glow = "none",
-    target = "icon",        -- icon | frame
-    color = C(1, 0.85, 0.1),
-    lines = 8,
-    thickness = 2,
-    freq = 0.25,
-    glowScale = 1,
-    particles = 4,          -- grupos de chispas
-    keepColor = false,      -- usar el color original de Blizzard
-    offsetX = 0,            -- desplazamiento del brillo
-    offsetY = 0,
-    border = false,
-    borderColor = C(1, 0.1, 0.1),
-    tint = false,
-    tintColor = C(1, 0.1, 0.1, 0.35),
-    pulse = false,
-    scale = 1,
-    sound = "none",
-    soundOnlyMe = false,
-}
-
--------------------------------------------------------------------------------
 -- Indicadores
--- kind: aura (personalizado) | raiddebuff | debuffs | dispel
+-- kind: aura (personalizado) | raiddebuff (debuff de jefe) | debuffs
 -- type: icon | icons | square | bar | text | border | overlay
 -------------------------------------------------------------------------------
 ns.indicatorDefaults = {
@@ -183,13 +145,13 @@ ns.indicatorDefaults = {
     enabled = true,
     kind = "aura",
     type = "square",
-    auraType = "HELPFUL",   -- HELPFUL | HARMFUL
     mine = true,            -- solo las mías
-    mode = "present",       -- present | missing
-    watch = "spells",       -- spells (la lista; vacía = todas) | dispellable (los que el juego dice que puedo disipar)
-    -- «puedo disipar»: qué tipos; y si el juego oculta el tipo, mostrarlo igualmente
+    mode = "present",       -- present | missing («le falta»: solo fuera de combate)
+    -- spells: bufos de la lista (vacía = todos) · dispellable: los debuffs que el
+    -- juego dice que puedo disipar · debuffTypes: debuffs de los tipos marcados
+    watch = "spells",
+    -- «puedo disipar» / «por tipo»: qué tipos
     dispelTypes = { Magic = true, Curse = true, Disease = true, Poison = true },
-    unknownType = true,
     onlyOOC = false,        -- solo fuera de combate
     spells = {},
     point = "TOPRIGHT",
@@ -198,15 +160,12 @@ ns.indicatorDefaults = {
     width = 9,
     height = 9,
     color = C(0.2, 1, 0.3),
-    warnColor = C(1, 0.25, 0.2),
-    warnAt = 0,             -- segundos (0 = sin aviso)
     timer = false,
     stacks = true,
     swipe = true,
     -- tipo «Texto»: qué muestra (time | custom | name | stacks | caster)
     textShow = "time",
     customText = "",
-    nameLetters = 0,        -- nombre del hechizo: máximo de letras (0 = entero)
     swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
     max = 3,
     grow = "LEFT",
@@ -214,7 +173,6 @@ ns.indicatorDefaults = {
     others = false,         -- solo las de los demás (no las mías)
     dispelColor = true,     -- borde según tipo de magia
     onlyDispellable = true,
-    excludeClaimed = true,
     -- textos del tiempo y de las cargas (mismo estilo que el resto de textos)
     timerText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
         point = "CENTER", x = 0, y = 0 },
@@ -233,10 +191,6 @@ ns.indicatorDefaults = {
     typeIconSize = 14,
     typeIconPos = { point = "CENTER", x = 0, y = 0 },
     borderInside = false,    -- borde del marco: por dentro (true) o por fuera
-    showBelow = 0,           -- solo mostrar si quedan menos de N s (0 = siempre)
-    blacklist = {},          -- Debuffs: hechizos que no se muestran
-    hl = ns.STYLE_DEFAULTS,  -- resaltado del indicador (se copia)
-    spellStyles = {},        -- [clave de hechizo] = resaltado propio (sustituye al del indicador)
     ranks = {},              -- [clave de hechizo] = { [id] = true } IDs elegidos (vacío = todos)
     exact = {},              -- (antiguo, se lee por compatibilidad)
 }
@@ -247,15 +201,14 @@ end
 
 function ns.BuiltinIndicators()
     return {
-        Ind { name = "Debuff de banda", kind = "raiddebuff", type = "icon",
+        Ind { name = "Debuff de jefe", kind = "raiddebuff", type = "icon",
             point = "CENTER", x = 0, y = -3, width = 20, height = 20,
-            timer = true, stacks = true, dispelColor = true, auraType = "HARMFUL", mine = false },
+            timer = true, stacks = true, dispelColor = true, mine = false },
         Ind { name = "Debuffs", kind = "debuffs", type = "icons",
             point = "BOTTOMLEFT", x = 2, y = 5, width = 12, height = 12, max = 3, grow = "RIGHT",
-            timer = false, stacks = true, auraType = "HARMFUL", mine = false,
-            onlyDispellable = false, excludeClaimed = true, dispelColor = true },
+            timer = false, stacks = true, mine = false, onlyDispellable = false, dispelColor = true },
         Ind { name = "Disipable (borde)", kind = "aura", watch = "dispellable", type = "border",
-            width = 2, auraType = "HARMFUL", mine = false, others = false, dispelColor = true },
+            width = 2, mine = false, others = false, dispelColor = true },
         ns.RestIndicator(),
     }
 end
@@ -264,7 +217,7 @@ end
 -- «Well Fed» de después). Es un indicador normal: se puede cambiar o borrar.
 function ns.RestIndicator()
     return Ind { name = "Bebiendo / comiendo", kind = "aura", type = "icon",
-        auraType = "HELPFUL", mine = false, others = false, mode = "present", onlyOOC = true,
+        mine = false, others = false, mode = "present", onlyOOC = true,
         spells = { "n:Drink", "n:Food", "n:Food & Drink", "n:Refreshment" },
         point = "LEFT", x = 2, y = 0, width = 14, height = 14,
         timer = false, stacks = false }
@@ -301,8 +254,15 @@ function ns.FixIndicator(ind)
     -- normal que vigila los debuffs que el juego dice que puedo disipar
     if ind.kind == "dispel" then
         ind.kind, ind.watch = "aura", "dispellable"
-        ind.auraType, ind.mine, ind.others, ind.mode = "HARMFUL", false, false, "present"
+        ind.mine, ind.others, ind.mode = false, false, "present"
         ind.spells = ind.spells or {}
+    end
+    -- el debuff de banda por listas de instancia pasa a ser el debuff de jefe
+    if ind.kind == "raiddebuff" and ind.name == "Debuff de banda" then ind.name = "Debuff de jefe" end
+    -- opciones que el juego no deja hacer con sus auras nativas
+    for _, k in ipairs({ "hl", "spellStyles", "warnAt", "warnColor", "showBelow", "blacklist",
+        "excludeClaimed", "nameLetters", "unknownType" }) do
+        ind[k] = nil
     end
     ns.CopyDefaults(ns.indicatorDefaults, ind)
     return ind
@@ -313,18 +273,11 @@ function ns.AddRecommended(list, class)
     local plan = {
         { key = "hots", origin = "mine", mode = "present" },
         { key = "raidbuffs", origin = "any", mode = "missing" },
-        { key = "healdebuffs", origin = "any", mode = "present" },
     }
     local added = 0
     for _, p in ipairs(plan) do
         local g = ns.CatalogByKey and ns.CatalogByKey[p.key]
         local entries = g and ns.CatalogRecommended(g, class) or {}
-        -- de los debufos importantes, solo los que provoca la propia clase
-        if p.key == "healdebuffs" then
-            local mine = {}
-            for _, e in ipairs(entries) do if e.class == class then table.insert(mine, e) end end
-            entries = mine
-        end
         if #entries > 0 then
             for _, ind in ipairs(ns.CatalogMakeIndicators(g, entries, p.origin, p.mode)) do
                 table.insert(list, ind)
@@ -393,6 +346,22 @@ function ns.FixProfile(p)
         inds = ns.DefaultIndicators(class)
         p.restIndicator = true
     end
+    -- debuffs elegidos por hechizo en aliados: el juego no deja hacerlo con sus
+    -- auras nativas, así que esos indicadores se quitan
+    local removed = {}
+    for i = #inds, 1, -1 do
+        local ind = inds[i]
+        if ind.kind == "aura" and ind.auraType == "HARMFUL" and (ind.watch or "spells") == "spells" then
+            table.insert(removed, 1, tostring(ind.name))
+            table.remove(inds, i)
+        else
+            ind.auraType = nil
+        end
+    end
+    if #removed > 0 then
+        ns.removedIndicators = ns.removedIndicators or {}
+        for _, n in ipairs(removed) do table.insert(ns.removedIndicators, n) end
+    end
     for _, ind in ipairs(inds) do ns.FixIndicator(ind) end
     -- perfiles de antes: «Bebiendo / comiendo» pasa de texto a indicador (una vez)
     if not p.restIndicator then
@@ -400,6 +369,7 @@ function ns.FixProfile(p)
         p.restIndicator = true
     end
     if p.texts and p.texts.status then p.texts.status.showRest, p.texts.status.restColor = nil, nil end
+    if p.bars then p.bars.auraTooltip = nil end
     p.indicators = inds
     return p
 end

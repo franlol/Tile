@@ -30,9 +30,6 @@ function ns.AnyS(...)
     return false
 end
 
-ns.sawSecret = false
-function ns.MarkSecret() ns.sawSecret = true end
-
 -------------------------------------------------------------------------------
 -- Utilidades
 -------------------------------------------------------------------------------
@@ -222,11 +219,10 @@ function ns.SpellSubtext(id)
     if type(sub) == "string" and sub ~= "" then return sub end
 end
 
--- Cuando el índice encuentra IDs nuevos: recompilar lo que depende de ellos
+-- Cuando el índice encuentra IDs nuevos: los indicadores se rehacen con ellos
 function ns.OnSpellIndexUpdated()
     if ns.ClearIconCache then ns.ClearIconCache() end
-    if ns.P and ns.CompileIndicators then ns.CompileIndicators() end
-    if ns.RebuildDebuffLookup then ns.RebuildDebuffLookup() end
+    if ns.P and ns.header and ns.ApplyProfile then ns.ApplyProfile() end
     if ns.OnSpellResolved then ns.OnSpellResolved() end
 end
 
@@ -366,177 +362,6 @@ function ns.ProfileChanged()
 end
 
 -------------------------------------------------------------------------------
--- Instancia actual y tabla de debuffs de banda
--------------------------------------------------------------------------------
-ns.instKey = 0
-ns.instName = nil
-ns.inInstance = false
-ns.raidSecret = false   -- en esta instancia se han visto debuffs con ID oculto
-
-ns.debuffByID = {}      -- [spellID] = prioridad (solo los activos)
-ns.listedByID = {}      -- [spellID] = true (todos los de la lista, también desactivados)
-
--- Lista de una instancia: [clave] = { prio, boss, default, custom, changed, disabled, defPrio, defBoss }
-function ns.GetDebuffList(key)
-    local out = {}
-    local def = ns.RaidDebuffs[key]
-    for _, b in ipairs(def and def.bosses or {}) do
-        for id, prio in pairs(b[2] or {}) do
-            out[id] = { prio = prio, defPrio = prio, boss = b[1], defBoss = b[1], default = true }
-        end
-    end
-    local custom = ns.db.raid.custom[key]
-    if custom then
-        for id, prio in pairs(custom) do
-            if out[id] then
-                out[id].prio = prio
-                out[id].changed = true
-            else
-                out[id] = { prio = prio, custom = true }
-            end
-        end
-    end
-    -- jefe cambiado a mano (false = «Otros / sin jefe»)
-    local boss = ns.db.raid.boss[key]
-    if boss then
-        for id, b in pairs(boss) do
-            local e = out[id]
-            if e then
-                e.boss = b or nil
-                if e.default then e.changed = true end
-            end
-        end
-    end
-    local disabled = ns.db.raid.disabled[key]
-    if disabled then
-        for id, e in pairs(out) do
-            if disabled[id] then e.disabled = true end
-        end
-    end
-    return out
-end
-
-ns.styleByID = {}
-
--- Estilo de resaltado de un debuff (nil si no tiene). create = crearlo.
-function ns.GetDebuffStyle(instKey, key, create)
-    local t = ns.db.raid.styles[instKey]
-    local s = t and t[key]
-    if not s and create then
-        if not t then t = {} ns.db.raid.styles[instKey] = t end
-        s = CopyDefaults(ns.STYLE_DEFAULTS, {})
-        t[key] = s
-    end
-    return s
-end
-
-function ns.RebuildDebuffLookup()
-    wipe(ns.debuffByID)
-    wipe(ns.listedByID)
-    wipe(ns.styleByID)
-    -- global, la instancia en la que estás y los jefes del mundo de tu zona
-    local keys = { 0 }
-    if ns.instKey ~= 0 then keys[#keys + 1] = ns.instKey end
-    for _, k in ipairs(ns.zoneKeys) do keys[#keys + 1] = k end
-    for _, key in ipairs(keys) do
-        -- un debuff se reconoce por su nombre y por todos sus IDs (todos los rangos)
-        for id, e in pairs(ns.GetDebuffList(key)) do
-            local active = not e.disabled and e.prio and e.prio > 0
-            for _, sid in ipairs(ns.KeyIDs(id)) do
-                ns.listedByID[sid] = true
-                if active and (ns.debuffByID[sid] or 0) < e.prio then ns.debuffByID[sid] = e.prio end
-            end
-        end
-        for id, s in pairs(ns.db.raid.styles[key] or {}) do
-            CopyDefaults(ns.STYLE_DEFAULTS, s)
-            -- el de la instancia sustituye al global: se asigna siempre
-            for _, sid in ipairs(ns.KeyIDs(id)) do ns.styleByID[sid] = s end
-        end
-    end
-    ns.styleVersion = (ns.styleVersion or 0) + 1
-    if ns.UpdateAllButtons then ns.UpdateAllButtons() end
-    if ns.testing and ns.LayoutTest then ns.LayoutTest() end
-end
-
--- auras ya contadas por el registrador (una vez por aplicación, no por refresco)
-local recorded = {}
-
-ns.zoneKeys = {}       -- jefes del mundo activos en tu zona
-ns.encounter = nil     -- jefe del encuentro en curso (lo dice el juego)
-
--- Tipos de instancia del juego que cuentan (no campos de batalla ni arenas)
-local INSTANCE_TYPES = { raid = true, party = true, scenario = true }
-
-local function UpdateInstance()
-    local name, instType, _, _, _, _, _, instanceID = GetInstanceInfo()
-    if INSTANCE_TYPES[instType] and instanceID and not ns.S(instanceID) then
-        ns.instKey = instanceID
-        ns.instName = name
-        ns.inInstance = true
-        if name and not ns.S(name) then ns.db.raid.names[instanceID] = name end
-        ns.zoneKeys = {}
-    else
-        ns.instKey = 0
-        ns.instName = nil
-        ns.inInstance = false
-        local zone = GetRealZoneText and GetRealZoneText()
-        ns.zoneKeys = (zone and not ns.S(zone)) and ns.ZoneKeys(zone) or {}
-    end
-    ns.encounter = nil
-    ns.raidSecret = false
-    wipe(recorded)
-    ns.RebuildDebuffLookup()
-end
-
--- Encuentro con un jefe: el juego da su nombre. Se recuerda en la instancia
--- (si no estaba en los datos) y el registrador lo apunta en lo que vea.
-local function EncounterStart(name)
-    if not name or ns.S(name) or name == "" then return end
-    ns.encounter = name
-    if not ns.inInstance then return end
-    for _, b in ipairs(ns.InstanceBosses(ns.instKey)) do
-        if b == name then return end
-    end
-    local l = ns.db.raid.learned[ns.instKey]
-    if not l then
-        l = {}
-        ns.db.raid.learned[ns.instKey] = l
-    end
-    l[#l + 1] = name
-end
-
--- auraInst: auraInstanceID (si se puede leer), para contar cada aplicación una vez
-function ns.RecordDebuff(spellID, name, icon, auraInst)
-    if not ns.db.raid.recorder or not ns.inInstance then return end
-    if ns.listedByID[spellID] then return end
-    local key = ns.instKey
-    local ignored = ns.db.raid.ignored[key]
-    if ignored and ignored[spellID] then return end
-    local seen = ns.db.raid.seen[key]
-    local e = seen and seen[spellID]
-    if auraInst then
-        if recorded[auraInst] then return end
-        recorded[auraInst] = true
-    elseif e then
-        return
-    end
-    if e then
-        e.count = (e.count or 0) + 1
-        if not e.boss then e.boss = ns.encounter end
-        return
-    end
-    if not seen then
-        seen = {}
-        ns.db.raid.seen[key] = seen
-    end
-    local n = 0
-    for _ in pairs(seen) do n = n + 1 end
-    if n >= 150 then return end
-    -- boss: el jefe que se estaba peleando (nil si fue con trash)
-    seen[spellID] = { name = name, icon = icon, count = 1, boss = ns.encounter }
-end
-
--------------------------------------------------------------------------------
 -- Ocultar los marcos de banda de Blizzard
 -------------------------------------------------------------------------------
 local hiddenParent = CreateFrame("Frame")
@@ -561,7 +386,7 @@ end
 local function LoadDB()
     local old = MendFramesDB
     if type(old) == "table" and not old.version then
-        local db = { raid = old.raid, hideBlizzard = old.layout and old.layout.hideBlizzard }
+        local db = { hideBlizzard = old.layout and old.layout.hideBlizzard }
         local p = ns.NewProfile()
         for _, k in ipairs({ "width", "height", "spacing", "groupSpacing", "orientation", "groupBy",
             "scale", "showSolo", "showParty", "showPlayer" }) do
@@ -582,17 +407,10 @@ local function LoadDB()
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
     end
-    ns.db.diag = nil -- restos del diagnóstico temporal /mf nativos
-    ns.db.auraDiag = {} -- diagnóstico de lectura de auras (se vacía en cada carga)
-    -- 0.2 -> prioridades de debuffs de banda de 1-20 a 1-5
-    if not ns.db.raid.prio5 then
-        for _, list in pairs(ns.db.raid.custom) do
-            for k, p in pairs(list) do
-                p = tonumber(p) or 3
-                list[k] = (p >= 8 and 5) or (p >= 6 and 4) or (p >= 4 and 3) or (p == 3 and 2) or 1
-            end
-        end
-        ns.db.raid.prio5 = true
+    -- datos de versiones anteriores que ya no se usan: listas de debuffs de
+    -- banda por instancia y diagnósticos
+    for _, k in ipairs({ "raid", "diag", "auraDiag", "indicatorAudit", "probe", "nativeDispelError" }) do
+        ns.db[k] = nil
     end
     for _, p in pairs(ns.db.profiles) do ns.FixProfile(p) end
 end
@@ -605,20 +423,12 @@ ns.eventFrame = ev
 ev:RegisterEvent("ADDON_LOADED")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
-ev:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("PLAYER_REGEN_DISABLED")
 ev:RegisterEvent("GROUP_ROSTER_UPDATE")
--- encuentros con jefes (existen en Forever: comprobado con /mf sondeo)
-pcall(ev.RegisterEvent, ev, "ENCOUNTER_START")
-pcall(ev.RegisterEvent, ev, "ENCOUNTER_END")
 
-ev:SetScript("OnEvent", function(self, event, arg1, arg2)
-    if event == "ENCOUNTER_START" then
-        EncounterStart(arg2) -- arg1 = ID del encuentro, arg2 = nombre
-    elseif event == "ENCOUNTER_END" then
-        ns.encounter = nil
-    elseif event == "ADDON_LOADED" and arg1 == ADDON then
+ev:SetScript("OnEvent", function(self, event, arg1)
+    if event == "ADDON_LOADED" and arg1 == ADDON then
         LoadDB()
         self:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_LOGIN" then
@@ -629,10 +439,12 @@ ev:SetScript("OnEvent", function(self, event, arg1, arg2)
         ns.CreateFrames()
         ns.HideBlizzard()
         ns.Print("cargado. Escribe |cffffff00/mf|r para abrir las opciones.")
-    elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
-        UpdateInstance()
-        if ns.header then ns.ActivateProfile() end
-    elseif event == "GROUP_ROSTER_UPDATE" then
+        if ns.removedIndicators then
+            ns.Print("indicadores quitados (el juego no deja elegir debuffs por hechizo en aliados): "
+                .. table.concat(ns.removedIndicators, ", "))
+            ns.removedIndicators = nil
+        end
+    elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
         if ns.db and not ns.db.locked then
@@ -667,23 +479,8 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.ToggleDemo()
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
-    elseif msg == "brillos" or msg == "glows" then
-        ns.Glow.Diagnose()
     elseif msg == "estado" or msg == "status" then
-        local n = 0
-        for _ in pairs(ns.debuffByID) do n = n + 1 end
-        ns.Print(("perfil: %s (%s) | instancia: %s (%s) | valores secretos vistos: %s | debuffs de banda activos: %d"):format(
-            tostring(ns.activeName), ns.SIZE_NAMES[ns.SizeKey()] or "?",
-            tostring(ns.instName or "ninguna"), tostring(ns.instKey),
-            ns.sawSecret and "sí" or "no", n))
-    elseif msg == "auditoria" then
-        ns.AuditIndicators()
-    elseif msg == "disipar" then
-        ns.DiagnoseNativeDispel()
-    elseif msg == "sondeo" or msg == "probe" then
-        ns.Probe()
-    elseif msg == "comprobar" or msg == "check" then
-        ns.CheckData()
+        ns.Print(("perfil: %s (%s)"):format(tostring(ns.activeName), ns.SIZE_NAMES[ns.SizeKey()] or "?"))
     elseif msg == "reset" then
         ns.RunOOC("reset", function()
             ns.P.pos = ns.DeepCopy(ns.profileDefaults.pos)

@@ -124,21 +124,6 @@ ns.Catalog = {
             S("WARLOCK", 20707, "Piedra de alma", { rec = true }),
         },
     },
-    {
-        key = "healdebuffs",
-        name = "Debufos importantes",
-        desc = "Debufos que cambian cómo puedes curar o proteger a un jugador.",
-        auraType = "HARMFUL",
-        origin = "any",
-        defaults = { type = "icons", point = "TOP", x = 0, y = -12, width = 11, height = 11,
-            max = 2, grow = "RIGHT", timer = true },
-        spells = {
-            S("PRIEST", 6788, "Alma debilitada: no se puede escudar", { rec = true }),
-            S("PALADIN", 25771, "Abstinencia: sin inmunidades", { rec = true }),
-            S("WARRIOR", 12294, "Golpe mortal: -50 % de curación", { rec = true }),
-            S("GENERAL", 11196, "Vendado recientemente"),
-        },
-    },
 }
 
 ns.CatalogByKey = {}
@@ -160,7 +145,6 @@ function ns.CatalogMakeIndicators(g, entries, origin, mode)
         local ind = ns.DeepCopy(g.defaults)
         ind.name = name
         ind.kind = "aura"
-        ind.auraType = g.auraType
         ind.mine = origin == "mine"
         ind.others = origin == "others"
         ind.mode = mode
