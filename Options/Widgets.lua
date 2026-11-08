@@ -246,16 +246,31 @@ function UI.Dropdown(parent, text, options, get, set, width)
     end
     UI.ApplyOptionFont = ApplyFont
 
+    -- Si la opción trae una textura (4º campo), se enseña de muestra detrás
+    local function ApplyTex(frame, tex)
+        if not frame.preview then
+            if not tex then return end
+            frame.preview = frame:CreateTexture(nil, "BORDER")
+            frame.preview:SetPoint("TOPLEFT", 1, -1)
+            frame.preview:SetPoint("BOTTOMRIGHT", -1, 1)
+            frame.preview:SetVertexColor(0.45, 0.6, 0.75, 1)
+        end
+        if tex then frame.preview:SetTexture(tex) end
+        frame.preview:SetShown(tex ~= nil)
+    end
+
     f.Refresh = function()
         local cur = get()
         for _, o in ipairs(Opts()) do
             if o[1] == cur then
                 ApplyFont(b.text, o[3])
+                ApplyTex(b, o[4])
                 b.text:SetText(o[2])
                 return
             end
         end
         ApplyFont(b.text, nil)
+        ApplyTex(b, nil)
         b.text:SetText(cur ~= nil and tostring(cur):match("([^\\]+)$") or "")
     end
 
@@ -286,6 +301,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
                 local item = items[i]
                 item.value = o and o[1]
                 ApplyFont(item.t, o and o[3])
+                ApplyTex(item, o and o[4])
                 item.t:SetText(o and o[2] or "")
                 item.sel:SetShown(o and o[1] == get() or false)
             end
@@ -304,7 +320,7 @@ function UI.Dropdown(parent, text, options, get, set, width)
             item.hl = item:CreateTexture(nil, "HIGHLIGHT")
             item.hl:SetAllPoints()
             item.hl:SetColorTexture(1, 1, 1, 0.1)
-            item.sel = item:CreateTexture(nil, "BACKGROUND")
+            item.sel = item:CreateTexture(nil, "ARTWORK")
             item.sel:SetAllPoints()
             item.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.2)
             item.t = UI.Label(item, "")

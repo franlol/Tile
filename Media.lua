@@ -69,7 +69,12 @@ function ns.FontList()
     for _, o in ipairs(list) do o[3] = o[1] end
     return list
 end
-function ns.TextureList() return Merge(TEXTURES, "statusbar") end
+-- En las texturas, el 4º campo es la textura que se enseña de muestra detrás
+function ns.TextureList()
+    local list = Merge(TEXTURES, "statusbar")
+    for _, o in ipairs(list) do o[4] = o[1] end
+    return list
+end
 
 ns.OUTLINES = {
     { "", "Sin contorno" },
