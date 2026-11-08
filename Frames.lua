@@ -1062,11 +1062,12 @@ local function FillTest(b)
     ns.TestAuras(b, i, b.previewAll)
 end
 
--- Marco suelto con datos de prueba y todos los indicadores a la vez
--- (la muestra de la pestaña Indicadores)
-function ns.FillPreviewButton(b)
+-- Marco suelto con datos de prueba (la muestra de la pestaña Indicadores).
+-- only: índice del único indicador que se enseña (nil = todos)
+function ns.FillPreviewButton(b, only)
     b.testIndex = 1
     b.previewAll = true
+    b.previewOnly = only
     ns.LayoutButton(b, false)
     FillTest(b)
     b:SetAlpha(1)

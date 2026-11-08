@@ -1056,9 +1056,14 @@ function ns.TestAuras(b, i, all)
                     spellId = key ~= nil and ns.KeyIDs(key)[1] or nil }   -- para el tooltip
             end
             HideWidget(w)
-            -- all: la muestra de Indicadores enseña todos a la vez
+            -- all: la muestra de Indicadores enseña el indicador que se edita
+            -- (b.previewOnly) o, si no, todos a la vez
             local focus = all or (pv and pv.cfg == cfg)
-            if c.kind == "aura" and UnitMeasure(cfg) then
+            -- solo el que se edita: los demás se quedan ocultos
+            local skip = b.previewOnly and c.index ~= b.previewOnly
+            if skip then
+                -- nada
+            elseif c.kind == "aura" and UnitMeasure(cfg) then
                 w.bar:SetMinMaxValues(0, 100)
                 w.bar:SetValue((i % 3 == 0 or focus) and (15 + (i * 13) % 40) or 0)
                 if w.SetMainColor then w:SetMainColor(cfg.color) end

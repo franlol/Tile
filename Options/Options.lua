@@ -1327,7 +1327,8 @@ local function BuildIndicators(p)
         pb:SetSize(W, H)
         pb:ClearAllPoints()
         pb:SetPoint("CENTER", psBg, "CENTER", 0, 0)
-        ns.FillPreviewButton(pb)
+        -- solo el indicador que se edita (si es del perfil que se ve)
+        ns.FillPreviewButton(pb, same and selInd or nil)
 
         local s = Sel()
         local strip = s and s.type == "bar" and ns.STRIP_SIDE[s.span]
