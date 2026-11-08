@@ -22,54 +22,19 @@ local function V(v)
 end
 
 -------------------------------------------------------------------------------
--- Llenado suave de barras
--- Nativo: el motor moderno anima SetValue(valor, interpolación), también con
--- valores secretos. Si no existe, se anima a mano (solo con valores legibles).
+-- Llenado suave de barras: SOLO la animación nativa del cliente
+-- (StatusBar:SetValue(valor, interpolación)). Si el cliente no la tiene, la
+-- opción no está disponible y las barras cambian al momento.
 -------------------------------------------------------------------------------
 local NATIVE_SMOOTH = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
-local tweens = {}   -- [barra] = valor objetivo
-
-local tweenFrame = CreateFrame("Frame")
-tweenFrame:Hide()
-tweenFrame:SetScript("OnUpdate", function(self, elapsed)
-    local k = math.min(1, elapsed * 10)
-    for bar, target in pairs(tweens) do
-        local cur = bar:GetValue()
-        if S(cur) or not cur then
-            bar:SetValue(target)
-            tweens[bar] = nil
-        else
-            local _, max = bar:GetMinMaxValues()
-            local nv = cur + (target - cur) * k
-            if S(max) or math.abs(target - nv) <= math.max(1, (max or 1) * 0.002) then
-                nv = target
-                tweens[bar] = nil
-            end
-            bar:SetValue(nv)
-        end
-    end
-    if not next(tweens) then self:Hide() end
-end)
+ns.hasNativeSmooth = NATIVE_SMOOTH ~= nil
 
 local function SetBarValue(bar, v, smooth)
-    if not smooth then
-        tweens[bar] = nil
+    if smooth and NATIVE_SMOOTH then
+        bar:SetValue(v, NATIVE_SMOOTH)
+    else
         bar:SetValue(v)
-        return
     end
-    if NATIVE_SMOOTH and pcall(bar.SetValue, bar, v, NATIVE_SMOOTH) then
-        tweens[bar] = nil
-        return
-    end
-    local cur = bar:GetValue()
-    if S(v) or S(cur) then
-        -- valor oculto por el juego: sin animación
-        tweens[bar] = nil
-        bar:SetValue(v)
-        return
-    end
-    tweens[bar] = v
-    tweenFrame:Show()
 end
 ns.SetBarValue = SetBarValue
 
@@ -375,7 +340,9 @@ function ns.UpdatePower(b)
     if want ~= b.powerShown then AnchorHealth(b, want) end
     if not want then return end
     b.power:SetMinMaxValues(0, V(UnitPowerMax(u)))
-    b.power:SetValue(V(UnitPower(u)))
+    -- suave solo si es la misma unidad (al cambiar de jugador, salto directo)
+    SetBarValue(b.power, V(UnitPower(u)), B.powerSmooth and b.lastPowerUnit == u)
+    b.lastPowerUnit = u
     token = R(token)
     local c = token and PowerBarColor and PowerBarColor[token]
     if c then b.power:SetStatusBarColor(c.r, c.g, c.b) else b.power:SetStatusBarColor(0.3, 0.5, 1) end

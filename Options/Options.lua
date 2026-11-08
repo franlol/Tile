@@ -222,7 +222,9 @@ local function BuildBars(p)
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
         UI.Dropdown(c, "Textura de la vida", ns.TextureList, PB("bars.healthTex")),
-        UI.Check(c, "Llenado y vaciado suave", PB("bars.smooth")),
+        E(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
+            or "Llenado y vaciado suave (no disponible en este cliente)", PB("bars.smooth")),
+            function() return ns.hasNativeSmooth end),
         UI.Attach(UI.Dropdown(c, "Color de la barra", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
@@ -244,6 +246,9 @@ local function BuildBars(p)
         UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
         UI.Header(c, "Maná / energía / ira"),
         UI.Check(c, "Mostrar barra", PB("bars.showPower")),
+        E(UI.Check(c, ns.hasNativeSmooth and "Llenado y vaciado suave"
+            or "Llenado y vaciado suave (no disponible en este cliente)", PB("bars.powerSmooth")),
+            function() return ns.hasNativeSmooth end),
         UI.Check(c, "Solo para quien usa maná", PB("bars.powerOnlyMana")),
         UI.Dropdown(c, "Textura", ns.TextureList, PB("bars.powerTex")),
         UI.Slider(c, "Alto", 1, 12, 1, nil, PB("bars.powerHeight")),
