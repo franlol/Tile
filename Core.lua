@@ -605,6 +605,32 @@ SlashCmdList.MENDFRAMES = function(msg)
             table.sort(fns)
             ns.Print("C_CurveUtil: " .. table.concat(fns, ", "))
         end
+        -- tablas globales de la interfaz de Blizzard que hablen de tipos de debuff
+        local function Dump(v, depth)
+            if type(v) ~= "table" then return tostring(v) end
+            if depth > 1 then return "{...}" end
+            local parts, n = {}, 0
+            for k, x in pairs(v) do
+                n = n + 1
+                if n > 25 then parts[#parts + 1] = "..." break end
+                parts[#parts + 1] = tostring(k) .. "=" .. Dump(x, depth + 1)
+            end
+            table.sort(parts)
+            return "{" .. table.concat(parts, ", ") .. "}"
+        end
+        local globals = {}
+        for name, v in pairs(_G) do
+            if type(name) == "string" and name:lower():find("dispel") and type(v) ~= "function" then
+                globals[#globals + 1] = name
+            end
+        end
+        table.sort(globals)
+        for _, name in ipairs(globals) do ns.Print("_G." .. name .. " = " .. Dump(_G[name], 0)) end
+        if AuraUtil then
+            for k, v in pairs(AuraUtil) do
+                if type(k) == "string" and k:lower():find("dispel") then ns.Print("AuraUtil." .. k .. " = " .. Dump(v, 0)) end
+            end
+        end
         ns.Print = realPrint
         realPrint("guardado. Haz /reload para que se escriba en disco.")
     elseif msg == "test" or msg == "prueba" then
