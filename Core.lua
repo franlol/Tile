@@ -493,6 +493,7 @@ local function LoadDB()
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
     end
+    ns.db.diag = nil -- restos del diagnóstico temporal /mf nativos
     for _, p in pairs(ns.db.profiles) do ns.FixProfile(p) end
 end
 
@@ -557,82 +558,6 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.SetLocked(false)
     elseif msg == "demo" or msg == "muestra" then
         ns.ToggleDemo()
-    elseif msg == "nativos" then
-        -- diagnóstico temporal: ¿tiene este cliente los componentes nativos de Blizzard?
-        -- Todo lo que se imprime se guarda también en MendFramesDB.diag (se
-        -- escribe en disco al hacer /reload o al salir)
-        ns.db.diag = {}
-        local realPrint = ns.Print
-        ns.Print = function(text)
-            table.insert(ns.db.diag, (tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")))
-            realPrint(text)
-        end
-        local function T(kind, tmpl)
-            local ok = pcall(CreateFrame, kind, nil, UIParent, tmpl)
-            return ok and "|cff55ff55sí|r" or "|cffff5555no|r"
-        end
-        ns.Print("UIPanelScrollFrameTemplate: " .. T("ScrollFrame", "UIPanelScrollFrameTemplate"))
-        ns.Print("ScrollFrameTemplate: " .. T("ScrollFrame", "ScrollFrameTemplate"))
-        ns.Print("WowScrollBoxList: " .. T("Frame", "WowScrollBoxList"))
-        ns.Print("MinimalScrollBar: " .. T("EventFrame", "MinimalScrollBar"))
-        ns.Print("WowStyle1DropdownTemplate: " .. T("DropdownButton", "WowStyle1DropdownTemplate"))
-        ns.Print("ScrollUtil: " .. (ScrollUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
-            .. "  MenuUtil: " .. (MenuUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
-            .. "  CreateScrollBoxListLinearView: " .. (CreateScrollBoxListLinearView and "|cff55ff55sí|r" or "|cffff5555no|r"))
-        local A = C_UnitAuras or {}
-        ns.Print("Tipo de debuff aunque esté oculto: GetAuraDispelTypeColor "
-            .. (A.GetAuraDispelTypeColor and "|cff55ff55sí|r" or "|cffff5555no|r")
-            .. "  C_CurveUtil: " .. (C_CurveUtil and "|cff55ff55sí|r" or "|cffff5555no|r"))
-        -- listas internas del juego: tipos de debuff y tipos de curva
-        if Enum then
-            local names = {}
-            for name in pairs(Enum) do
-                local l = name:lower()
-                if l:find("dispel") or l:find("curvetype") then names[#names + 1] = name end
-            end
-            table.sort(names)
-            for _, name in ipairs(names) do
-                local parts = {}
-                for k, v in pairs(Enum[name]) do parts[#parts + 1] = k .. "=" .. tostring(v) end
-                table.sort(parts)
-                ns.Print("Enum." .. name .. ": " .. table.concat(parts, ", "))
-            end
-            if #names == 0 then ns.Print("Enum: ninguna lista de tipos de debuff ni de curvas") end
-        end
-        if C_CurveUtil then
-            local fns = {}
-            for k in pairs(C_CurveUtil) do fns[#fns + 1] = k end
-            table.sort(fns)
-            ns.Print("C_CurveUtil: " .. table.concat(fns, ", "))
-        end
-        -- tablas globales de la interfaz de Blizzard que hablen de tipos de debuff
-        local function Dump(v, depth)
-            if type(v) ~= "table" then return tostring(v) end
-            if depth > 1 then return "{...}" end
-            local parts, n = {}, 0
-            for k, x in pairs(v) do
-                n = n + 1
-                if n > 25 then parts[#parts + 1] = "..." break end
-                parts[#parts + 1] = tostring(k) .. "=" .. Dump(x, depth + 1)
-            end
-            table.sort(parts)
-            return "{" .. table.concat(parts, ", ") .. "}"
-        end
-        local globals = {}
-        for name, v in pairs(_G) do
-            if type(name) == "string" and name:lower():find("dispel") and type(v) ~= "function" then
-                globals[#globals + 1] = name
-            end
-        end
-        table.sort(globals)
-        for _, name in ipairs(globals) do ns.Print("_G." .. name .. " = " .. Dump(_G[name], 0)) end
-        if AuraUtil then
-            for k, v in pairs(AuraUtil) do
-                if type(k) == "string" and k:lower():find("dispel") then ns.Print("AuraUtil." .. k .. " = " .. Dump(v, 0)) end
-            end
-        end
-        ns.Print = realPrint
-        realPrint("guardado. Haz /reload para que se escriba en disco.")
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then
