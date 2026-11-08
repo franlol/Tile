@@ -210,9 +210,9 @@ local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
     local function E(w, cond) w.enableIf = cond return w end
-    local barSwatch = UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged)
+    local barSwatch = UI.Attach(UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged))
     barSwatch.enableIf = function() return ns.EP().bars.healthColor == "custom" end
-    local bgSwatch = UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged)
+    local bgSwatch = UI.Attach(UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged))
     bgSwatch.enableIf = function() return ns.EP().bars.bgColor == "custom" end
 
     local a = UI.Stack(c, COL1, -6, {
@@ -224,7 +224,7 @@ local function BuildBars(p)
             { "gradient", "Degradado según la vida" },
         }, PB("bars.healthColor")),
         barSwatch,
-        E(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness")),
+        E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
             function() return ns.EP().bars.healthColor ~= "custom" end),
         UI.Dropdown(c, "Color del fondo (vida que falta)", {
             { "dark", "Color de la barra, oscurecido" },
@@ -232,7 +232,7 @@ local function BuildBars(p)
             { "custom", "Un solo color" },
         }, PB("bars.bgColor")),
         bgSwatch,
-        E(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness")),
+        E(UI.Attach(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness"))),
             function() return ns.EP().bars.bgColor ~= "custom" end),
         UI.Slider(c, "Opacidad del fondo", 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
         UI.Swatch(c, "Color del borde", Col("bars.borderColor"), ns.ProfileChanged, true),
@@ -245,15 +245,15 @@ local function BuildBars(p)
     local b = UI.Stack(c, COL2, -6, {
         UI.Header(c, "Curación y escudos"),
         UI.Check(c, "Curación entrante", PB("bars.showHealPred")),
-        UI.Swatch(c, "Color de curación entrante", Col("bars.healPredColor"), ns.ProfileChanged, true),
+        UI.Attach(UI.Swatch(c, "Color de curación entrante", Col("bars.healPredColor"), ns.ProfileChanged, true)),
         UI.Check(c, "Escudos (absorción)", PB("bars.showAbsorb")),
-        UI.Swatch(c, "Color de escudos", Col("bars.absorbColor"), ns.ProfileChanged, true),
+        UI.Attach(UI.Swatch(c, "Color de escudos", Col("bars.absorbColor"), ns.ProfileChanged, true)),
         UI.Header(c, "Resaltados"),
         UI.Slider(c, "Opacidad fuera de rango", 0.1, 1, 0.05, UI.pct, PB("bars.rangeAlpha")),
         UI.Check(c, "Resaltar mi objetivo", PB("bars.targetHighlight")),
-        UI.Swatch(c, "Color del objetivo", Col("bars.targetColor"), ns.ProfileChanged, true),
+        UI.Attach(UI.Swatch(c, "Color del objetivo", Col("bars.targetColor"), ns.ProfileChanged, true)),
         UI.Check(c, "Marcar quien tiene amenaza (aggro)", PB("bars.aggro")),
-        UI.Swatch(c, "Color de amenaza", Col("bars.aggroColor"), ns.ProfileChanged, true),
+        UI.Attach(UI.Swatch(c, "Color de amenaza", Col("bars.aggroColor"), ns.ProfileChanged, true)),
         UI.Header(c, "Tooltips"),
         UI.Dropdown(c, "Tooltip al pasar por un icono de aura", {
             { "always", "Siempre" }, { "ooc", "Solo fuera de combate" }, { "never", "Nunca" },
@@ -268,7 +268,7 @@ end
 local function TextSection(c, key, title, extra)
     local base = "texts." .. key
     local function isCustom() return ns.EP().texts[key].colorMode == "custom" end
-    local sw = UI.Swatch(c, "Color", function() return ns.EP().texts[key].color end, ns.ProfileChanged)
+    local sw = UI.Attach(UI.Swatch(c, "Color", function() return ns.EP().texts[key].color end, ns.ProfileChanged))
     sw.enableIf = isCustom
     local list = {
         UI.Header(c, title),
@@ -472,7 +472,7 @@ local function BuildSide()
         UI.Dropdown(c, "Tipo de brillo", ns.Glow.TYPES, SG("glow")),
         E(UI.Dropdown(c, "Dónde", { { "icon", "En el icono" }, { "frame", "En todo el marco" } }, SG("target")), hasGlow),
         E(UI.Check(c, "Usar el color original de Blizzard", SG("keepColor")), blizzGlow),
-        E(UI.Swatch(c, "Color del brillo", Col("color"), Changed, true, ColEdit("color")),
+        E(UI.Attach(UI.Swatch(c, "Color del brillo", Col("color"), Changed, true, ColEdit("color"))),
             function() return hasGlow() and not (blizzGlow() and V("keepColor")) end),
         fallbackNote,
         E(UI.Slider(c, "Líneas", 4, 16, 1, nil, SG("lines")), function() return V("glow") == "pixel" end),
@@ -486,10 +486,10 @@ local function BuildSide()
 
         UI.Header(c, "Marco"),
         UI.Check(c, "Borde de color en el marco", SG("border")),
-        E(UI.Swatch(c, "Color del borde", Col("borderColor"), Changed, true, ColEdit("borderColor")),
+        E(UI.Attach(UI.Swatch(c, "Color del borde", Col("borderColor"), Changed, true, ColEdit("borderColor"))),
             function() return V("border") end),
         UI.Check(c, "Teñir la barra de vida", SG("tint")),
-        E(UI.Swatch(c, "Color del tinte", Col("tintColor"), Changed, true, ColEdit("tintColor")),
+        E(UI.Attach(UI.Swatch(c, "Color del tinte", Col("tintColor"), Changed, true, ColEdit("tintColor"))),
             function() return V("tint") end),
 
         UI.Header(c, "Elemento"),
@@ -498,7 +498,7 @@ local function BuildSide()
 
         UI.Header(c, "Sonido"),
         UI.Dropdown(c, "Sonido al aparecer", ns.SOUNDS, SG("sound")),
-        E(UI.Check(c, "Solo si me lo ponen a mí", SG("soundOnlyMe")), function() return V("sound") ~= "none" end),
+        E(UI.Attach(UI.Check(c, "Solo si me lo ponen a mí", SG("soundOnlyMe"))), function() return V("sound") ~= "none" end),
     })
 
     local copy = UI.Button(side, "Copiar del indicador", 266, 22, function()
@@ -1064,7 +1064,7 @@ local function BuildIndicators(p)
         UI.Header(c, "Aspecto"),
         W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")),
             function() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end),
-        WE(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true),
+        WE(UI.Attach(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true)),
             function() return colored() or K() == "dispel" end,
             function() return colored() or not Sel().dispelColor end),
         W(UI.Check(c, "Borde negro", IB("showBorder")),
@@ -1073,7 +1073,7 @@ local function BuildIndicators(p)
             function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end),
         W(UI.Slider(c, "Aviso con menos de (s)", 0, 15, 1,
             function(v) return v == 0 and "no" or (v .. " s") end, IB("warnAt")), timed),
-        WE(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true),
+        WE(UI.Attach(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true)),
             timed, function() return Sel().warnAt > 0 end),
 
         W(UI.Header(c, "Textos"), hasText),

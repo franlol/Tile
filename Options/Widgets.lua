@@ -14,6 +14,13 @@ local ACCENT = UI.ACCENT
 UI.W = 230          -- ancho estándar de un control
 UI.GAP = 10         -- separación entre controles
 UI.SECTION_GAP = 10 -- separación extra antes de cada título de sección
+UI.ATTACH_GAP = 2   -- separación de un control unido al anterior (su color, su brillo...)
+
+-- Marca un control como parte del de arriba: va pegado a él
+function UI.Attach(w)
+    w.attached = true
+    return w
+end
 
 UI.widgets = {}     -- controles con Refresh()
 UI.stacks = {}      -- columnas que se recolocan al refrescar
@@ -424,6 +431,8 @@ function UI.Stack(content, x, y, list, gap, fill)
             if visible then
                 -- hueco extra antes de cada título de sección (salvo el primero)
                 if w.isHeader and not first then yy = yy - UI.SECTION_GAP end
+                -- unido al anterior: casi sin hueco
+                if w.attached and not first then yy = yy + self.gap - UI.ATTACH_GAP end
                 first = false
                 w:ClearAllPoints()
                 w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
