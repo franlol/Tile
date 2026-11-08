@@ -71,6 +71,7 @@ ns.profileDefaults = {
     },
     bars = {
         healthTex = FLAT,
+        bgTex = "",                   -- textura del fondo ("" = igual que la barra)
         powerTex = FLAT,
         healthColor = "class",        -- barra: class | custom | gradient
         customColor = C(0.2, 0.75, 0.3),

@@ -218,19 +218,24 @@ local function BuildBars(p)
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
         UI.Dropdown(c, "Textura de la vida", ns.TextureList, PB("bars.healthTex")),
-        UI.Dropdown(c, "Color de la barra", {
+        UI.Attach(UI.Dropdown(c, "Color de la barra", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
             { "gradient", "Degradado según la vida" },
-        }, PB("bars.healthColor")),
+        }, PB("bars.healthColor"))),
         barSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
             function() return ns.EP().bars.healthColor ~= "custom" end),
-        UI.Dropdown(c, "Color del fondo (vida que falta)", {
+        UI.Dropdown(c, "Textura del fondo (vida que falta)", function()
+            local list = { { "", "Igual que la barra" } }
+            for _, o in ipairs(ns.TextureList()) do list[#list + 1] = o end
+            return list
+        end, PB("bars.bgTex")),
+        UI.Attach(UI.Dropdown(c, "Color del fondo", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
             { "gradient", "Degradado según la vida" },
-        }, PB("bars.bgColor")),
+        }, PB("bars.bgColor"))),
         bgSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo del fondo", 0.1, 1, 0.05, UI.pct, PB("bars.bgBrightness"))),
             function() return ns.EP().bars.bgColor ~= "custom" end),
