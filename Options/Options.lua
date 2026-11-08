@@ -500,9 +500,21 @@ end
 local function ElementSection(c, key, title)
     local function root() return ns.EP().elements[key] end
     local function on() return root().show end
-    return Flat({
+    local list = {
         UI.Header(c, title),
         UI.Check(c, "Mostrar", PB("elements." .. key .. ".show")),
+    }
+    -- el de listos solo existe durante la comprobación: no tiene «cuándo»
+    if key ~= "ready" then
+        list[#list + 1] = Cond(UI.Attach(UI.Dropdown(c, "Cuándo", {
+            { "always", "Siempre" },
+            { "ready", "Solo en la comprobación de listos" },
+            { "ooc", "Solo fuera de combate" },
+        }, PB("elements." .. key .. ".when"))), nil, on)
+    end
+    return Flat({
+        list,
+        Cond(UI.Check(c, "Por encima de los indicadores", PB("elements." .. key .. ".onTop")), nil, on),
         Cond(UI.Slider(c, "Tamaño", 6, 40, 1, nil, PB("elements." .. key .. ".size")), nil, on),
         PositionBlock(c, root, PAfter, { enableIf = on }),
     })

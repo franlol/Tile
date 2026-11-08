@@ -97,6 +97,10 @@ function ns.BuildVisuals(b)
     b.raidIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     b.ready = overlay:CreateTexture(nil, "OVERLAY", nil, 7)
     b.ready:Hide()
+    -- capa para los iconos de estado que van por encima de los indicadores
+    b.topLayer = CreateFrame("Frame", nil, b)
+    b.topLayer:SetAllPoints()
+    b.topLayer:SetFrameLevel(overlay:GetFrameLevel() + 250)
 
     b.hl = CreateFrame("Frame", nil, b, "BackdropTemplate")
     b.hl:SetAllPoints()
@@ -119,6 +123,7 @@ local function PlaceText(fs, t, b)
 end
 
 local function PlaceElement(tex, e, b)
+    tex:SetParent(e.onTop and b.topLayer or b.overlay)
     tex:ClearAllPoints()
     tex:SetPoint(e.point, b, e.point, e.x, e.y)
     tex:SetSize(e.size, e.size)
@@ -417,8 +422,30 @@ function ns.UpdateName(b)
     b.name:SetText(UnitName(b.unit))
 end
 
+-- ¿Se ve ahora este icono de estado? (siempre, solo en la comprobación de
+-- listos o solo fuera de combate)
+local function ElementOn(key)
+    local e = ns.P.elements[key]
+    if not e.show then return false end
+    local when = e.when or "always"
+    if when == "ready" then return ns.readyActive and true or false end
+    if when == "ooc" then return not InCombatLockdown() end
+    return true
+end
+
+-- Rol, líder y marca (los que dependen de «cuándo»)
+local function UpdateStateIcons()
+    for _, b in ipairs(ns.buttons) do
+        if b.unit then
+            ns.UpdateRole(b)
+            ns.UpdateLeader(b)
+            ns.UpdateRaidIcon(b)
+        end
+    end
+end
+
 function ns.UpdateRole(b)
-    if not ns.P.elements.role.show or b.isPet then b.role:Hide() return end
+    if not ElementOn("role") or b.isPet then b.role:Hide() return end
     local role = UnitGroupRolesAssigned and R(UnitGroupRolesAssigned(b.unit))
     local atlas = (role == "TANK" and "roleicon-tiny-tank") or (role == "HEALER" and "roleicon-tiny-healer")
         or (role == "DAMAGER" and "roleicon-tiny-dps")
@@ -426,7 +453,7 @@ function ns.UpdateRole(b)
 end
 
 function ns.UpdateLeader(b)
-    if not ns.P.elements.leader.show or b.isPet then b.leader:Hide() return end
+    if not ElementOn("leader") or b.isPet then b.leader:Hide() return end
     local u = b.unit
     if R(UnitIsGroupLeader(u)) then
         b.leader:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
@@ -440,7 +467,7 @@ function ns.UpdateLeader(b)
 end
 
 function ns.UpdateRaidIcon(b)
-    if not ns.P.elements.raidIcon.show then b.raidIcon:Hide() return end
+    if not ElementOn("raidIcon") then b.raidIcon:Hide() return end
     local idx = R(GetRaidTargetIndex(b.unit))
     if idx and SetRaidTargetIconTexture then
         SetRaidTargetIconTexture(b.raidIcon, idx)
@@ -791,7 +818,8 @@ end
 local gev = CreateFrame("Frame")
 for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "RAID_TARGET_UPDATE",
     "PLAYER_ROLES_ASSIGNED", "UNIT_PET", "PARTY_LEADER_CHANGED",
-    "READY_CHECK", "READY_CHECK_CONFIRM", "READY_CHECK_FINISHED" }) do
+    "READY_CHECK", "READY_CHECK_CONFIRM", "READY_CHECK_FINISHED",
+    "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
     pcall(gev.RegisterEvent, gev, e)
 end
 gev:SetScript("OnEvent", function(_, event)
@@ -801,13 +829,19 @@ gev:SetScript("OnEvent", function(_, event)
     elseif event == "RAID_TARGET_UPDATE" then
         for _, b in ipairs(ns.buttons) do if b.unit then ns.UpdateRaidIcon(b) end end
     elseif event == "READY_CHECK" or event == "READY_CHECK_CONFIRM" then
+        local started = not ns.readyActive
         ns.readyActive = true
         for _, b in ipairs(ns.buttons) do if b.unit then ns.UpdateReady(b) end end
+        if started then UpdateStateIcons() end
     elseif event == "READY_CHECK_FINISHED" then
+        -- los iconos se quedan unos segundos para ver quién no estaba listo
         C_Timer.After(6, function()
             ns.readyActive = false
             for _, b in ipairs(ns.buttons) do b.ready:Hide() end
+            UpdateStateIcons()
         end)
+    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+        UpdateStateIcons()
     else
         ns.UpdateAllButtons()
     end
