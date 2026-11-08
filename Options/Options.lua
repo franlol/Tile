@@ -793,6 +793,13 @@ local KIND_LABEL = { aura = "", raiddebuff = "banda", debuffs = "debuffs", dispe
 local TYPE_LABEL = { icon = "icono", icons = "iconos", square = "cuadrado", bar = "barra", text = "texto",
     border = "borde", overlay = "tinte" }
 
+-- icono de los indicadores integrados en la lista
+local KIND_ICON = {
+    raiddebuff = "Interface\\Icons\\Spell_Shadow_AntiShadow",
+    debuffs = "Interface\\Icons\\Spell_Shadow_CurseOfSargeras",
+    dispel = "Interface\\Icons\\Spell_Holy_DispelMagic",
+}
+
 local function Inds() return ns.EP().indicators end
 local function Sel()
     local list = Inds()
@@ -840,10 +847,22 @@ local function BuildIndicators(p)
                 row.name:SetTextColor(ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45)
                 local tag = KIND_LABEL[ind.kind] ~= "" and KIND_LABEL[ind.kind] or TYPE_LABEL[ind.type] or ""
                 row.tag:SetText(tag)
-                local col = ind.color or { r = 1, g = 1, b = 1 }
+                -- lo que se ve en el marco: el icono (iconos e integrados) o su color
+                local t = EffType(ind)
+                local icon
                 if ind.kind ~= "aura" then
-                    row.swatch:SetColorTexture(0.6, 0.6, 0.6, 1)
+                    icon = KIND_ICON[ind.kind]
+                elseif t == "icon" or t == "icons" then
+                    local _, ic = ns.SpellKeyInfo(ind.spells[1])
+                    icon = ic or 134400
+                end
+                if icon then
+                    row.swatch:SetTexture(icon)
+                    row.swatch:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                    row.swatch:SetVertexColor(1, 1, 1, 1)
                 else
+                    local col = ind.color or { r = 1, g = 1, b = 1 }
+                    row.swatch:SetTexCoord(0, 1, 0, 1)
                     row.swatch:SetColorTexture(col.r, col.g, col.b, 1)
                 end
                 row.sel:SetShown(idx == selInd)
@@ -869,11 +888,11 @@ local function BuildIndicators(p)
         row.hl:SetAllPoints()
         row.hl:SetColorTexture(1, 1, 1, 0.08)
         row.swatch = row:CreateTexture(nil, "ARTWORK")
-        row.swatch:SetSize(8, 8)
-        row.swatch:SetPoint("LEFT", 4, 0)
+        row.swatch:SetSize(14, 14)
+        row.swatch:SetPoint("LEFT", 3, 0)
         row.name = UI.Label(row, "")
-        row.name:SetPoint("LEFT", 16, 0)
-        row.name:SetWidth(120)
+        row.name:SetPoint("LEFT", 22, 0)
+        row.name:SetWidth(114)
         row.name:SetWordWrap(false)
         row.tag = UI.Label(row, "")
         row.tag:SetPoint("RIGHT", -4, 0)
