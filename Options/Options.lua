@@ -474,18 +474,23 @@ local function BuildTexts(p)
         UI.Check(c, "Con apellido", PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
         UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
-    local function resOn() return ns.EP().texts.status.showRes end
-    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)", {
-        UI.Check(c, "Avisar si le están resucitando", PB("texts.status.showRes")),
-        Cond(UI.Attach(UI.Swatch(c, "Color de «Resucitando»", function() return ns.EP().texts.status.resColor end,
-            PAfter, true)), nil, resOn),
-        UI.Check(c, "Avisar si está bebiendo o comiendo", PB("texts.status.showRest")),
-        Cond(UI.Attach(UI.Swatch(c, "Color de «Bebiendo»", function() return ns.EP().texts.status.restColor end,
-            PAfter, true)), nil, function() return ns.EP().texts.status.showRest end),
-    })) do nameList[#nameList + 1] = w end
+    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)")) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 
-    local b = UI.Stack(c, COL2, -6, TextSection(c, "health", "Texto de vida", {
+    -- avisos que salen en el texto de estado, cada uno con su color
+    local S = function() return ns.EP().texts.status end
+    local function statusOn() return S().show end
+    local alerts = {
+        UI.Header(c, "Avisos en el texto de estado"),
+        Cond(UI.Check(c, "Mostrar «Resucitando»", PB("texts.status.showRes")), nil, statusOn),
+        Cond(UI.Attach(UI.Swatch(c, "Color", function() return S().resColor end, PAfter, true)), nil,
+            function() return statusOn() and S().showRes end),
+        Cond(UI.Check(c, "Mostrar «Bebiendo» y «Comiendo»", PB("texts.status.showRest")), nil, statusOn),
+        Cond(UI.Attach(UI.Swatch(c, "Color", function() return S().restColor end, PAfter, true)), nil,
+            function() return statusOn() and S().showRest end),
+        UI.Note(c, "Usan la fuente, el tamaño y la posición del texto de estado.", UI.W),
+    }
+    for _, w in ipairs(TextSection(c, "health", "Texto de vida", {
         UI.Dropdown(c, "Formato", {
             { "none", "Ninguno" },
             { "deficit", "Vida que falta (-1.2k)" },
@@ -494,7 +499,8 @@ local function BuildTexts(p)
             { "both", "Actual / máxima" },
         }, PB("texts.health.format")),
         UI.Check(c, "Ocultar con la vida llena", PB("texts.health.hideFull")),
-    }))
+    })) do alerts[#alerts + 1] = w end
+    local b = UI.Stack(c, COL2, -6, alerts)
     UI.FitContent(c, { a, b })
 end
 
