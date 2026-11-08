@@ -115,8 +115,11 @@ ns.profileDefaults = {
             show = true, font = FONT, size = 10, outline = "OUTLINE",
             colorMode = "custom", color = C(0.75, 0.75, 0.75),
             point = "CENTER", x = 0, y = -3,
-            showRes = true, resColor = C(0.3, 1, 0.45),   -- «Resucitando» (le están lanzando un resucitar)
-            showRest = true, restColor = C(0.45, 0.75, 1), -- «Bebiendo» / «Comiendo»
+            -- estados extra (cada uno con su color); Desconectado, Muerto y Fantasma, siempre
+            showRes = true, resColor = C(0.3, 1, 0.45),        -- «Resucitando»: le lanzan un resucitar
+            showCharm = true, charmColor = C(1, 0.4, 0.8),     -- «Controlado»: bajo control mental
+            showSummon = true, summonColor = C(0.7, 0.55, 1),  -- «Invocación»: pendiente, aceptada o rechazada
+            showAFK = true, afkColor = C(1, 0.8, 0.3),         -- «Ausente»: AFK
         },
         health = {
             show = true, format = "none", hideFull = true,
@@ -233,7 +236,18 @@ function ns.BuiltinIndicators()
             onlyDispellable = false, excludeClaimed = true, dispelColor = true },
         Ind { name = "Disipable (borde)", kind = "dispel", type = "border",
             width = 2, onlyDispellable = true, auraType = "HARMFUL", mine = false, dispelColor = true },
+        ns.RestIndicator(),
     }
+end
+
+-- Bebiendo / comiendo: el bufo que hay mientras se bebe o se come (no el
+-- «Well Fed» de después). Es un indicador normal: se puede cambiar o borrar.
+function ns.RestIndicator()
+    return Ind { name = "Bebiendo / comiendo", kind = "aura", type = "icon",
+        auraType = "HELPFUL", mine = false, others = false, mode = "present", onlyOOC = true,
+        spells = { "n:Drink", "n:Food", "n:Food & Drink", "n:Refreshment" },
+        point = "LEFT", x = 2, y = 0, width = 14, height = 14,
+        timer = false, stacks = false }
 end
 
 -- Nombres de clase (el catálogo de hechizos está en Catalog.lua)
@@ -307,6 +321,7 @@ function ns.NewProfile()
     local p = ns.DeepCopy(ns.profileDefaults)
     local _, class = UnitClass("player")
     p.indicators = ns.DefaultIndicators(class)
+    p.restIndicator = true
     return p
 end
 
@@ -349,8 +364,15 @@ function ns.FixProfile(p)
     if type(inds) ~= "table" then
         local _, class = UnitClass("player")
         inds = ns.DefaultIndicators(class)
+        p.restIndicator = true
     end
     for _, ind in ipairs(inds) do ns.FixIndicator(ind) end
+    -- perfiles de antes: «Bebiendo / comiendo» pasa de texto a indicador (una vez)
+    if not p.restIndicator then
+        table.insert(inds, ns.FixIndicator(ns.RestIndicator()))
+        p.restIndicator = true
+    end
+    if p.texts and p.texts.status then p.texts.status.showRest, p.texts.status.restColor = nil, nil end
     p.indicators = inds
     return p
 end

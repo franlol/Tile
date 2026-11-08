@@ -14,7 +14,7 @@ local UNIT_EVENTS = {
     "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_HEAL_PREDICTION", "UNIT_ABSORB_AMOUNT_CHANGED",
     "UNIT_AURA", "UNIT_CONNECTION", "UNIT_NAME_UPDATE", "UNIT_FLAGS",
     "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER", "UNIT_THREAT_SITUATION_UPDATE",
-    "INCOMING_RESURRECT_CHANGED",
+    "INCOMING_RESURRECT_CHANGED", "INCOMING_SUMMON_CHANGED", "PLAYER_FLAGS_CHANGED", "UNIT_FACTION",
 }
 
 local function V(v)
@@ -256,22 +256,42 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
-function ns.IsRestText(t)
-    return t == "Bebiendo" or t == "Comiendo" or t == "Comiendo y bebiendo"
-end
-
--- «Resucitando» y «Bebiendo/Comiendo» tienen su propio color; el resto, el del texto
-function ns.StatusColor(b, text, testClass)
+-- Color del texto de estado: los estados extra tienen el suyo; el resto
+-- (Desconectado, Muerto, Fantasma) usa el color del texto
+local STATUS_COLOR = { res = "resColor", charm = "charmColor", summon = "summonColor", afk = "afkColor" }
+function ns.StatusColor(b, key, testClass)
     local T = ns.P.texts.status
-    if text == "Resucitando" then
-        local c = T.resColor
-        b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
-    elseif text and ns.IsRestText(text) then
-        local c = T.restColor
+    local c = key and STATUS_COLOR[key] and T[STATUS_COLOR[key]]
+    if c then
         b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
     else
         TextColor(b.status, T, UnitColor(b.unit, b.isPet, testClass))
     end
+end
+
+local SUMMON_TEXT = { [1] = "Invocación", [2] = "Inv. aceptada", [3] = "Inv. rechazada" }
+
+-- Qué pone el texto de estado: texto, clave (para el color) y si está «caído»
+-- (desconectado o muerto: se apaga el fondo y el texto de vida). Por orden:
+-- Desconectado > Resucitando > Fantasma/Muerto > Controlado > Invocación > Ausente
+local function StatusOf(u)
+    local T = ns.P.texts.status
+    if R(UnitIsConnected(u)) == false then return "Desconectado", "offline", true end
+    local ghost = R(UnitIsGhost(u))
+    if ghost or R(UnitIsDead(u)) then
+        if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
+            return "Resucitando", "res", true
+        end
+        return ghost and "Fantasma" or "Muerto", "dead", true
+    end
+    if T.showCharm and UnitIsCharmed and R(UnitIsCharmed(u)) then return "Controlado", "charm", false end
+    if T.showSummon and C_IncomingSummon and C_IncomingSummon.IncomingSummonStatus then
+        local ok, st = pcall(C_IncomingSummon.IncomingSummonStatus, u)
+        st = ok and R(st)
+        if st and SUMMON_TEXT[st] then return SUMMON_TEXT[st], "summon", false end
+    end
+    if T.showAFK and UnitIsAFK and R(UnitIsAFK(u)) then return "Ausente", "afk", false end
+    return nil
 end
 
 function ns.UpdateColors(b, testClass, testPct)
@@ -279,7 +299,7 @@ function ns.UpdateColors(b, testClass, testPct)
     local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
     ns.UpdateBarColor(b, testClass, testPct)
     TextColor(b.name, T.name, r, g, bl)
-    ns.StatusColor(b, b.cacheStatus, testClass)
+    ns.StatusColor(b, b.statusKey, testClass)
     TextColor(b.hpText, T.health, r, g, bl)
 end
 
@@ -374,66 +394,16 @@ function ns.UpdateHealth(b, full)
     -- cuando cambia el máximo (su escala)
     if maxChanged then ns.UpdatePrediction(b, max) end
 
-    local text
-    local T = ns.P.texts.status
-    local down = true -- desconectado o muerto: se apaga el fondo y el texto de vida
-    if R(UnitIsConnected(u)) == false then
-        text = "Desconectado"
-    elseif R(UnitIsGhost(u)) or R(UnitIsDead(u)) then
-        -- alguien le está lanzando un resucitar
-        if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
-            text = "Resucitando"
-        else
-            text = R(UnitIsGhost(u)) and "Fantasma" or "Muerto"
-        end
-    else
-        -- vivo: puede estar bebiendo o comiendo (lo calcula UpdateRest)
-        down = false
-        text = b.resting
-    end
+    local text, key, down = StatusOf(u)
     -- estado y transparencia solo cuando cambian
     if full or text ~= b.cacheStatus then
-        b.cacheStatus = text
-        b.status:SetText(T.show and text or "")
-        ns.StatusColor(b, text)
-        b.health.bg:SetAlpha((text and down) and 0.4 or 1)
-        if text and down then b.hpText:SetText("") end
+        b.cacheStatus, b.statusKey = text, key
+        b.status:SetText(ns.P.texts.status.show and text or "")
+        ns.StatusColor(b, key)
+        b.health.bg:SetAlpha(down and 0.4 or 1)
+        if down then b.hpText:SetText("") end
     end
-    if not (text and down) then HealthText(b, u, cur, max) end
-end
-
--- Bebiendo / comiendo: se mira en las auras (nombres del cliente en inglés
--- y, por si acaso, en español). En combate no se bebe: ni se mira.
-local REST_AURAS = {
-    { "Drink", "drink" }, { "Beber", "drink" },
-    { "Food", "food" }, { "Comida", "food" }, { "Comer", "food" },
-    { "Food & Drink", "both" }, { "Refreshment", "both" }, { "Refrigerio", "both" },
-}
-local REST_TEXT = { drink = "Bebiendo", food = "Comiendo", both = "Comiendo y bebiendo" }
-ns.REST_TEXT = REST_TEXT
-local GetAuraBySpellName = C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName
-
-local function RestState(u)
-    if not GetAuraBySpellName or InCombatLockdown() then return nil end
-    local drink, food
-    for _, a in ipairs(REST_AURAS) do
-        local ok, aura = pcall(GetAuraBySpellName, u, a[1], "HELPFUL")
-        if ok and aura then
-            if a[2] == "both" then return REST_TEXT.both end
-            if a[2] == "drink" then drink = true else food = true end
-        end
-    end
-    if drink and food then return REST_TEXT.both end
-    return (drink and REST_TEXT.drink) or (food and REST_TEXT.food) or nil
-end
-
--- Tras cambiar sus auras: si empieza o deja de beber/comer, actualiza el estado
-function ns.UpdateRest(b)
-    local r = ns.P.texts.status.showRest and b.unit and RestState(b.unit) or nil
-    if r ~= b.resting then
-        b.resting = r
-        ns.UpdateHealth(b, true)
-    end
+    if not down then HealthText(b, u, cur, max) end
 end
 
 -- Valor de maná/energía/ira: lo que llega en cada tic (UNIT_POWER_UPDATE)
@@ -593,7 +563,6 @@ function ns.UpdateButton(b)
     ns.UpdateThreat(b)
     ns.UpdateRange(b)
     ns.UpdateAuras(b)
-    ns.UpdateRest(b)
 end
 
 function ns.UpdateAllButtons()
@@ -613,7 +582,8 @@ local function OnButtonEvent(b, event)
         auraDirty[b] = true
     elseif event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         ns.UpdateHealth(b)
-    elseif event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" or event == "INCOMING_RESURRECT_CHANGED" then
+    elseif event == "UNIT_CONNECTION" or event == "UNIT_FLAGS" or event == "INCOMING_RESURRECT_CHANGED"
+        or event == "INCOMING_SUMMON_CHANGED" or event == "PLAYER_FLAGS_CHANGED" or event == "UNIT_FACTION" then
         ns.UpdateHealth(b, true)
     elseif event == "UNIT_HEAL_PREDICTION" or event == "UNIT_ABSORB_AMOUNT_CHANGED" then
         -- solo sus barras: no tocar la de vida (cortaría su animación)
@@ -635,7 +605,6 @@ local function SetButtonUnit(b, unit)
     if b.unit == unit then return end
     b:UnregisterAllEvents()
     b.unit = unit
-    b.resting = nil
     if unit then
         for _, e in ipairs(UNIT_EVENTS) do
             pcall(b.RegisterUnitEvent, b, e, unit)
@@ -909,10 +878,7 @@ local rangeElapsed = 0
 gev:SetScript("OnUpdate", function(_, elapsed)
     for b in pairs(auraDirty) do
         auraDirty[b] = nil
-        if b.unit and b:IsVisible() then
-            ns.UpdateAuras(b)
-            ns.UpdateRest(b)
-        end
+        if b.unit and b:IsVisible() then ns.UpdateAuras(b) end
     end
     rangeElapsed = rangeElapsed + elapsed
     if rangeElapsed > 0.25 then
@@ -1002,13 +968,18 @@ local function FillTest(b)
         or (class == "ROGUE" and PowerBarColor and PowerBarColor.ENERGY)
     if pc then PowerColor(b, pc.r, pc.g, pc.b, class) else PowerColor(b, 0, 0.55, 1, class) end
 
-    local res = (i == 12) and T.status.showRes
-    local dead = (i == 7) or res
-    local stext = res and "Resucitando" or (dead and "Muerto" or nil)
-    if not stext and i == 3 and T.status.showRest then stext = "Bebiendo" end
-    b.cacheStatus = stext
-    b.status:SetText((stext and T.status.show) and stext or "")
-    ns.StatusColor(b, stext, class)
+    -- un ejemplo de cada estado
+    local TS = T.status
+    local stext, skey
+    if i == 7 then stext, skey = "Muerto", "dead"
+    elseif i == 12 and TS.showRes then stext, skey = "Resucitando", "res"
+    elseif i == 3 and TS.showAFK then stext, skey = "Ausente", "afk"
+    elseif i == 9 and TS.showCharm then stext, skey = "Controlado", "charm"
+    elseif i == 11 and TS.showSummon then stext, skey = "Invocación", "summon" end
+    local dead = skey == "dead" or skey == "res"
+    b.cacheStatus, b.statusKey = stext, skey
+    b.status:SetText((stext and TS.show) and stext or "")
+    ns.StatusColor(b, skey, class)
     if dead then
         b.hpText:SetText("")
         b.health:SetValue(0)

@@ -474,22 +474,28 @@ local function BuildTexts(p)
         UI.Check(c, "Con apellido", PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
         UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
-    for _, w in ipairs(TextSection(c, "status", "Estado (muerto, desconectado...)")) do nameList[#nameList + 1] = w end
+    for _, w in ipairs(TextSection(c, "status", "Texto de estado")) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 
     -- avisos que salen en el texto de estado, cada uno con su color
     local S = function() return ns.EP().texts.status end
     local function statusOn() return S().show end
     local alerts = {
-        UI.Header(c, "Avisos en el texto de estado"),
-        Cond(UI.Check(c, "Mostrar «Resucitando»", PB("texts.status.showRes")), nil, statusOn),
-        Cond(UI.Attach(UI.Swatch(c, "Color", function() return S().resColor end, PAfter, true)), nil,
-            function() return statusOn() and S().showRes end),
-        Cond(UI.Check(c, "Mostrar «Bebiendo» y «Comiendo»", PB("texts.status.showRest")), nil, statusOn),
-        Cond(UI.Attach(UI.Swatch(c, "Color", function() return S().restColor end, PAfter, true)), nil,
-            function() return statusOn() and S().showRest end),
-        UI.Note(c, "Usan la fuente, el tamaño y la posición del texto de estado.", UI.W),
+        UI.Header(c, "Qué muestra el texto de estado"),
+        Cond(UI.Note(c, "Siempre: «Desconectado», «Muerto» y «Fantasma». Además, los que actives (si hay varios, sale el primero):", UI.W), nil, statusOn),
     }
+    for _, st in ipairs({
+        { "showRes", "resColor", "«Resucitando»", "Le están lanzando un resucitar." },
+        { "showCharm", "charmColor", "«Controlado»", "Bajo control mental: puede atacaros." },
+        { "showSummon", "summonColor", "«Invocación»", "Tiene una invocación pendiente, aceptada o rechazada." },
+        { "showAFK", "afkColor", "«Ausente»", "Está ausente (AFK)." },
+    }) do
+        local function on() return statusOn() and S()[st[1]] end
+        alerts[#alerts + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
+        alerts[#alerts + 1] = Cond(UI.Attach(UI.Note(c, st[4], UI.W - 20)), nil, statusOn)
+        alerts[#alerts + 1] = Cond(UI.Attach(UI.Swatch(c, "Color", function() return S()[st[2]] end, PAfter, true)), nil, on)
+    end
+    alerts[#alerts + 1] = UI.Note(c, "Usan la fuente, el tamaño y la posición del texto de estado. Beber y comer es un indicador (pestaña Indicadores).", UI.W)
     for _, w in ipairs(TextSection(c, "health", "Texto de vida", {
         UI.Dropdown(c, "Formato", {
             { "none", "Ninguno" },
