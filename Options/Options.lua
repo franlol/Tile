@@ -676,7 +676,33 @@ local function BuildSide()
     end
     table.insert(UI.widgets, fallbackNote)
 
+    -- Debuff de banda (solo si el contexto trae «debuff»): prioridad, activo,
+    -- jefe y borrar / restaurar. ctx.debuff = { get(campo), set(campo, v),
+    -- bosses(), removeLabel(), remove(), exists() }
+    local function D() return sideCtx and sideCtx.debuff end
+    local function isDeb() return D() ~= nil end
+    local function DG(field)
+        return function() local d = D() return d and d.get(field) end,
+            function(v) local d = D() if d then d.set(field, v) Changed() end end
+    end
+    local debDel = UI.Confirm(UI.Button(c, "", UI.W, 20, function()
+        local d = D()
+        if d then d.remove() end
+    end))
+    debDel.Refresh = function()
+        local d = D()
+        if d and not debDel.armed then debDel.text:SetText(d.removeLabel() or "") end
+    end
+    table.insert(UI.widgets, debDel)
+
     local st = UI.Stack(c, 6, -2, {
+        W(UI.Header(c, "Debuff"), isDeb),
+        W(UI.Slider(c, "Prioridad (5 = se ve antes)", 1, ns.PRIO_MAX, 1, nil, DG("prio")), isDeb),
+        W(UI.Check(c, "Activo", DG("enabled")), isDeb),
+        W(UI.Dropdown(c, "Jefe", function() local d = D() return d and d.bosses() or {} end, DG("boss")),
+            function() local d = D() return d ~= nil and #d.bosses() > 1 end),
+        W(debDel, function() local d = D() return d ~= nil and d.removeLabel() ~= nil end),
+
         UI.Header(c, "Brillo"),
         UI.Dropdown(c, "Tipo de brillo", ns.Glow.TYPES, SG("glow")),
         E(UI.Dropdown(c, "Dónde", { { "icon", "En el icono" }, { "frame", "En todo el marco" } }, SG("target")), hasGlow),
@@ -727,6 +753,8 @@ local function BuildSide()
 
     side.Refresh = function()
         if not sideCtx then side:Hide() return end
+        -- el debuff se ha borrado: no queda nada que editar
+        if sideCtx.debuff and not sideCtx.debuff.exists() then CloseSide() return end
         local name, icon = sideCtx.title()
         side.icon:SetTexture(icon or 134400)
         side.title:SetText(name or "")
@@ -960,14 +988,20 @@ local function BuildIndicators(p)
     local function unitBar() return isAura() and ns.IndicatorUnitMeasure(Sel()) end
     local function watchAuras() return isAura() and not unitBar() end
     -- vigila los hechizos de su lista (no «los que puedo disipar»)
-    local function listWatch() return watchAuras() and Sel().watch ~= "dispellable" end
-    local function dispWatch() return watchAuras() and Sel().watch == "dispellable" end
+    local function dispWatch() return watchAuras() and (Sel().watch == "dispellable" or Sel().watch == "debuffTypes") end
+    local function listWatch() return watchAuras() and not dispWatch() end
     local function timed()
         if T() == "bar" and (Sel().barMeasure or "time") ~= "time" then return false end
         if frameT() then return false end
         return notDispel() and not isMissing()
     end
     local function hasText() return timed() end
+    -- borde o tinte que enseña debuffs (los que tienen tipo)
+    local function typeIconT()
+        local s = Sel()
+        return frameT() and (K() ~= "aura" or s.watch == "dispellable" or s.watch == "debuffTypes" or s.auraType == "HARMFUL")
+    end
+    local function typeIconOn() return Sel().typeIcon end
 
     local function W(widget, cond) widget.showIf = cond return widget end
     -- WE: se ve según el tipo y se desactiva (sin moverse) según una sub-opción
@@ -1352,7 +1386,7 @@ local function BuildIndicators(p)
         local function typed()
             if K() == "raiddebuff" or K() == "debuffs" then return true end
             local s = Sel()
-            return isAura() and (s.watch == "dispellable" or s.auraType == "HARMFUL") and (frameT() or iconLike())
+            return isAura() and (s.watch == "dispellable" or s.watch == "debuffTypes" or s.auraType == "HARMFUL") and (frameT() or iconLike())
         end
         local function on() return Sel().dispelColor end
         local list = {}
@@ -1360,7 +1394,7 @@ local function BuildIndicators(p)
             { "Magic", "Magia" }, { "Curse", "Maldición" }, { "Disease", "Enfermedad" }, { "Poison", "Veneno" },
             { "none", "Sin tipo (borde y tinte)" },
         }) do
-            list[#list + 1] = WE(UI.Attach(UI.Swatch(c, d[2], function() return ns.EP().dispelColors[d[1]] end,
+            list[#list + 1] = WE(UI.Attach(UI.Swatch(c, ns.DispelLabel(d[1], d[2]), function() return ns.EP().dispelColors[d[1]] end,
                 IndChanged)), function() return typed() and (d[1] ~= "none" or frameT()) end, on)
         end
         list[#list + 1] = WE(UI.Attach(UI.Note(c, "Son los mismos para todos los indicadores del perfil. Si el juego oculta el tipo del debuff (puede pasar en combate o en instancias), el icono queda con borde negro y el borde o el tinte usan «Sin tipo».", 340)),
@@ -1368,10 +1402,17 @@ local function BuildIndicators(p)
         return list
     end
 
+    local auraSupport = UI.Attach(UI.Note(c, "", 340))
+    auraSupport.Refresh = function(self)
+        self.text:SetText(ns.IndicatorAuraSummary(Sel()))
+        self:SetHeight(self.text:GetStringHeight() + 2)
+    end
+    table.insert(UI.widgets, auraSupport)
     local st = UI.Stack(c, 4, -4, Flat({
         UI.Header(c, "Indicador"),
         nameW,
         UI.Check(c, "Activo", IB("enabled")),
+        auraSupport,
         W(UI.Dropdown(c, "Tipo", {
             { "square", "Cuadrado de color" }, { "icon", "Icono" }, { "icons", "Varios iconos" },
             { "bar", "Barra" }, { "text", "Texto" },
@@ -1402,14 +1443,16 @@ local function BuildIndicators(p)
         W(UI.Dropdown(c, "Vigila", {
             { "spells", "Los hechizos de su lista" },
             { "dispellable", "Los debuffs que puedo disipar" },
+            { "debuffTypes", "Debuffs por tipo (cualquier clase)" },
         }, IB("watch")), watchAuras),
-        W(UI.Attach(UI.Note(c, "El juego decide cuáles puedes disipar tú (según tu clase y talentos).", 340)), dispWatch),
-        W(UI.Attach(UI.Check(c, "Magia", IB("dispelTypes.Magic"))), dispWatch),
-        W(UI.Attach(UI.Check(c, "Maldición", IB("dispelTypes.Curse"))), dispWatch),
-        W(UI.Attach(UI.Check(c, "Enfermedad", IB("dispelTypes.Disease"))), dispWatch),
-        W(UI.Attach(UI.Check(c, "Veneno", IB("dispelTypes.Poison"))), dispWatch),
-        W(UI.Check(c, "Si el juego oculta el tipo, mostrarlo igualmente", IB("unknownType")), dispWatch),
-        W(UI.Attach(UI.Note(c, "En combate o en instancias el juego puede ocultar el tipo del debuff. Activado: se muestra (con el color «Sin tipo»). Desactivado: no se muestra.", 340)), dispWatch),
+        W(UI.Attach(UI.Note(c, "El juego decide cuáles puedes disipar tú (según tu clase y talentos).", 340)), function() return dispWatch() and Sel().watch == "dispellable" end),
+        W(UI.Attach(UI.Note(c, "Muestra los tipos marcados aunque tu clase no pueda disiparlos. En combate, el borde y el tinte los dibuja el sistema nativo del juego.", 340)), function() return dispWatch() and Sel().watch == "debuffTypes" end),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Magic", "Magia"), IB("dispelTypes.Magic"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Curse", "Maldición"), IB("dispelTypes.Curse"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Disease", "Enfermedad"), IB("dispelTypes.Disease"))), dispWatch),
+        W(UI.Attach(UI.Check(c, ns.DispelLabel("Poison", "Veneno"), IB("dispelTypes.Poison"))), dispWatch),
+        W(UI.Check(c, "Si el juego oculta el tipo, mostrarlo igualmente", IB("unknownType")), function() return dispWatch() and Sel().watch == "dispellable" end),
+        W(UI.Attach(UI.Note(c, "En combate o en instancias el juego puede ocultar el tipo del debuff. Activado: se muestra (con el color «Sin tipo»). Desactivado: no se muestra.", 340)), function() return dispWatch() and Sel().watch == "dispellable" end),
         W(UI.Dropdown(c, "Auras", { { "HELPFUL", "Bufos" }, { "HARMFUL", "Debufos" } }, IB("auraType")), listWatch),
         W(UI.Dropdown(c, "De quién", { { "mine", "Solo las mías" }, { "others", "Solo las de los demás" }, { "any", "De cualquiera" } },
             function()
@@ -1481,11 +1524,17 @@ local function BuildIndicators(p)
         }, IB("tintShape")), function() return T() == "overlay" end),
         W(UI.Slider(c, "Intensidad", 0.1, 1, 0.05, UI.pct, IB("overlayAlpha")), function() return T() == "overlay" end),
 
+        -- borde / tinte de debuffs: icono nativo del tipo encima
+        W(UI.Header(c, "Icono del tipo"), typeIconT),
+        W(UI.Check(c, ns.DispelLabel("Poison", "Mostrar el icono del tipo"), IB("typeIcon")), typeIconT),
+        WE(UI.Slider(c, "Tamaño", 8, 32, 1, nil, IB("typeIconSize")), typeIconT, typeIconOn),
+        PositionBlock(c, function() return Sel().typeIconPos end, IndChanged, { showIf = typeIconT, enableIf = typeIconOn }),
+
         UI.Header(c, "Aspecto"),
         W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")), function()
             if K() == "raiddebuff" or K() == "debuffs" then return true end
             local s = Sel()
-            return isAura() and (s.watch == "dispellable" or s.auraType == "HARMFUL") and (frameT() or iconLike())
+            return isAura() and (s.watch == "dispellable" or s.watch == "debuffTypes" or s.auraType == "HARMFUL") and (frameT() or iconLike())
         end),
         DispelSwatches(),
         WE(UI.Attach(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true)),
@@ -1802,58 +1851,242 @@ end
 
 -------------------------------------------------------------------------------
 -- Debuffs de banda
+-- Izquierda, las instancias. Derecha, dos pestañas: «Lista» (agrupada por
+-- jefe) y «Vistos» (lo que ha apuntado el registrador). Clic en un debuff:
+-- panel lateral con prioridad, activo, jefe y resaltado.
 -------------------------------------------------------------------------------
-local selKey = 0
-local listOffset, seenOffset = 0, 0
-local LIST_ROWS, SEEN_ROWS = 12, 5
+local selKey, picked = 0, false
+local raidTab = "list"
+local listOffset, seenOffset, instOffset = 0, 0, 0
+local LIST_ROWS, INST_ROWS = 21, 25
+local NEW_PRIO = 3
+local OTHERS = "Otros / sin jefe"
+local PLUS_TEX = "Interface\\Buttons\\UI-PlusButton-Up"
+local MINUS_TEX = "Interface\\Buttons\\UI-MinusButton-Up"
+local collapsed = {}      -- [instancia .. "\n" .. jefe] = true (solo esta sesión)
+local query = ""
+local showIgnored = false
+local selDebuff
 
-local function SortedList()
-    local out = {}
-    for id, e in pairs(ns.GetDebuffList(selKey)) do
-        e.key = id
-        e.name = ns.SpellKeyInfo(id)
-        out[#out + 1] = e
+-- Tabla de la base de datos por instancia (creada si hace falta)
+local function RaidT(field, key)
+    local t = ns.db.raid[field][key]
+    if not t then t = {} ns.db.raid[field][key] = t end
+    return t
+end
+
+local function Count(t)
+    local n = 0
+    for _ in pairs(t or {}) do n = n + 1 end
+    return n
+end
+
+local function KeyID(key)
+    if type(key) == "number" then return key end
+    return (select(3, ns.SpellKeyInfo(key)))
+end
+
+-- ¿Coincide con la búsqueda? (nombre o ID)
+local function Matches(name, id)
+    if query == "" then return true end
+    local q = query:lower()
+    if name and tostring(name):lower():find(q, 1, true) then return true end
+    return id ~= nil and tostring(id):find(q, 1, true) ~= nil
+end
+
+-- Cambios de un debuff --------------------------------------------------------
+local function SetPrio(inst, key, prio)
+    local e = ns.GetDebuffList(inst)[key]
+    if not e then return end
+    prio = math.max(1, math.min(ns.PRIO_MAX, prio))
+    -- igual que el de fábrica: no hace falta guardarlo
+    if e.default and prio == e.defPrio then
+        local c = ns.db.raid.custom[inst]
+        if c then c[key] = nil end
+    else
+        RaidT("custom", inst)[key] = prio
     end
+end
+
+-- boss = nombre del jefe, o "" para «Otros / sin jefe»
+local function SetBoss(inst, key, boss)
+    local e = ns.GetDebuffList(inst)[key]
+    if not e then return end
+    local b = (boss ~= "" and boss) or nil
+    if b == e.defBoss or (not e.default and b == nil) then
+        local t = ns.db.raid.boss[inst]
+        if t then t[key] = nil end
+    else
+        RaidT("boss", inst)[key] = b or false
+    end
+end
+
+local function SetEnabled(inst, key, on)
+    RaidT("disabled", inst)[key] = (not on) or nil
+end
+
+-- Borra uno propio, o devuelve uno de fábrica a su prioridad y jefe
+local function RemoveDebuff(inst, key)
+    local e = ns.GetDebuffList(inst)[key]
+    if not e then return end
+    for _, f in ipairs({ "custom", "boss" }) do
+        local t = ns.db.raid[f][inst]
+        if t then t[key] = nil end
+    end
+    if e.custom then
+        for _, f in ipairs({ "disabled", "styles" }) do
+            local t = ns.db.raid[f][inst]
+            if t then t[key] = nil end
+        end
+    end
+end
+
+-- Añade un debuff a la lista (o lo reactiva si ya estaba)
+local function AddDebuff(inst, key)
+    if not ns.GetDebuffList(inst)[key] then RaidT("custom", inst)[key] = NEW_PRIO end
+    local d = ns.db.raid.disabled[inst]
+    if d then d[key] = nil end
+    if type(key) == "number" then
+        for _, f in ipairs({ "seen", "ignored" }) do
+            local t = ns.db.raid[f][inst]
+            if t then t[key] = nil end
+        end
+    end
+end
+
+-- Filas de cada lista ---------------------------------------------------------
+-- Categoría de una clave en la lista de instancias
+local function CategoryOf(key)
+    local def = ns.RaidDebuffs[key]
+    if not def then return "other" end
+    if def.kind == "global" then return "global" end
+    if def.status == "unannounced" then return "unannounced" end
+    return def.kind
+end
+
+-- plegadas al empezar: todas menos las bandas (y la de la instancia elegida)
+local catClosed = { dungeon = true, solo = true, world = true, zone = true, unannounced = true }
+
+-- Filas: { cat, label, n, closed } (título de categoría) o { key }
+local function InstanceRows()
+    local groups, known = {}, {}
+    for _, k in ipairs(ns.RaidOrder) do
+        local cat = CategoryOf(k)
+        groups[cat] = groups[cat] or {}
+        table.insert(groups[cat], k)
+        known[k] = true
+    end
+    -- instancias que el juego ha dado y no están en los datos
+    local extra = {}
+    for _, f in ipairs({ "custom", "seen", "names", "ignored", "boss", "learned" }) do
+        for k in pairs(ns.db.raid[f]) do
+            if not known[k] then known[k] = true extra[#extra + 1] = k end
+        end
+    end
+    table.sort(extra, function(a, b) return ns.InstanceName(a) < ns.InstanceName(b) end)
+    groups.other = extra
+
+    local out = {}
+    for _, k in ipairs(groups.global or {}) do out[#out + 1] = { key = k } end
+    local order = {}
+    for _, kind in ipairs(ns.KINDS) do order[#order + 1] = kind end
+    order[#order + 1] = "unannounced"
+    order[#order + 1] = "other"
+    for _, cat in ipairs(order) do
+        local list = groups[cat]
+        if list and #list > 0 then
+            local closed = catClosed[cat] and CategoryOf(selKey) ~= cat
+            out[#out + 1] = { cat = cat, label = ns.KIND_NAMES[cat] or cat, n = #list, closed = closed }
+            if not closed then
+                for _, k in ipairs(list) do out[#out + 1] = { key = k } end
+            end
+        end
+    end
+    return out
+end
+
+-- ¿Estás ahí ahora? (instancia actual o jefe del mundo de tu zona)
+local function IsHere(key)
+    if ns.inInstance and key == ns.instKey then return true end
+    for _, k in ipairs(ns.zoneKeys or {}) do
+        if k == key then return true end
+    end
+    return false
+end
+
+-- Lista agrupada por jefe: filas { header = jefe, n, ck, closed } o entradas
+local function ListRows()
+    local bosses = ns.InstanceBosses(selKey)
+    local groups, byBoss = {}, {}
+    for _, b in ipairs(bosses) do
+        local g = { boss = b, items = {} }
+        groups[#groups + 1] = g
+        byBoss[b] = g
+    end
+    local other = { items = {} }
+    groups[#groups + 1] = other
+    local total = 0
+    for key, e in pairs(ns.GetDebuffList(selKey)) do
+        total = total + 1
+        e.key = key
+        e.name = ns.SpellKeyInfo(key)
+        e.id = KeyID(key)
+        if Matches(e.name, e.id) then
+            local g = (e.boss and byBoss[e.boss]) or other
+            g.items[#g.items + 1] = e
+        end
+    end
+    local rows = {}
+    local grouped = #bosses > 0
+    for _, g in ipairs(groups) do
+        if #g.items > 0 then
+            table.sort(g.items, function(a, b)
+                if a.prio ~= b.prio then return a.prio > b.prio end
+                return tostring(a.name) < tostring(b.name)
+            end)
+            local ck = tostring(selKey) .. "\n" .. (g.boss or "")
+            -- buscando, todo abierto
+            local closed = grouped and collapsed[ck] and query == "" or false
+            if grouped then
+                rows[#rows + 1] = { header = g.boss or OTHERS, n = #g.items, ck = ck, closed = closed }
+            end
+            if not closed then
+                for _, e in ipairs(g.items) do rows[#rows + 1] = e end
+            end
+        end
+    end
+    return rows, total
+end
+
+local function SeenRows()
+    local out = {}
+    local function Add(t, ignored)
+        for id, s in pairs(t or {}) do
+            local name = s.name or ns.GetSpellName(id)
+            if Matches(name, id) then
+                out[#out + 1] = { id = id, name = name, icon = s.icon, count = s.count or 0, boss = s.boss, ignored = ignored }
+            end
+        end
+    end
+    Add(ns.db.raid.seen[selKey], false)
+    if showIgnored then Add(ns.db.raid.ignored[selKey], true) end
     table.sort(out, function(a, b)
-        if a.prio ~= b.prio then return a.prio > b.prio end
+        if a.ignored ~= b.ignored then return not a.ignored end
+        if a.count ~= b.count then return a.count > b.count end
         return tostring(a.name) < tostring(b.name)
     end)
     return out
 end
 
-local function Custom(key)
-    local c = ns.db.raid.custom[key]
-    if not c then c = {} ns.db.raid.custom[key] = c end
-    return c
-end
-
-local function InstanceOptions()
-    local out, seen = {}, {}
-    for _, k in ipairs(ns.RaidOrder) do
-        out[#out + 1] = { k, ns.InstanceName(k) }
-        seen[k] = true
-    end
-    local extra = {}
-    for _, t in ipairs({ ns.db.raid.custom, ns.db.raid.seen, ns.db.raid.names }) do
-        for k in pairs(t) do
-            if not seen[k] then seen[k] = true extra[#extra + 1] = k end
-        end
-    end
-    table.sort(extra)
-    for _, k in ipairs(extra) do out[#out + 1] = { k, ns.InstanceName(k) } end
-    return out
-end
-
-local selDebuff
-
+-- Página ----------------------------------------------------------------------
 local function BuildRaid(p)
     local RefreshRaid
     local function RaidChanged()
         ns.RebuildDebuffLookup()
-        RefreshRaid()
+        UI.RefreshAll() -- esta página y el panel lateral, si está abierto
     end
 
-    -- clic en un debuff: abrir su excepción de resaltado en el panel lateral
+    -- clic en un debuff: abrir su panel lateral
     local function Select(key)
         if key == nil then
             selDebuff = nil
@@ -1863,15 +2096,46 @@ local function BuildRaid(p)
         end
         local inst = selKey
         selDebuff = key
+        local function E() return ns.GetDebuffList(inst)[key] end
         OpenSide({
             title = function() return ns.SpellKeyInfo(key) end,
-            sub = ("Excepción en %s: sustituye al resaltado del indicador «Debuff de banda»."):format(ns.InstanceName(inst)),
+            sub = ("Debuff de banda en %s. Su resaltado propio sustituye al del indicador «Debuff de banda»."):format(ns.InstanceName(inst)),
+            debuff = {
+                exists = function() return E() ~= nil end,
+                get = function(f)
+                    local e = E()
+                    if not e then return nil end
+                    if f == "prio" then return e.prio end
+                    if f == "enabled" then return not e.disabled end
+                    if f == "boss" then return e.boss or "" end
+                end,
+                set = function(f, v)
+                    if f == "prio" then SetPrio(inst, key, v)
+                    elseif f == "enabled" then SetEnabled(inst, key, v)
+                    elseif f == "boss" then SetBoss(inst, key, v) end
+                end,
+                bosses = function()
+                    local out = {}
+                    for _, b in ipairs(ns.InstanceBosses(inst)) do out[#out + 1] = { b, b } end
+                    out[#out + 1] = { "", OTHERS }
+                    return out
+                end,
+                removeLabel = function()
+                    local e = E()
+                    if not e then return nil end
+                    if e.custom then return "Borrar de la lista" end
+                    if e.changed then return "Restaurar prioridad y jefe" end
+                end,
+                remove = function()
+                    local e = E()
+                    local wasCustom = e and e.custom
+                    RemoveDebuff(inst, key)
+                    if wasCustom then Select(nil) end
+                    RaidChanged()
+                end,
+            },
             load = function() return ns.GetDebuffStyle(inst, key) end,
-            store = function(s)
-                local t = ns.db.raid.styles[inst]
-                if not t then t = {} ns.db.raid.styles[inst] = t end
-                t[key] = s
-            end,
+            store = function(s) RaidT("styles", inst)[key] = s end,
             clear = function()
                 local t = ns.db.raid.styles[inst]
                 if t then t[key] = nil end
@@ -1886,45 +2150,160 @@ local function BuildRaid(p)
         })
     end
 
-    local dd = UI.Dropdown(p, "Instancia", InstanceOptions, function() return selKey end, function(v)
-        selKey = v
+    local function SelectInstance(k)
+        selKey, picked = k, true
         listOffset, seenOffset = 0, 0
         Select(nil)
-        RefreshRaid()
-    end, 230)
-    dd:SetPoint("TOPLEFT", 12, -6)
+    end
 
-    local cur = UI.Button(p, "Instancia actual", 110, 18, function()
-        selKey = ns.instKey or 0
+    local function Wheel(frame, fn)
+        frame:EnableMouseWheel(true)
+        frame:SetScript("OnMouseWheel", function(_, d) fn(d) RefreshRaid() end)
+    end
+
+    ---------------------------------------------------------------------------
+    -- Izquierda: instancias
+    ---------------------------------------------------------------------------
+    local left = CreateFrame("Frame", nil, p, "BackdropTemplate")
+    left:SetPoint("TOPLEFT")
+    left:SetPoint("BOTTOMLEFT")
+    left:SetWidth(176)
+    UI.Backdrop(left, { 0.095, 0.095, 0.118, 1 }, { 0.19, 0.19, 0.235, 1 })
+    local lt = UI.Label(left, "Instancias", "GameFontNormal")
+    lt:SetPoint("TOPLEFT", 10, -8)
+    lt:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+
+    local instArea = CreateFrame("Frame", nil, left)
+    instArea:SetPoint("TOPLEFT", 4, -28)
+    instArea:SetSize(168, INST_ROWS * 20)
+    Wheel(instArea, function(d) instOffset = math.max(0, instOffset - d) end)
+    local instBar = UI.ScrollBar(instArea, function(v) instOffset = v RefreshRaid() end)
+    instBar:SetPoint("TOPRIGHT", 0, 0)
+    instBar:SetPoint("BOTTOMRIGHT", 0, 0)
+
+    local instRows = {}
+    for i = 1, INST_ROWS do
+        local r = CreateFrame("Button", nil, instArea)
+        r:SetSize(156, 19)
+        r:SetPoint("TOPLEFT", 0, -(i - 1) * 20)
+        r.sel = r:CreateTexture(nil, "BACKGROUND")
+        r.sel:SetAllPoints()
+        r.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.22)
+        r.hl = r:CreateTexture(nil, "HIGHLIGHT")
+        r.hl:SetAllPoints()
+        r.hl:SetColorTexture(1, 1, 1, 0.07)
+        r.dot = r:CreateTexture(nil, "ARTWORK")
+        r.dot:SetSize(6, 6)
+        r.dot:SetPoint("LEFT", 4, 0)
+        r.dot:SetColorTexture(0.3, 0.9, 0.4, 1)
+        -- +/- de las categorías
+        r.exp = r:CreateTexture(nil, "ARTWORK")
+        r.exp:SetSize(12, 12)
+        r.exp:SetPoint("LEFT", 0, 0)
+        r.name = UI.Label(r, "")
+        r.name:SetPoint("LEFT", 14, 0)
+        r.name:SetWidth(116)
+        r.name:SetWordWrap(false)
+        r.count = UI.Label(r, "")
+        r.count:SetPoint("RIGHT", -4, 0)
+        r.count:SetTextColor(0.6, 0.6, 0.6)
+        r:SetScript("OnClick", function(self)
+            if self.cat then
+                -- plegar / desplegar la categoría (la de la elegida no se pliega)
+                catClosed[self.cat] = not self.closed
+                if catClosed[self.cat] and CategoryOf(selKey) == self.cat then catClosed[self.cat] = false end
+                RefreshRaid()
+            elseif self.key ~= nil then
+                SelectInstance(self.key)
+            end
+        end)
+        r:SetScript("OnEnter", function(self)
+            if self.key == nil or not IsHere(self.key) then return end
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Estás aquí")
+            GameTooltip:Show()
+        end)
+        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        instRows[i] = r
+    end
+
+    ---------------------------------------------------------------------------
+    -- Derecha: cabecera, pestañas y búsqueda
+    ---------------------------------------------------------------------------
+    local right = CreateFrame("Frame", nil, p)
+    right:SetPoint("TOPLEFT", 186, 0)
+    right:SetPoint("BOTTOMRIGHT")
+
+    local title = UI.Label(right, "", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 2, -4)
+    title:SetWidth(250)
+    title:SetWordWrap(false)
+
+    local tabSeen = UI.Button(right, "", 84, 20, function() raidTab = "seen" RefreshRaid() end)
+    tabSeen:SetPoint("TOPRIGHT", 0, -2)
+    local tabList = UI.Button(right, "Lista", 64, 20, function() raidTab = "list" RefreshRaid() end)
+    tabList:SetPoint("RIGHT", tabSeen, "LEFT", -4, 0)
+
+    local search = UI.EditBox(right, 230)
+    search:SetPoint("TOPLEFT", 0, -30)
+    local ph = UI.Label(search, "Buscar, o un ID / nombre para añadir")
+    ph:SetPoint("LEFT", 6, 0)
+    ph:SetTextColor(0.45, 0.45, 0.45)
+    search:SetScript("OnTextChanged", function(self)
+        local txt = self:GetText() or ""
+        ph:SetShown(txt == "")
+        query = txt:trim()
         listOffset, seenOffset = 0, 0
-        Select(nil)
-        dd.Refresh()
         RefreshRaid()
     end)
-    cur:SetPoint("TOPLEFT", 250, -20)
+    search:SetScript("OnEnterPressed", search.ClearFocus)
+    local clearQ = UI.Button(right, "x", 20, 20, function()
+        search:SetText("")
+        search:ClearFocus()
+    end)
+    clearQ:SetPoint("LEFT", search, "RIGHT", 4, 0)
+    local add = UI.Button(right, "+ Añadir", 80, 20, function()
+        local key = ns.ParseSpellInput(search:GetText())
+        if not key then return end
+        AddDebuff(selKey, key)
+        search:SetText("")
+        search:ClearFocus()
+        raidTab = "list"
+        ns.RebuildDebuffLookup()
+        Select(key) -- abre el panel para ponerle jefe y prioridad
+    end)
+    add:SetPoint("LEFT", clearQ, "RIGHT", 6, 0)
 
-    local rec = UI.Check(p, "Registrar debuffs nuevos",
-        function() return ns.db.raid.recorder end, function(v) ns.db.raid.recorder = v end)
-    rec:SetPoint("TOPLEFT", 372, -22)
-
-    local hdr = UI.Label(p, "Debuff")
-    hdr:SetPoint("TOPLEFT", 16, -48)
-    hdr:SetTextColor(0.6, 0.6, 0.6)
-    local hdr2 = UI.Label(p, "Prioridad     Activo")
-    hdr2:SetPoint("TOPLEFT", 326, -48)
-    hdr2:SetTextColor(0.6, 0.6, 0.6)
-    local scrollInfo = UI.Label(p, "")
-    scrollInfo:SetPoint("TOPRIGHT", -16, -48)
+    local function ColLabel(text, x)
+        local l = UI.Label(right, text)
+        l:SetPoint("TOPLEFT", x, -58)
+        l:SetTextColor(0.6, 0.6, 0.6)
+        return l
+    end
+    local scrollInfo = UI.Label(right, "")
+    scrollInfo:SetPoint("TOPRIGHT", -14, -58)
     scrollInfo:SetTextColor(0.6, 0.6, 0.6)
 
-    local listArea = CreateFrame("Frame", nil, p)
-    listArea:SetPoint("TOPLEFT", 12, -62)
-    listArea:SetSize(570, LIST_ROWS * 20)
-    listArea:EnableMouseWheel(true)
-    listArea:SetScript("OnMouseWheel", function(_, d)
-        listOffset = math.max(0, listOffset - d)
-        RefreshRaid()
-    end)
+    local emptyText = UI.Label(right, "")
+    emptyText:SetPoint("TOPLEFT", 4, -78)
+    emptyText:SetWidth(400)
+    emptyText:SetTextColor(0.6, 0.6, 0.6)
+
+    -- aviso: el juego oculta los IDs aquí
+    local warn = UI.Label(right, "")
+    warn:SetPoint("TOPLEFT", 0, -72 - LIST_ROWS * 20 - 8)
+    warn:SetWidth(418)
+    warn:SetTextColor(1, 0.55, 0.3)
+
+    ---------------------------------------------------------------------------
+    -- Pestaña «Lista»
+    ---------------------------------------------------------------------------
+    local listCols = { ColLabel("Debuff", 38), ColLabel("ID", 192), ColLabel("Prioridad", 258), ColLabel("Activo", 326) }
+
+    local listArea = CreateFrame("Frame", nil, right)
+    listArea:SetPoint("TOPLEFT", 0, -72)
+    listArea:SetSize(418, LIST_ROWS * 20)
+    Wheel(listArea, function(d) listOffset = math.max(0, listOffset - d) end)
     local listBar = UI.ScrollBar(listArea, function(v) listOffset = v RefreshRaid() end)
     listBar:SetPoint("TOPRIGHT", -2, 0)
     listBar:SetPoint("BOTTOMRIGHT", -2, 0)
@@ -1932,176 +2311,276 @@ local function BuildRaid(p)
     local listRows = {}
     for i = 1, LIST_ROWS do
         local row = CreateFrame("Frame", nil, listArea)
-        row:SetSize(554, 19)
-        row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
+        row:SetSize(406, 19)
+        row:SetPoint("TOPLEFT", 0, -(i - 1) * 20)
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints()
-        row.bg:SetColorTexture(1, 1, 1, i % 2 == 0 and 0.03 or 0)
         row.sel = row:CreateTexture(nil, "BACKGROUND", nil, 1)
         row.sel:SetAllPoints()
         row.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.22)
         row.sel:Hide()
-        -- clic en el nombre: abrir el resaltado
+
+        -- clic: plegar el jefe, o abrir el panel del debuff
         row.click = CreateFrame("Button", nil, row)
         row.click:SetPoint("TOPLEFT")
-        row.click:SetSize(306, 19)
+        row.click:SetHeight(19)
         row.click.hl = row.click:CreateTexture(nil, "HIGHLIGHT")
         row.click.hl:SetAllPoints()
         row.click.hl:SetColorTexture(1, 1, 1, 0.07)
         row.click:SetScript("OnClick", function()
-            if row.entry then Select(row.entry.key ~= selDebuff and row.entry.key or nil) end
+            local d = row.data
+            if not d then return end
+            if d.header then
+                collapsed[d.ck] = (not collapsed[d.ck]) or nil
+                RefreshRaid()
+            else
+                Select(d.key ~= selDebuff and d.key or nil)
+            end
         end)
-        row.icon = row:CreateTexture(nil, "ARTWORK")
+
+        -- fila de jefe
+        row.h = CreateFrame("Frame", nil, row)
+        row.h:SetAllPoints()
+        row.exp = row.h:CreateTexture(nil, "ARTWORK")
+        row.exp:SetSize(14, 14)
+        row.exp:SetPoint("LEFT", 2, 0)
+        row.hname = UI.Label(row.h, "", "GameFontNormal")
+        row.hname:SetPoint("LEFT", 20, 0)
+        row.hname:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+        row.hcount = UI.Label(row.h, "")
+        row.hcount:SetPoint("LEFT", row.hname, "RIGHT", 6, 0)
+        row.hcount:SetTextColor(0.6, 0.6, 0.6)
+
+        -- fila de debuff (por encima del clic, para sus botones)
+        row.e = CreateFrame("Frame", nil, row)
+        row.e:SetAllPoints()
+        row.e:SetFrameLevel(row.click:GetFrameLevel() + 1)
+        row.icon = row.e:CreateTexture(nil, "ARTWORK")
         row.icon:SetSize(17, 17)
-        row.icon:SetPoint("LEFT")
+        row.icon:SetPoint("LEFT", 16, 0)
         row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        -- tooltip del hechizo solo sobre el icono
-        local tip = UI.IconTip(row, row.icon, function()
-            local key = row.entry and row.entry.key
-            return key ~= nil and ns.KeyIDs(key)[1] or nil
-        end)
-        tip:SetFrameLevel(row.click:GetFrameLevel() + 2)
-        row.name = UI.Label(row, "")
-        row.name:SetPoint("LEFT", 22, 0)
-        row.name:SetWidth(196)
+        UI.IconTip(row.e, row.icon, function() return row.data and row.data.id end)
+        row.name = UI.Label(row.e, "")
+        row.name:SetPoint("LEFT", 38, 0)
+        row.name:SetWidth(150)
         row.name:SetWordWrap(false)
-        row.styled = row:CreateTexture(nil, "ARTWORK")
-        row.styled:SetSize(8, 8)
-        row.styled:SetPoint("LEFT", 226, 0)
-        row.id = UI.Label(row, "")
-        row.id:SetPoint("LEFT", 248, 0)
+        row.id = UI.Label(row.e, "")
+        row.id:SetPoint("LEFT", 192, 0)
         row.id:SetTextColor(0.6, 0.6, 0.6)
-        row.minus = UI.Button(row, "-", 16, 16, function()
-            Custom(selKey)[row.entry.key] = math.max(1, row.entry.prio - 1)
-            RaidChanged()
-        end)
-        row.minus:SetPoint("LEFT", 314, 0)
-        row.prio = UI.Label(row, "")
-        row.prio:SetPoint("LEFT", 336, 0)
-        row.plus = UI.Button(row, "+", 16, 16, function()
-            Custom(selKey)[row.entry.key] = math.min(20, row.entry.prio + 1)
-            RaidChanged()
-        end)
-        row.plus:SetPoint("LEFT", 354, 0)
-        row.toggle = CreateFrame("Button", nil, row, "BackdropTemplate")
+        -- prioridad: un cuadro por nivel; clic en uno = esa prioridad
+        row.sq = {}
+        for k = 1, ns.PRIO_MAX do
+            local b = CreateFrame("Button", nil, row.e)
+            b:SetSize(10, 10)
+            b:SetPoint("LEFT", 258 + (k - 1) * 12, 0)
+            b.t = b:CreateTexture(nil, "ARTWORK")
+            b.t:SetAllPoints()
+            b:SetScript("OnClick", function()
+                if row.data and not row.data.header then
+                    SetPrio(selKey, row.data.key, k)
+                    RaidChanged()
+                end
+            end)
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:SetText(("Prioridad %d"):format(k))
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            row.sq[k] = b
+        end
+        row.toggle = CreateFrame("Button", nil, row.e, "BackdropTemplate")
         row.toggle:SetSize(14, 14)
-        row.toggle:SetPoint("LEFT", 392, 0)
+        row.toggle:SetPoint("LEFT", 334, 0)
         UI.Backdrop(row.toggle, { 0.05, 0.05, 0.06, 1 })
         row.toggle.mark = row.toggle:CreateTexture(nil, "OVERLAY")
         row.toggle.mark:SetPoint("TOPLEFT", 3, -3)
         row.toggle.mark:SetPoint("BOTTOMRIGHT", -3, 3)
         row.toggle.mark:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 1)
         row.toggle:SetScript("OnClick", function()
-            local dis = ns.db.raid.disabled[selKey]
-            if not dis then dis = {} ns.db.raid.disabled[selKey] = dis end
-            dis[row.entry.key] = (not dis[row.entry.key]) or nil
-            RaidChanged()
+            local d = row.data
+            if d and not d.header then
+                SetEnabled(selKey, d.key, d.disabled)
+                RaidChanged()
+            end
         end)
-        row.del = UI.Confirm(UI.Button(row, "", 80, 16, function()
-            Custom(selKey)[row.entry.key] = nil
-            RaidChanged()
-        end))
-        row.del:SetPoint("LEFT", 424, 0)
+        -- punto de color: tiene resaltado propio
+        row.styled = row.e:CreateTexture(nil, "ARTWORK")
+        row.styled:SetSize(8, 8)
+        row.styled:SetPoint("LEFT", 362, 0)
         listRows[i] = row
     end
 
-    local y = -62 - LIST_ROWS * 20 - 10
-    local addLbl = UI.Label(p, "Añadir debuff (ID o nombre exacto):")
-    addLbl:SetPoint("TOPLEFT", 16, y)
-    local e = UI.EditBox(p, 200)
-    e:SetPoint("TOPLEFT", 16, y - 14)
-    local prioLbl = UI.Label(p, "Prioridad")
-    prioLbl:SetPoint("LEFT", e, "RIGHT", 8, 0)
-    local pe = UI.EditBox(p, 34)
-    pe:SetPoint("LEFT", prioLbl, "RIGHT", 4, 0)
-    pe:SetText("5")
-    pe:SetNumeric(true)
-    local add = UI.Button(p, "Añadir", 70, 20, function()
-        local key = ns.ParseSpellInput(e:GetText())
-        if not key then return end
-        Custom(selKey)[key] = math.max(1, tonumber(pe:GetText()) or 5)
-        local disabled = ns.db.raid.disabled[selKey]
-        if disabled then disabled[key] = nil end
-        e:SetText("")
-        e:ClearFocus()
-        RaidChanged()
-    end)
-    add:SetPoint("LEFT", pe, "RIGHT", 8, 0)
-    e:SetScript("OnEnterPressed", function() add:Click() end)
-
-    y = y - 46
-    local seenHdr = UI.Header(p, "Vistos en esta instancia (no están en la lista)")
-    seenHdr:SetPoint("TOPLEFT", 16, y + 4)
-    seenHdr:SetWidth(440)
-    local clear = UI.Button(p, "Limpiar", 70, 18, function()
+    ---------------------------------------------------------------------------
+    -- Pestaña «Vistos»
+    ---------------------------------------------------------------------------
+    local seenCols = { ColLabel("Debuff", 22), ColLabel("ID", 166), ColLabel("Veces · jefe", 214) }
+    local clear = UI.Confirm(UI.Button(right, "Limpiar vistos", 90, 16, function()
         ns.db.raid.seen[selKey] = nil
+        seenOffset = 0
         RefreshRaid()
-    end)
-    clear:SetPoint("TOPRIGHT", -16, y + 2)
+    end))
+    clear:SetPoint("TOPRIGHT", -14, -54)
 
-    local seenArea = CreateFrame("Frame", nil, p)
-    seenArea:SetPoint("TOPLEFT", 12, y - 22)
-    seenArea:SetSize(570, SEEN_ROWS * 20)
-    seenArea:EnableMouseWheel(true)
-    seenArea:SetScript("OnMouseWheel", function(_, d)
-        seenOffset = math.max(0, seenOffset - d)
-        RefreshRaid()
-    end)
+    local seenArea = CreateFrame("Frame", nil, right)
+    seenArea:SetPoint("TOPLEFT", 0, -72)
+    seenArea:SetSize(418, LIST_ROWS * 20)
+    Wheel(seenArea, function(d) seenOffset = math.max(0, seenOffset - d) end)
     local seenBar = UI.ScrollBar(seenArea, function(v) seenOffset = v RefreshRaid() end)
     seenBar:SetPoint("TOPRIGHT", -2, 0)
     seenBar:SetPoint("BOTTOMRIGHT", -2, 0)
+
     local seenRows = {}
-    for i = 1, SEEN_ROWS do
+    for i = 1, LIST_ROWS do
         local row = CreateFrame("Frame", nil, seenArea)
-        row:SetSize(554, 19)
-        row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
+        row:SetSize(406, 19)
+        row:SetPoint("TOPLEFT", 0, -(i - 1) * 20)
+        row.bg = row:CreateTexture(nil, "BACKGROUND")
+        row.bg:SetAllPoints()
+        row.bg:SetColorTexture(1, 1, 1, i % 2 == 0 and 0.03 or 0)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetSize(17, 17)
         row.icon:SetPoint("LEFT")
         row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        UI.IconTip(row, row.icon, function() return row.data and row.data.id end)
         row.name = UI.Label(row, "")
         row.name:SetPoint("LEFT", 22, 0)
-        row.name:SetWidth(220)
+        row.name:SetWidth(140)
         row.name:SetWordWrap(false)
         row.id = UI.Label(row, "")
-        row.id:SetPoint("LEFT", 248, 0)
+        row.id:SetPoint("LEFT", 166, 0)
         row.id:SetTextColor(0.6, 0.6, 0.6)
         row.count = UI.Label(row, "")
-        row.count:SetPoint("LEFT", 314, 0)
+        row.count:SetPoint("LEFT", 214, 0)
+        row.count:SetWidth(78)
+        row.count:SetWordWrap(false)
         row.count:SetTextColor(0.6, 0.6, 0.6)
-        -- tooltip del hechizo solo sobre el icono
-        UI.IconTip(row, row.icon, function() return row.spellID end)
-        row.add = UI.Button(row, "Añadir", 70, 16, function()
-            Custom(selKey)[row.spellID] = 5
-            ns.db.raid.seen[selKey][row.spellID] = nil
-            RaidChanged()
+        row.add = UI.Button(row, "Añadir", 52, 16, function()
+            local id = row.data and row.data.id
+            if not id then return end
+            local boss = row.data.boss
+            AddDebuff(selKey, id)
+            -- el jefe que dio el juego al verlo
+            if boss then SetBoss(selKey, id, boss) end
+            ns.RebuildDebuffLookup()
+            Select(id) -- abre el panel para ponerle jefe y prioridad
         end)
-        row.add:SetPoint("LEFT", 424, 0)
+        row.add:SetPoint("LEFT", 296, 0)
+        -- Ignorar (no vuelve a salir) / Recuperar
+        row.ign = UI.Button(row, "", 54, 16, function()
+            local d = row.data
+            if not d then return end
+            local from, to = "seen", "ignored"
+            if d.ignored then from, to = "ignored", "seen" end
+            local src = ns.db.raid[from][selKey]
+            local s = src and src[d.id]
+            if src then src[d.id] = nil end
+            RaidT(to, selKey)[d.id] = s or { name = d.name, icon = d.icon, count = d.count }
+            RefreshRaid()
+        end)
+        row.ign:SetPoint("LEFT", 352, 0)
         seenRows[i] = row
     end
-    local seenEmpty = UI.Label(p, "Nada todavía. Entra en la instancia con el registrador activo: los debuffs que no\nestén en la lista aparecerán aquí (cuando el juego deje leerlos).")
-    seenEmpty:SetPoint("TOPLEFT", 16, y - 26)
-    seenEmpty:SetTextColor(0.6, 0.6, 0.6)
 
-    RefreshRaid = function()
-        local list = SortedList()
-        listOffset = math.max(0, math.min(listOffset, #list - LIST_ROWS))
-        listBar:SetRange(#list - LIST_ROWS, #list > 0 and LIST_ROWS / #list or 1)
-        listBar:SetPos(listOffset)
+    local rec = UI.Check(right, "Registrar debuffs nuevos",
+        function() return ns.db.raid.recorder end, function(v) ns.db.raid.recorder = v RefreshRaid() end)
+    rec:SetPoint("TOPLEFT", 0, -72 - LIST_ROWS * 20 - 30)
+    local ign = UI.Check(right, "Mostrar ignorados",
+        function() return showIgnored end, function(v) showIgnored = v seenOffset = 0 RefreshRaid() end)
+    ign:SetPoint("TOPLEFT", 200, -72 - LIST_ROWS * 20 - 30)
+
+    ---------------------------------------------------------------------------
+    -- Refresco
+    ---------------------------------------------------------------------------
+    local function Scroll(bar, offset, n)
+        offset = math.max(0, math.min(offset, n - LIST_ROWS))
+        bar:SetRange(n - LIST_ROWS, n > 0 and LIST_ROWS / n or 1)
+        bar:SetPos(offset)
+        if n > LIST_ROWS then
+            scrollInfo:SetText(("%d-%d de %d"):format(offset + 1, math.min(n, offset + LIST_ROWS), n))
+        else
+            scrollInfo:SetText("")
+        end
+        return offset
+    end
+
+    local function RefreshInstances()
+        local rows = InstanceRows()
+        instOffset = math.max(0, math.min(instOffset, #rows - INST_ROWS))
+        instBar:SetRange(#rows - INST_ROWS, #rows > 0 and INST_ROWS / #rows or 1)
+        instBar:SetPos(instOffset)
+        for i, r in ipairs(instRows) do
+            local d = rows[i + instOffset]
+            r.key = d and d.key
+            r.cat = d and d.cat
+            r.closed = d and d.closed
+            if not d then
+                r:Hide()
+            elseif d.cat then
+                r.exp:SetTexture(d.closed and PLUS_TEX or MINUS_TEX)
+                r.exp:Show()
+                r.name:SetText(d.label)
+                if d.cat == "unannounced" or d.cat == "other" then
+                    r.name:SetTextColor(0.55, 0.55, 0.55)
+                else
+                    r.name:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+                end
+                r.count:SetText(d.n)
+                r.sel:Hide()
+                r.dot:Hide()
+                r:Show()
+            else
+                r.exp:Hide()
+                r.name:SetText(d.key == 0 and "Global" or ns.InstanceName(d.key))
+                local g = CategoryOf(d.key) == "unannounced" and 0.6 or 1
+                r.name:SetTextColor(g, g, g)
+                r.count:SetText(Count(ns.GetDebuffList(d.key)))
+                r.sel:SetShown(d.key == selKey)
+                r.dot:SetShown(IsHere(d.key))
+                r:Show()
+            end
+        end
+    end
+
+    local function RefreshList()
+        local rows, total = ListRows()
+        listOffset = Scroll(listBar, listOffset, #rows)
         for i, row in ipairs(listRows) do
-            local en = list[i + listOffset]
-            row.entry = en
-            if en then
-                local name, icon = ns.SpellKeyInfo(en.key)
+            local d = rows[i + listOffset]
+            row.data = d
+            if not d then
+                row:Hide()
+            elseif d.header then
+                row.h:Show()
+                row.e:Hide()
+                row.click:SetWidth(406)
+                row.bg:SetColorTexture(1, 1, 1, 0.06)
+                row.sel:Hide()
+                row.exp:SetTexture(d.closed and PLUS_TEX or MINUS_TEX)
+                row.hname:SetText(d.header)
+                row.hcount:SetText(("(%d)"):format(d.n))
+                row:Show()
+            else
+                row.h:Hide()
+                row.e:Show()
+                row.click:SetWidth(250)
+                row.bg:SetColorTexture(1, 1, 1, 0)
+                local _, icon = ns.SpellKeyInfo(d.key)
                 row.icon:SetTexture(icon or 134400)
-                row.name:SetText(name)
-                local g = en.disabled and 0.5 or 1
+                row.name:SetText(d.name)
+                local g = d.disabled and 0.5 or 1
                 row.name:SetTextColor(g, g, g)
-                row.id:SetText(type(en.key) == "number" and en.key or (select(3, ns.SpellKeyInfo(en.key)) or "buscando..."))
-                row.prio:SetText(en.prio)
-                row.toggle.mark:SetShown(not en.disabled)
-                row.sel:SetShown(en.key == selDebuff)
-                local s = ns.GetDebuffStyle(selKey, en.key)
+                row.id:SetText(d.id or "buscando...")
+                for k, b in ipairs(row.sq) do
+                    if k <= d.prio then
+                        b.t:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], d.disabled and 0.35 or 1)
+                    else
+                        b.t:SetColorTexture(0.2, 0.2, 0.24, 1)
+                    end
+                end
+                row.toggle.mark:SetShown(not d.disabled)
+                row.sel:SetShown(d.key == selDebuff)
+                local s = ns.GetDebuffStyle(selKey, d.key)
                 local styled = s and (s.glow ~= "none" or s.border or s.tint or s.pulse or s.sound ~= "none" or s.scale ~= 1)
                 if styled then
                     local c = (s.glow ~= "none" and s.color) or (s.border and s.borderColor) or (s.tint and s.tintColor) or { r = 1, g = 1, b = 1 }
@@ -2110,54 +2589,83 @@ local function BuildRaid(p)
                 else
                     row.styled:Hide()
                 end
-                -- fila reutilizada para otro debuff: no arrastrar la confirmación
-                if row.delKey ~= en.key then row.del.Disarm() row.delKey = en.key end
-                if en.custom then
-                    if not row.del.armed then row.del.text:SetText("Borrar") end
-                    row.del:Show()
-                elseif en.changed then
-                    if not row.del.armed then row.del.text:SetText("Restaurar") end
-                    row.del:Show()
-                else
-                    row.del:Hide()
-                end
                 row:Show()
-            else
-                row:Hide()
             end
         end
-        if #list > LIST_ROWS then
-            scrollInfo:SetText(("%d-%d de %d"):format(listOffset + 1, math.min(#list, listOffset + LIST_ROWS), #list))
+        if #rows == 0 then
+            emptyText:SetText(total == 0 and "Lista vacía. Escribe un ID o nombre arriba y pulsa «+ Añadir»."
+                or "Nada coincide con la búsqueda.")
         else
-            scrollInfo:SetText(#list == 0 and "lista vacía" or (#list .. " debuffs"))
+            emptyText:SetText("")
         end
+    end
 
-        local seen = {}
-        for id, s in pairs(ns.db.raid.seen[selKey] or {}) do
-            seen[#seen + 1] = { id = id, name = s.name, icon = s.icon, count = s.count or 0 }
-        end
-        table.sort(seen, function(a, b) return a.count > b.count end)
-        seenOffset = math.max(0, math.min(seenOffset, #seen - SEEN_ROWS))
-        seenBar:SetRange(#seen - SEEN_ROWS, #seen > 0 and SEEN_ROWS / #seen or 1)
-        seenBar:SetPos(seenOffset)
+    local function RefreshSeen()
+        local rows = SeenRows()
+        seenOffset = Scroll(seenBar, seenOffset, #rows)
         for i, row in ipairs(seenRows) do
-            local s = seen[i + seenOffset]
-            if s then
-                row.spellID = s.id
-                row.icon:SetTexture(s.icon or ns.GetSpellIcon(s.id) or 134400)
-                row.name:SetText(s.name or ns.GetSpellName(s.id) or "?")
-                row.id:SetText(s.id)
-                row.count:SetText(s.count .. " veces")
+            local d = rows[i + seenOffset]
+            row.data = d
+            if d then
+                row.icon:SetTexture(d.icon or ns.GetSpellIcon(d.id) or 134400)
+                row.name:SetText(d.name or "?")
+                local g = d.ignored and 0.5 or 1
+                row.name:SetTextColor(g, g, g)
+                row.id:SetText(d.id)
+                local n = d.count == 1 and "1 vez" or (d.count .. " veces")
+                row.count:SetText(d.boss and (n .. " · " .. d.boss) or n)
+                row.ign.text:SetText(d.ignored and "Recuperar" or "Ignorar")
                 row:Show()
             else
                 row:Hide()
             end
         end
-        seenEmpty:SetShown(#seen == 0)
+        if #rows > 0 then
+            emptyText:SetText("")
+        elseif query ~= "" then
+            emptyText:SetText("Nada coincide con la búsqueda.")
+        elseif not ns.db.raid.recorder then
+            emptyText:SetText("El registrador está apagado: actívalo abajo para apuntar los debuffs nuevos.")
+        else
+            emptyText:SetText("Nada todavía. Entra en la instancia con el registrador activo: los debuffs que\nno estén en la lista aparecerán aquí (si el juego deja leerlos).")
+        end
+    end
+
+    local function Tab(b, on)
+        b:SetBackdropColor(on and 0.12 or 0.15, on and 0.3 or 0.15, on and 0.42 or 0.18, 1)
+    end
+
+    RefreshRaid = function()
+        RefreshInstances()
+        title:SetText(ns.InstanceName(selKey) .. (CategoryOf(selKey) == "unannounced" and "  |cff888888(sin anunciar)|r" or ""))
+        local nSeen = Count(ns.db.raid.seen[selKey])
+        tabSeen.text:SetText(nSeen > 0 and ("Vistos (%d)"):format(nSeen) or "Vistos")
+        local isList = raidTab == "list"
+        Tab(tabList, isList)
+        Tab(tabSeen, not isList)
+        listArea:SetShown(isList)
+        for _, l in ipairs(listCols) do l:SetShown(isList) end
+        seenArea:SetShown(not isList)
+        for _, l in ipairs(seenCols) do l:SetShown(not isList) end
+        clear:SetShown(not isList and nSeen > 0)
+        rec:SetShown(not isList)
+        ign:SetShown(not isList)
+        if isList then RefreshList() else RefreshSeen() end
+        -- con «Limpiar» a la vista, el contador de scroll se aparta
+        scrollInfo:ClearAllPoints()
+        scrollInfo:SetPoint("TOPRIGHT", clear:IsShown() and -110 or -14, -58)
+        add:SetEnabled(query ~= "")
+        add:SetAlpha(query ~= "" and 1 or 0.4)
+        clearQ:SetShown(query ~= "")
+        local hidden = ns.inInstance and ns.raidSecret and (selKey == ns.instKey or selKey == 0)
+        warn:SetText(hidden and "Aviso: en esta instancia el juego oculta los IDs de algunos debuffs. Esos no se pueden detectar ni registrar." or "")
     end
 
     p.OnShow = function()
-        dd.Refresh()
+        -- hasta que elijas una, se sigue la instancia en la que estás
+        if not picked then selKey = (ns.inInstance and ns.instKey) or (ns.zoneKeys and ns.zoneKeys[1]) or 0 end
+        rec.Refresh()
+        ign.Refresh()
         RefreshRaid()
         if side:IsShown() then side.Refresh() end
     end
@@ -2210,7 +2718,7 @@ local function CreateWindow()
     win.testBtn = UI.Button(win, "", 100, 20, function() ns.ToggleTest() end)
     win.testBtn:SetPoint("TOPRIGHT", win.lockBtn, "TOPLEFT", -6, 0)
 
-    local names = { "Perfiles", "Diseño", "Barras", "Textos", "Iconos de estado", "Indicadores", "Catálogo", "Debuffs de banda" }
+    local names = { "Perfiles", "Diseño", "Barras", "Textos", "Iconos de estado", "Indicadores", "Catálogo", "Debuffs de instancia" }
     local builders = { BuildProfiles, BuildLayout, BuildBars, BuildTexts, BuildElements, BuildIndicators, BuildCatalog, BuildRaid }
     for i, n in ipairs(names) do
         local nb = UI.Button(win, n, 130, 26, function() SelectPage(i) end)

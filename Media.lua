@@ -138,10 +138,14 @@ function ns.ColorText(fs, t, r, g, b)
 end
 
 -- Color de clase de una unidad (si el juego lo deja leer)
-function ns.ClassColorOf(unit)
-    if not unit then return nil end
-    local _, c = UnitClass(unit)
-    c = ns.R and ns.R(c) or c
+function ns.ClassColorOf(unit, previewClass, isPet)
+    if isPet then return 0.25, 0.75, 0.3 end
+    local c = previewClass
+    if not c and unit then
+        local _, class = UnitClass(unit)
+        if ns.R then class = ns.R(class) end
+        c = class
+    end
     local cc = c and RAID_CLASS_COLORS and RAID_CLASS_COLORS[c]
     if cc then return cc.r, cc.g, cc.b end
     return nil

@@ -8,6 +8,9 @@ local _, ns = ...
 local S, R, AnyS = ns.S, ns.R, ns.AnyS
 
 local GetAuraDataByIndex = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
+local GetUnitAuras = C_UnitAuras and C_UnitAuras.GetUnitAuras
+local GetAuraInstanceIDs = C_UnitAuras and C_UnitAuras.GetUnitAuraInstanceIDs
+local GetAuraByInstance = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
 local GetAuraDuration = C_UnitAuras and C_UnitAuras.GetAuraDuration
 local GetAuraApplicationDisplayCount = C_UnitAuras and C_UnitAuras.GetAuraApplicationDisplayCount
 
@@ -20,6 +23,21 @@ ns.DISPEL_COLORS = {
     Poison  = { 0.0, 0.6, 0.0 },
     none    = { 0.85, 0.1, 0.1 },
 }
+
+-- Iconos nativos de cada tipo (los de los marcos de banda de Blizzard)
+ns.DISPEL_ICONS = {
+    Magic   = "Interface\\RaidFrame\\Raid-Icon-DebuffMagic",
+    Curse   = "Interface\\RaidFrame\\Raid-Icon-DebuffCurse",
+    Disease = "Interface\\RaidFrame\\Raid-Icon-DebuffDisease",
+    Poison  = "Interface\\RaidFrame\\Raid-Icon-DebuffPoison",
+}
+
+-- Texto con el icono del tipo delante (para las opciones)
+function ns.DispelLabel(t, text)
+    local icon = ns.DISPEL_ICONS[t]
+    if not icon then return text end
+    return ("|T%s:14:14:0:0|t %s"):format(icon, text)
+end
 
 -- Color de un tipo de debuff: el del perfil (configurable) o el de siempre
 function ns.DispelColor(t)
@@ -51,9 +69,9 @@ function ns.CompileIndicators()
                     ns.AddSpellKey(c.blackID, c.blackName, key, true, ns.KeyRank(cfg, key))
                 end
             end
-            if cfg.kind == "aura" and cfg.watch == "dispellable" then
+            if cfg.kind == "aura" and (cfg.watch == "dispellable" or cfg.watch == "debuffTypes") then
                 -- el juego filtra los debuffs que puedo disipar (HARMFUL|RAID)
-                c.filter = "HARMFUL|RAID"
+                c.filter = cfg.watch == "debuffTypes" and "HARMFUL" or "HARMFUL|RAID"
                 c.any = true
                 c.dispellable = true
             elseif cfg.kind == "aura" then
@@ -304,9 +322,16 @@ creators.text = function(parent)
     return f
 end
 
+-- Icono nativo del tipo (magia, veneno...) encima del borde o del tinte
+local function AddTypeIcon(f)
+    f.typeIcon = f:CreateTexture(nil, "OVERLAY", nil, 7)
+    f.typeIcon:Hide()
+end
+
 creators.border = function(parent)
     local f = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     f.wtype = "border"
+    AddTypeIcon(f)
     f:Hide()
     return f
 end
@@ -317,6 +342,7 @@ creators.overlay = function(parent)
     f.tex = f:CreateTexture(nil, "OVERLAY")
     f.tex:SetAllPoints()
     f.tex:SetTexture(FLAT)
+    AddTypeIcon(f)
     f:Hide()
     return f
 end
@@ -324,18 +350,8 @@ end
 -- Tinte de "Disipable": degradado del color con la intensidad elegida
 -- Tinte sobre la vida: liso, o degradado de abajo arriba / de arriba abajo
 local function SetOverlayColor(w, r, g, b, alpha, shape)
-    shape = shape or "up"
-    if shape ~= "solid" and w.tex.SetGradient and CreateColor then
-        w.tex:SetVertexColor(1, 1, 1, 1)
-        local clear, full = CreateColor(r, g, b, 0), CreateColor(r, g, b, alpha)
-        if shape == "down" then
-            w.tex:SetGradient("VERTICAL", full, clear)
-        else
-            w.tex:SetGradient("VERTICAL", clear, full)
-        end
-    else
-        w.tex:SetVertexColor(r, g, b, alpha)
-    end
+    w.tex:SetTexture(ns.DispelTintAsset(shape))
+    w.tex:SetVertexColor(r, g, b, alpha)
 end
 
 local function WidgetType(cfg)
@@ -437,7 +453,9 @@ end
 local function ColorTexts(w, cfg, unit)
     local tt, st = TextCfg(cfg)
     local r, g, b
-    if tt.colorMode == "class" or st.colorMode == "class" then r, g, b = ns.ClassColorOf(unit) end
+    if tt.colorMode == "class" or st.colorMode == "class" then
+        r, g, b = ns.ClassColorOf(unit, w.previewClass, w.previewIsPet)
+    end
     if w.timerText and w.wtype ~= "text" then
         ns.ColorText(w.timerText, tt, r, g, b)
         local fs = w.cd and w.cd.GetCountdownFontString and w.cd:GetCountdownFontString()
@@ -492,8 +510,16 @@ local function GrowOffset(cfg, i)
 end
 
 local function LayoutWidget(w, cfg, b)
+    w.previewClass, w.previewIsPet = b.testClass, b.testIndex and b.isPet or nil
     w:ClearAllPoints()
     local t = w.wtype
+    if w.typeIcon then
+        local pos = cfg.typeIconPos or {}
+        local sz = cfg.typeIconSize or 14
+        w.typeIcon:ClearAllPoints()
+        w.typeIcon:SetPoint(pos.point or "CENTER", w, pos.point or "CENTER", pos.x or 0, pos.y or 0)
+        w.typeIcon:SetSize(sz, sz)
+    end
     if t == "border" then
         local th = math.max(1, cfg.width or 2)
         if cfg.borderInside then
@@ -549,6 +575,7 @@ local function LayoutWidget(w, cfg, b)
                 icon:SetPoint(cfg.point, w, cfg.point, x, y)
                 icon:SetSize(cfg.width, cfg.height)
                 icon.wtype = "icon"
+                icon.previewClass, icon.previewIsPet = w.previewClass, w.previewIsPet
                 icon.border:SetShown(cfg.showBorder ~= false)
                 SetupMouse(icon)
                 StyleTexts(icon, cfg)
@@ -570,6 +597,7 @@ function ns.BuildIndicators(b)
     b.pool = b.pool or {}
     for _, w in pairs(b.ind) do
         ns.HideWidget(w)
+        ns.ReleaseNativeIndicator(w)
         local p = b.pool[w.wtype]
         if not p then p = {} b.pool[w.wtype] = p end
         table.insert(p, w)
@@ -587,6 +615,7 @@ function ns.BuildIndicators(b)
         -- orden de dibujo = orden de la lista (los de abajo, por encima)
         w:SetFrameLevel(b.overlay:GetFrameLevel() + (wt == "border" and 1 or (3 + c.index * 3)))
         b.ind[c.index] = w
+        ns.BuildNativeIndicator(b, w, c.cfg)
     end
     -- franjas propias: su sitio depende de las demás y de la barra de maná
     if ns.AnchorHealth then ns.AnchorHealth(b, b.powerShown) end
@@ -692,7 +721,7 @@ end
 
 -- Recorta a N letras (respeta tildes); los textos secretos no se pueden tocar
 local function Letters(s, n)
-    if not s or n <= 0 or S(s) then return s end
+    if S(s) or not s or n <= 0 then return s end
     return s:match("^" .. ("[%z\1-\127\194-\244][\128-\191]*"):rep(n)) or s
 end
 
@@ -706,8 +735,11 @@ local function ApplyTextContent(w, unit, aura, cfg)
         fs:SetText(cfg.customText or "")
     elseif show == "name" then
         local name = aura.name
-        if name == nil and aura.spellId then name = ns.GetSpellName(aura.spellId) end
-        fs:SetText(Letters(name, cfg.nameLetters or 0) or "")
+        if not S(name) and name == nil then
+            local id = R(aura.spellId)
+            name = id and ns.GetSpellName(id) or ""
+        end
+        fs:SetText(Letters(name, cfg.nameLetters or 0))
     elseif show == "stacks" then
         local n = aura.applications
         if not S(n) then
@@ -720,10 +752,11 @@ local function ApplyTextContent(w, unit, aura, cfg)
             fs:SetText("")
         end
     elseif show == "caster" then
-        local src = aura.sourceUnit
+        local src = R(aura.sourceUnit)
         local ok, name = false, nil
         if src then ok, name = pcall(UnitName, src) end
-        fs:SetText((ok and name) or "")
+        if not ok or (not S(name) and name == nil) then name = "" end
+        fs:SetText(name)
     end
     -- con «Cargas» el número ya es el texto: no repetirlo al lado
     if w.count and show == "stacks" then w.count:SetText("") end
@@ -757,6 +790,9 @@ function ns.ShowMissing(w, cfg)
     if w.drain then w.drain:Hide() end
     if w.count then w.count:SetText("") end
     if w.SetMainColor then w:SetMainColor(cfg.color) end
+    ColorTexts(w, cfg, nil)
+    -- «le falta»: no hay debuff, así que tampoco icono de tipo
+    if w.typeIcon then w.typeIcon:Hide() end
     if w.wtype == "border" then
         local c = cfg.color
         w:SetBackdropBorderColor(c.r, c.g, c.b, 1)
@@ -787,6 +823,7 @@ end
 
 local function HideWidget(w)
     if not w then return end
+    if w.nativeDispel then w.nativeDispel:Hide() end
     timers[w] = nil
     ns.ClearHighlight(w)
     w.hlSoundIdent = nil
@@ -812,7 +849,7 @@ ns.IndicatorStyleFor = StyleFor
 
 local function Ident(aura)
     local id = aura.auraInstanceID
-    if id and not S(id) then return id end
+    if not S(id) and id then return id end
     return aura
 end
 
@@ -844,21 +881,74 @@ end
 -------------------------------------------------------------------------------
 -- Lectura de auras con caché por actualización
 -------------------------------------------------------------------------------
-local cache, cachePool = {}, {}
+local cache, cachePool, cacheComplete = {}, {}, {}
 
-local function GetList(unit, filter)
-    local l = cache[filter]
-    if l then return l end
-    l = table.remove(cachePool) or {}
+-- Lectura nativa de las auras de una unidad. Con auras secretas (combate,
+-- instancias) el juego no deja leerlas por índice desde un addon
+-- También puede bloquear todas las APIs, incluida la consulta por ID.
+-- Una lectura fallida o incompleta no demuestra que falte un aura.
+-- Diagnóstico: qué vía falla y con qué error (MendFramesDB.auraDiag)
+local function Diag(way, ok, err, n)
+    local d = ns.db and ns.db.auraDiag
+    if not d then return end
+    local e = d[way]
+    if not e then
+        e = { ok = 0, fail = 0, auras = 0 }
+        d[way] = e
+    end
+    if ok then
+        e.ok = e.ok + 1
+        e.auras = e.auras + (n or 0)
+    else
+        e.fail = e.fail + 1
+        e.lastError = tostring(err)
+        e.inCombat = InCombatLockdown() and true or false
+    end
+end
+
+local function ReadAuras(unit, filter, l)
+    if GetAuraInstanceIDs and GetAuraByInstance then
+        local ok, ids = pcall(GetAuraInstanceIDs, unit, filter)
+        Diag("instanceIDs", ok and type(ids) == "table", ok and ("tipo " .. type(ids)) or ids, ok and type(ids) == "table" and #ids or 0)
+        if ok and type(ids) == "table" then
+            local complete = #ids <= 40
+            for _, id in ipairs(ids) do
+                local ok2, a = pcall(GetAuraByInstance, unit, id)
+                Diag("byInstance", ok2 and a ~= nil, ok2 and "nil" or a, 1)
+                if ok2 and a then l[#l + 1] = a end
+                if not ok2 or not a then complete = false end
+                if #l >= 40 then break end
+            end
+            return complete
+        end
+    end
+    if GetUnitAuras then
+        local ok, list = pcall(GetUnitAuras, unit, filter, 40)
+        Diag("unitAuras", ok and type(list) == "table", ok and ("tipo " .. type(list)) or list, ok and type(list) == "table" and #list or 0)
+        if ok and type(list) == "table" then
+            for _, a in ipairs(list) do l[#l + 1] = a end
+            return #list < 40
+        end
+    end
     if GetAuraDataByIndex then
         for i = 1, 40 do
-            local a = GetAuraDataByIndex(unit, i, filter)
-            if not a then break end
+            local ok, a = pcall(GetAuraDataByIndex, unit, i, filter)
+            if not ok then Diag("byIndex", false, a) end
+            if not ok then return false end
+            if not a then return true end
             l[#l + 1] = a
         end
     end
+    return false
+end
+
+local function GetList(unit, filter)
+    local l = cache[filter]
+    if l then return l, cacheComplete[filter] end
+    l = table.remove(cachePool) or {}
+    cacheComplete[filter] = ReadAuras(unit, filter, l)
     cache[filter] = l
-    return l
+    return l, cacheComplete[filter]
 end
 
 local function ResetCache()
@@ -866,6 +956,7 @@ local function ResetCache()
         wipe(l)
         table.insert(cachePool, l)
         cache[k] = nil
+        cacheComplete[k] = nil
     end
 end
 
@@ -887,6 +978,17 @@ local function ShowDispel(b, w, found, cfg, unit, style)
         SetOverlayColor(w, r, g, bl, cfg.overlayAlpha or 0.6, cfg.tintShape)
     else
         w:SetBackdropBorderColor(r, g, bl, 1)
+    end
+    -- icono del tipo (si el juego deja leerlo)
+    if w.typeIcon then
+        local t = cfg.typeIcon and R(found.dispelName)
+        local file = t and ns.DISPEL_ICONS[t]
+        if file then
+            w.typeIcon:SetTexture(file)
+            w.typeIcon:Show()
+        else
+            w.typeIcon:Hide()
+        end
     end
     w:Show()
     ns.ApplyHighlight(b, w, style or cfg.hl, Ident(found), unit)
@@ -934,14 +1036,21 @@ function ns.UpdateAuras(b)
         local cfg, w = c.cfg, b.ind[c.index]
         if not w then
             -- nada
+        elseif w.nativeDispel then
+            timers[w] = nil
+            ns.ClearHighlight(w)
+            w:Hide()
+            w.nativeDispel:SetUnit(unit)
+            w.nativeDispel:SetShown(not (cfg.onlyOOC and inCombat))
         elseif c.kind == "aura" and UnitMeasure(cfg) then
             if cfg.onlyOOC and inCombat then HideWidget(w) else ShowUnitBar(w, unit, cfg) end
         elseif c.kind == "aura" then
             if cfg.onlyOOC and inCombat then
                 HideWidget(w)
             elseif cfg.mode == "missing" then
-                local present, unknown = false, false
-                for _, a in ipairs(GetList(unit, c.filter)) do
+                local list, complete = GetList(unit, c.filter)
+                local present, unknown = false, not complete
+                for _, a in ipairs(list) do
                     local m, readable = Match(a, c.byID, c.byName)
                     if m then present = true break end
                     if not readable then unknown = true end
@@ -963,7 +1072,7 @@ function ns.UpdateAuras(b)
                         local t = R(a.dispelName)
                         if t then
                             if not cfg.dispelTypes[t] then order = nil end
-                        elseif not cfg.unknownType then
+                        elseif cfg.watch == "debuffTypes" or not cfg.unknownType then
                             order = nil
                         end
                     end
@@ -1010,14 +1119,18 @@ function ns.UpdateAuras(b)
 
         elseif c.kind == "raiddebuff" then
             local best, bestPrio
-            for _, a in ipairs(GetList(unit, "HARMFUL")) do
-                local prio, readable = Match(a, ns.debuffByID, ns.debuffByName)
+            local list, complete = GetList(unit, "HARMFUL")
+            if not complete and ns.inInstance then ns.raidSecret = true end
+            for _, a in ipairs(list) do
+                local prio, readable = Match(a, ns.debuffByID)
                 if prio then
                     if not bestPrio or prio > bestPrio then best, bestPrio = a, prio end
-                elseif readable and ns.inInstance then
+                elseif not readable then
+                    if ns.inInstance then ns.raidSecret = true end
+                elseif ns.inInstance then
                     local id = R(a.spellId)
                     if id and R(a.sourceUnit) ~= "player" then
-                        ns.RecordDebuff(id, R(a.name), R(a.icon))
+                        ns.RecordDebuff(id, R(a.name), R(a.icon), R(a.auraInstanceID))
                     end
                 end
             end
@@ -1058,6 +1171,16 @@ function ns.TestAuras(b, i, all)
     for _, c in ipairs(ns.compiled) do
         local cfg, w = c.cfg, b.ind[c.index]
         if w then
+            w.previewClass, w.previewIsPet = b.testClass, b.isPet
+            for _, icon in ipairs(w.icons or {}) do
+                icon.previewClass, icon.previewIsPet = b.testClass, b.isPet
+            end
+            local previewDispelType
+            if c.dispellable then
+                for _, kind in ipairs({ "Magic", "Curse", "Disease", "Poison" }) do
+                    if cfg.dispelTypes[kind] then previewDispelType = kind break end
+                end
+            end
             local function Fake(key, n, dispel)
                 local _, icon = ns.SpellKeyInfo(key)
                 local dur = 15 + (i * 7 + n * 5) % 30
@@ -1071,7 +1194,7 @@ function ns.TestAuras(b, i, all)
             local focus = all or (pv and pv.cfg == cfg)
             -- solo el que se edita: los demás se quedan ocultos
             local skip = (b.previewOnly and c.index ~= b.previewOnly)
-                or (c.dispellable and not cfg.dispelTypes.Magic)
+                or (c.dispellable and not previewDispelType)
             if skip then
                 -- nada
             elseif c.kind == "aura" and UnitMeasure(cfg) then
@@ -1098,7 +1221,7 @@ function ns.TestAuras(b, i, all)
                     elseif w.wtype == "border" or w.wtype == "overlay" then
                         -- en pocos marcos, para que no tape todo el modo prueba
                         if i % 6 == 4 or focus then
-                            ShowDispel(b, w, Fake(first, 1, "Magic"), cfg, nil, StyleFor(cfg, first))
+                            ShowDispel(b, w, Fake(first, 1, previewDispelType or "Magic"), cfg, nil, StyleFor(cfg, first))
                         end
                     else
                         if w.tex and w.tex.SetDesaturated then w.tex:SetDesaturated(false) end

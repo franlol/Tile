@@ -1,142 +1,102 @@
 -------------------------------------------------------------------------------
--- MendFrames - Debuffs de banda por defecto
--- Clave = ID de mapa de la instancia (GetInstanceInfo, 8º valor). 0 = global.
--- spells = { [spellID] = prioridad }  (mayor prioridad = se muestra antes)
+-- MendFrames - Registro de debuffs por instancia
 --
--- Los IDs son los de Classic. Se comparan también por nombre, así que si
--- Forever usa otro rango/ID del mismo hechizo también se detecta. Lo que falte
--- se añade desde /mf > Debuffs de banda (el registrador apunta los debuffs
--- que ve en cada instancia para añadirlos con un clic).
+-- Los datos van en Data\*.lua y solo llaman a ns.RegisterInstance:
+--   ns.RegisterInstance(clave, {
+--       name   = "Molten Core",
+--       kind   = "raid" | "dungeon" | "solo" | "world" | "zone",
+--       status = nil | "unannounced",      -- en el cliente pero sin anunciar
+--       zones  = { "Azshara" },            -- solo mundo abierto: zonas donde se activa
+--       bosses = { { "Jefe", { [spellID | "Nombre"] = prioridad } }, ... },
+--   })
+-- clave: ID de mapa de la instancia (GetInstanceInfo, 8º valor), o una cadena
+-- ("w:...") para mundo abierto. Prioridad de 1 a 5 (5 = se muestra antes).
+--
+-- Lo que da el juego manda: un hechizo puesto por nombre se busca en el
+-- cliente (todos sus IDs), los jefes que se pelean (ENCOUNTER_START) se
+-- añaden solos a su instancia, y el registrador apunta los debuffs nuevos.
+-- Jefes y orden: los del cliente según los datos de ForeverDB.net.
 -------------------------------------------------------------------------------
 
 local _, ns = ...
 
-ns.RaidDebuffs = {
-    [0] = {
-        name = "Global (todas las instancias)",
-        spells = {},
-    },
+ns.RaidDebuffs = {}   -- [clave] = definición
+ns.RaidOrder = {}     -- claves en orden de registro
+ns.PRIO_MAX = 5
 
-    [409] = {
-        name = "Molten Core",
-        spells = {
-            [19702] = 3,  -- Impending Doom (Lucifron)
-            [19703] = 4,  -- Lucifron's Curse
-            [20604] = 8,  -- Dominate Mind (Flamewaker Protector)
-            [19408] = 5,  -- Panic (Magmadar)
-            [19428] = 3,  -- Conflagration (Magmadar)
-            [19716] = 4,  -- Gehennas' Curse
-            [19717] = 2,  -- Rain of Fire (Gehennas)
-            [20475] = 9,  -- Living Bomb (Baron Geddon)
-            [19659] = 4,  -- Ignite Mana (Baron Geddon)
-            [19713] = 4,  -- Shazzrah's Curse
-            [13880] = 3,  -- Magma Splash (Golemagg)
-            [19776] = 3,  -- Shadow Word: Pain (Sulfuron adds)
-            [20294] = 3,  -- Immolate (Sulfuron adds)
-        },
-    },
-
-    [249] = {
-        name = "Onyxia's Lair",
-        spells = {
-            [18431] = 6,  -- Bellowing Roar
-            [18392] = 3,  -- Fireball
-            [18435] = 2,  -- Flame Breath
-        },
-    },
-
-    [469] = {
-        name = "Blackwing Lair",
-        spells = {
-            [23023] = 4,  -- Conflagration (Razorgore / magos)
-            [18173] = 9,  -- Burning Adrenaline (Vaelastrasz)
-            [23340] = 6,  -- Shadow of Ebonroc
-            [23341] = 3,  -- Flame Buffet (Firemaw)
-            [22687] = 5,  -- Veil of Shadow (Nefarian)
-            [22667] = 9,  -- Shadow Command (Nefarian)
-            [23401] = 6,  -- Corrupted Healing (llamada de sacerdotes)
-            [23310] = 7,  -- Time Lapse (Chromaggus)
-            [23170] = 8,  -- Brood Affliction: Bronze
-            [23155] = 4,  -- Brood Affliction: Red
-            [23153] = 4,  -- Brood Affliction: Blue
-            [23154] = 4,  -- Brood Affliction: Black
-            [23169] = 4,  -- Brood Affliction: Green
-            [24573] = 3,  -- Mortal Strike (Death Talon)
-        },
-    },
-
-    [309] = {
-        name = "Zul'Gurub",
-        spells = {
-            [23860] = 3,  -- Holy Fire (Venoxis)
-            [24099] = 2,  -- Poison Bolt Volley
-            [24111] = 3,  -- Corrosive Poison
-            [24210] = 6,  -- Mark of Arlokk
-            [24314] = 9,  -- Threatening Gaze (Mandokir)
-            [24306] = 7,  -- Delusions of Jin'do
-            [24324] = 3,  -- Blood Siphon (Hakkar)
-            [24327] = 9,  -- Cause Insanity (Hakkar)
-            [24328] = 7,  -- Corrupted Blood (Hakkar)
-        },
-    },
-
-    [509] = {
-        name = "Ruins of Ahn'Qiraj",
-        spells = {
-            [25646] = 4,  -- Mortal Wound (Kurinnaxx)
-            [25725] = 8,  -- Paralyze (Ayamiss)
-            [25189] = 5,  -- Enveloping Winds (Ossirian)
-            [25195] = 3,  -- Curse of Tongues (Ossirian)
-        },
-    },
-
-    [531] = {
-        name = "Temple of Ahn'Qiraj",
-        spells = {
-            [785]   = 9,  -- True Fulfillment (Skeram)
-            [26580] = 5,  -- Fear (Princess Yauj)
-            [26050] = 4,  -- Acid Spit (Huhuran)
-            [26180] = 6,  -- Wyvern Sting (Huhuran)
-            [26053] = 3,  -- Noxious Poison (Huhuran)
-            [25989] = 3,  -- Toxin (Viscidus)
-            [25937] = 6,  -- Viscidus Freeze
-            [26476] = 5,  -- Digestive Acid (C'Thun)
-            [26044] = 4,  -- Mind Flay (C'Thun)
-        },
-    },
-
-    [533] = {
-        name = "Naxxramas",
-        spells = {
-            [28776] = 6,  -- Necrotic Poison (Maexxna)
-            [28622] = 9,  -- Web Wrap (Maexxna)
-            [28796] = 2,  -- Poison Bolt Volley (Faerlina)
-            [29213] = 6,  -- Curse of the Plaguebringer (Noth)
-            [29212] = 3,  -- Cripple (Noth)
-            [29998] = 5,  -- Decrepit Fever (Heigan)
-            [29204] = 2,  -- Inevitable Doom (Loatheb)
-            [28169] = 9,  -- Mutating Injection (Grobbulus)
-            [25646] = 4,  -- Mortal Wound (Gluth)
-            [28059] = 6,  -- Positive Charge (Thaddius)
-            [28084] = 6,  -- Negative Charge (Thaddius)
-            [28832] = 3,  -- Mark of Korth'azz
-            [28833] = 3,  -- Mark of Blaumeux
-            [28834] = 3,  -- Mark of Mograine
-            [28835] = 3,  -- Mark of Zeliek
-            [28522] = 8,  -- Icebolt (Sapphiron)
-            [27808] = 9,  -- Frost Blast (Kel'Thuzad)
-            [27819] = 8,  -- Detonate Mana (Kel'Thuzad)
-            [28410] = 9,  -- Chains of Kel'Thuzad
-        },
-    },
+-- Categorías de la lista de instancias, en orden
+ns.KINDS = { "raid", "dungeon", "solo", "world", "zone" }
+ns.KIND_NAMES = {
+    raid = "Bandas",
+    dungeon = "Mazmorras",
+    solo = "Instancias de un jugador",
+    world = "Jefes del mundo",
+    zone = "Eventos y zonas",
+    unannounced = "Sin anunciar (en el cliente)",
+    other = "Otras",
 }
 
--- Orden en el desplegable de opciones
-ns.RaidOrder = { 0, 409, 249, 469, 309, 509, 531, 533 }
+local zoneIndex   -- [zona] = { claves } (se rehace al registrar)
+
+function ns.RegisterInstance(key, def)
+    def.kind = def.kind or "raid"
+    def.bosses = def.bosses or {}
+    -- un hechizo por nombre se guarda como "n:Nombre"; si sale en varios
+    -- jefes de la misma instancia, se queda en el primero
+    local used = {}
+    for _, b in ipairs(def.bosses) do
+        local spells = {}
+        for k, prio in pairs(b[2] or {}) do
+            if type(k) == "string" and not k:find("^n:") then k = "n:" .. k end
+            if not used[k] then
+                used[k] = true
+                spells[k] = prio
+            end
+        end
+        b[2] = spells
+    end
+    if not ns.RaidDebuffs[key] then ns.RaidOrder[#ns.RaidOrder + 1] = key end
+    ns.RaidDebuffs[key] = def
+    zoneIndex = nil
+end
+
+ns.RegisterInstance(0, { name = "Global (todas las instancias)", kind = "global" })
+
+-- Claves de mundo abierto que se activan en una zona
+function ns.ZoneKeys(zone)
+    if not zoneIndex then
+        zoneIndex = {}
+        for _, key in ipairs(ns.RaidOrder) do
+            for _, z in ipairs(ns.RaidDebuffs[key].zones or {}) do
+                zoneIndex[z] = zoneIndex[z] or {}
+                table.insert(zoneIndex[z], key)
+            end
+        end
+    end
+    return (zone and zoneIndex[zone]) or {}
+end
 
 -- Nombre visible de una instancia
 function ns.InstanceName(key)
     local def = ns.RaidDebuffs[key]
     if def then return def.name end
     return (ns.db and ns.db.raid.names[key]) or ("Instancia " .. tostring(key))
+end
+
+-- Jefes de una instancia: los de los datos, en orden, y luego los que el
+-- juego ha dicho al empezar un encuentro (si no estaban)
+function ns.InstanceBosses(key)
+    local out, have = {}, {}
+    local def = ns.RaidDebuffs[key]
+    for _, b in ipairs(def and def.bosses or {}) do
+        out[#out + 1] = b[1]
+        have[b[1]] = true
+    end
+    for _, name in ipairs(ns.db and ns.db.raid.learned[key] or {}) do
+        if not have[name] then
+            out[#out + 1] = name
+            have[name] = true
+        end
+    end
+    return out
 end

@@ -283,6 +283,17 @@ function UI.CloseMenu()
     if openMenu then openMenu:Hide() openMenu = nil end
 end
 
+-- Clic fuera del desplegable abierto: se cierra (evento nativo del juego)
+local outside = CreateFrame("Frame")
+pcall(outside.RegisterEvent, outside, "GLOBAL_MOUSE_DOWN")
+outside:SetScript("OnEvent", function()
+    local m = openMenu
+    if not m then return end
+    -- en la lista o en su propio botón (que ya lo abre y cierra) no se toca
+    if m:IsMouseOver() or (m.owner and m.owner.button and m.owner.button:IsMouseOver()) then return end
+    UI.CloseMenu()
+end)
+
 function UI.Dropdown(parent, text, options, get, set, width)
     width = width or UI.W
     local f = CreateFrame("Frame", nil, parent)

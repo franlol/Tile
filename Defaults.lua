@@ -27,6 +27,9 @@ ns.dbDefaults = {
         seen = {},       -- [instancia] = { [spellID] = { name, icon, count } }
         names = {},      -- [instancia] = nombre visto en el juego
         styles = {},     -- [instancia] = { [clave] = estilo de resaltado }
+        boss = {},       -- [instancia] = { [clave] = jefe elegido a mano (false = sin jefe) }
+        ignored = {},    -- [instancia] = { [spellID] = { name, icon } } vistos que no se quieren
+        learned = {},    -- [instancia] = { "Jefe", ... } jefes que el juego dio al empezar un encuentro
     },
 }
 
@@ -226,6 +229,9 @@ ns.indicatorDefaults = {
     span = "none",          -- none | width | height
     overlayAlpha = 0.6,      -- intensidad del tinte
     tintShape = "up",        -- tinte: up (degradado de abajo arriba) | down (de arriba abajo) | solid (liso)
+    typeIcon = true,         -- borde / tinte: icono nativo del tipo (magia, veneno...)
+    typeIconSize = 14,
+    typeIconPos = { point = "CENTER", x = 0, y = 0 },
     borderInside = false,    -- borde del marco: por dentro (true) o por fuera
     showBelow = 0,           -- solo mostrar si quedan menos de N s (0 = siempre)
     blacklist = {},          -- Debuffs: hechizos que no se muestran

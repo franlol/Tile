@@ -240,14 +240,8 @@ end
 -- Actualizaciones
 -------------------------------------------------------------------------------
 local function UnitColor(unit, isPet, testClass)
-    if isPet then return 0.25, 0.75, 0.3 end
-    local class = testClass
-    if not class then
-        local _, c = UnitClass(unit)
-        class = R(c)
-    end
-    local c = class and (RAID_CLASS_COLORS or {})[class]
-    if c then return c.r, c.g, c.b end
+    local r, g, blue = ns.ClassColorOf(unit, testClass, isPet)
+    if r then return r, g, blue end
     return 0.5, 0.5, 0.5
 end
 
@@ -394,7 +388,7 @@ end
 function ns.UpdatePrediction(b, max)
     local u = b.unit
     local B = ns.P.bars
-    max = max or UnitHealthMax(u)
+    if not S(max) and max == nil then max = UnitHealthMax(u) end
     if B.showHealPred and UnitGetIncomingHeals then
         b.pred:SetMinMaxValues(0, V(max))
         b.pred:SetValue(V(UnitGetIncomingHeals(u)))
@@ -657,6 +651,12 @@ local function SetButtonUnit(b, unit)
     if b.unit == unit then return end
     b:UnregisterAllEvents()
     b.unit = unit
+    for _, w in pairs(b.ind or {}) do
+        if w.nativeDispel then
+            w.nativeDispel:Hide()
+            w.nativeDispel:SetUnit(unit or "none")
+        end
+    end
     if unit then
         for _, e in ipairs(UNIT_EVENTS) do
             pcall(b.RegisterUnitEvent, b, e, unit)
@@ -974,7 +974,14 @@ local TEST_ROLE = { WARRIOR = "TANK", PRIEST = "HEALER", PALADIN = "HEALER" }
 -- mascotas que se simulan según el tamaño del grupo
 local TEST_PETS = { party = 2, raid10 = 3, raid20 = 5, raid40 = 10 }
 
-local function TestClass(i) return TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1] end
+local function TestClass(i)
+    if i == 1 then
+        local _, class = UnitClass("player")
+        class = R(class)
+        if class then return class end
+    end
+    return TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1]
+end
 local function TestName(i)
     if i == 1 then return ns.UnitDisplayName("player") or TEST_NAMES[1] end -- el 1 eres tú
     local n = TEST_NAMES[(i - 1) % #TEST_NAMES + 1]
@@ -996,6 +1003,7 @@ local function FillTest(b)
     local B, T = P.bars, P.texts
     local i = b.testIndex
     local class = (not b.isPet) and TestClass(i) or nil
+    b.testClass = class
     ns.UpdateColors(b, class)
 
     b.name:SetText(b.isPet and ("Mascota " .. i) or TestName(i))
@@ -1077,6 +1085,7 @@ end
 -- only: índice del único indicador que se enseña (nil = todos)
 function ns.FillPreviewButton(b, only)
     b.testIndex = 1
+    b.testClass = TestClass(1)
     b.previewAll = true
     b.previewOnly = only
     ns.LayoutButton(b, false)

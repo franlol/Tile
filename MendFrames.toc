@@ -5,7 +5,7 @@
 ## Version: 0.2.0
 ## IconTexture: Interface\Icons\Spell_Nature_Rejuvenation
 ## SavedVariables: MendFramesDB
-## OptionalDeps: LibSharedMedia-3.0, SharedMedia
+## OptionalDeps: LibSharedMedia-3.0, SharedMedia, Blizzard_AuraContainer
 
 Core.lua
 Defaults.lua
@@ -13,6 +13,12 @@ Catalog.lua
 Media.lua
 Glow.lua
 RaidDebuffs.lua
+Data\Raids.lua
+Data\Dungeons.lua
+Data\World.lua
+Probe.lua
+AuraAudit.lua
+NativeDispel.lua
 Indicators.lua
 Frames.lua
 Options\Widgets.lua
