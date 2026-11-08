@@ -206,15 +206,18 @@ function ns.UpdateBarColor(b, testClass, testPct)
         local pct = HealthPct(b, testPct)
         if pct then r, g, bl = Gradient(pct) end   -- si está oculta: color de clase
     end
-    b.health:SetStatusBarColor(r, g, bl)
+    local hb = B.healthBrightness or 1
+    b.health:SetStatusBarColor(r * hb, g * hb, bl * hb)
+    local br, bg2, bb
     if B.bgColor == "class" then
-        b.health.bg:SetVertexColor(cr, cg, cb, B.bgAlpha)
+        br, bg2, bb = cr, cg, cb
     elseif B.bgColor == "custom" then
-        local c = B.bgCustom
-        b.health.bg:SetVertexColor(c.r, c.g, c.b, B.bgAlpha)
+        br, bg2, bb = B.bgCustom.r, B.bgCustom.g, B.bgCustom.b
     else
-        b.health.bg:SetVertexColor(r * 0.25, g * 0.25, bl * 0.25, B.bgAlpha)
+        br, bg2, bb = r * 0.25, g * 0.25, bl * 0.25
     end
+    local bk = B.bgBrightness or 1
+    b.health.bg:SetVertexColor(br * bk, bg2 * bk, bb * bk, B.bgAlpha)
 end
 
 function ns.UpdateColors(b, testClass, testPct)
