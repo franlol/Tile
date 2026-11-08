@@ -133,6 +133,11 @@ ns.profileDefaults = {
         raidIcon = { show = true, when = "always", onTop = false, point = "TOP", x = 0, y = 5, size = 12 },
         ready    = { show = true, when = "ready", onTop = true, point = "CENTER", x = 0, y = 0, size = 18 },
     },
+    -- colores por tipo de debuff (bordes y tinte de los indicadores)
+    dispelColors = {
+        Magic = C(0.2, 0.6, 1), Curse = C(0.6, 0, 1), Disease = C(0.6, 0.4, 0), Poison = C(0, 0.6, 0),
+        none = C(0.85, 0.1, 0.1),
+    },
     -- indicators: se crea aparte (lista ordenada)
 }
 

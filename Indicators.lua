@@ -21,6 +21,15 @@ ns.DISPEL_COLORS = {
     none    = { 0.85, 0.1, 0.1 },
 }
 
+-- Color de un tipo de debuff: el del perfil (configurable) o el de siempre
+function ns.DispelColor(t)
+    local c = ns.P and ns.P.dispelColors and ns.P.dispelColors[t]
+    if c then return c.r, c.g, c.b end
+    local d = ns.DISPEL_COLORS[t]
+    if d then return d[1], d[2], d[3] end
+    return nil
+end
+
 -------------------------------------------------------------------------------
 -- Indicadores compilados del perfil activo
 -------------------------------------------------------------------------------
@@ -623,9 +632,12 @@ end
 local function DispelBorder(w, aura, cfg)
     if not w.border then return end
     local t = cfg.dispelColor and R(aura.dispelName)
-    local c = t and ns.DISPEL_COLORS[t]
-    w.baseBorder = c or { 0, 0, 0 }
-    w.border:SetColorTexture(w.baseBorder[1], w.baseBorder[2], w.baseBorder[3], 1)
+    local bb = w.baseBorder
+    if not bb then bb = { 0, 0, 0 } w.baseBorder = bb end
+    local r, g, b
+    if t then r, g, b = ns.DispelColor(t) end
+    bb[1], bb[2], bb[3] = r or 0, g or 0, b or 0
+    w.border:SetColorTexture(bb[1], bb[2], bb[3], 1)
 end
 
 function ns.ShowAura(w, unit, aura, cfg)
@@ -756,8 +768,8 @@ local function ShowDispel(b, w, found, cfg, unit)
     local r, g, bl
     if cfg.dispelColor then
         local t = R(found.dispelName)
-        local col = ns.DISPEL_COLORS[t or "none"] or ns.DISPEL_COLORS.none
-        r, g, bl = col[1], col[2], col[3]
+        r, g, bl = ns.DispelColor(t or "none")
+        if not r then r, g, bl = ns.DispelColor("none") end
     else
         r, g, bl = cfg.color.r, cfg.color.g, cfg.color.b
     end

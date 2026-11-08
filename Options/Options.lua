@@ -1354,6 +1354,23 @@ local function BuildIndicators(p)
     end
     table.insert(UI.widgets, posSample)
 
+    -- colores por tipo (comunes a todos los indicadores del perfil)
+    local function DispelSwatches()
+        local function typed() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end
+        local function on() return Sel().dispelColor end
+        local list = {}
+        for _, d in ipairs({
+            { "Magic", "Magia" }, { "Curse", "Maldición" }, { "Disease", "Enfermedad" }, { "Poison", "Veneno" },
+            { "none", "Sin tipo (solo en «Disipar»)" },
+        }) do
+            list[#list + 1] = WE(UI.Attach(UI.Swatch(c, d[2], function() return ns.EP().dispelColors[d[1]] end,
+                IndChanged)), function() return typed() and (d[1] ~= "none" or K() == "dispel") end, on)
+        end
+        list[#list + 1] = WE(UI.Attach(UI.Note(c, "Estos colores son los mismos para todos los indicadores del perfil.", 340)),
+            typed, on)
+        return list
+    end
+
     local st = UI.Stack(c, 4, -4, Flat({
         UI.Header(c, "Indicador"),
         nameW,
@@ -1419,6 +1436,7 @@ local function BuildIndicators(p)
         UI.Header(c, "Aspecto"),
         W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")),
             function() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end),
+        DispelSwatches(),
         WE(UI.Attach(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true)),
             function() return colored() or K() == "dispel" end,
             function() return colored() or not Sel().dispelColor end),
