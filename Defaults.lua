@@ -71,7 +71,7 @@ ns.profileDefaults = {
     },
     bars = {
         healthTex = FLAT,
-        bgTex = "",                   -- textura del fondo ("" = igual que la barra)
+        bgTex = FLAT,                 -- textura del fondo
         powerTex = FLAT,
         healthColor = "class",        -- barra: class | custom | gradient
         customColor = C(0.2, 0.75, 0.3),
@@ -295,6 +295,10 @@ function ns.FixProfile(p)
             b.healthColor, b.bgColor = "class", "dark"
         end
         b.colorMode = nil
+    end
+    -- textura del fondo sin elegir (antes "igual que la barra"): la de la barra
+    if b and (b.bgTex == nil or b.bgTex == "") and b.healthTex then
+        b.bgTex = b.healthTex
     end
     -- antiguo fondo "barra oscurecida" -> mismas opciones que la barra + brillo
     if b and b.bgColor == "dark" then

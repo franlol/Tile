@@ -226,11 +226,7 @@ local function BuildBars(p)
         barSwatch,
         E(UI.Attach(UI.Slider(c, "Brillo de la barra", 0.1, 1, 0.05, UI.pct, PB("bars.healthBrightness"))),
             function() return ns.EP().bars.healthColor ~= "custom" end),
-        UI.Dropdown(c, "Textura del fondo (vida que falta)", function()
-            local list = { { "", "Igual que la barra" } }
-            for _, o in ipairs(ns.TextureList()) do list[#list + 1] = o end
-            return list
-        end, PB("bars.bgTex")),
+        UI.Dropdown(c, "Textura del fondo (vida que falta)", ns.TextureList, PB("bars.bgTex")),
         UI.Attach(UI.Dropdown(c, "Color del fondo", {
             { "class", "Color de clase" },
             { "custom", "Un solo color" },
