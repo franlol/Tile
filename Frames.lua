@@ -1083,7 +1083,7 @@ end
 
 -- Standalone frame with test data (the Indicators tab preview).
 -- only: index of the only indicator shown (nil = all)
-function ns.FillPreviewButton(b, only)
+local function FillPreview(b, only)
     b.testIndex = 1
     b.testClass = TestClass(1)
     b.previewAll = true
@@ -1091,6 +1091,20 @@ function ns.FillPreviewButton(b, only)
     ns.LayoutButton(b, false)
     FillTest(b)
     b:SetAlpha(1)
+end
+
+-- profile: the one to draw (the one being edited in the options). The drawing
+-- code reads ns.P and ns.compiled, so they point to it while the frame is
+-- filled and go back to the shown profile afterwards (even on an error).
+function ns.FillPreviewButton(b, only, profile)
+    local shownP, shownCompiled = ns.P, ns.compiled
+    if profile and profile ~= shownP then
+        ns.P, ns.compiled = profile, {}
+        ns.CompileIndicators()
+    end
+    local ok, err = pcall(FillPreview, b, only)
+    ns.P, ns.compiled = shownP, shownCompiled
+    if not ok then error(err, 0) end
 end
 
 local function PositionGrid(list, parent, w, h, perGroup, ox, oy)

@@ -1037,23 +1037,21 @@ local function BuildIndicators(p)
 
     posSample.Refresh = function()
         if not ns.P then return end
-        -- the preview frame uses the profile being shown; if you edit another one,
-        -- a warning is shown (in test mode the one shown is always the one you edit)
-        local same = ns.EditedProfileName() == ns.activeName
-        local L = ns.P.layout
-        local W, H = L.width, L.height
+        -- the preview frame always shows the profile being edited
+        local LY = ns.EP().layout
+        local W, H = LY.width, LY.height
         local z = math.min(3, (SAMPLE_W - 60) / W, (SAMPLE_H - 20) / H)
         pb:SetScale(z)
         pb:SetSize(W, H)
         pb:ClearAllPoints()
         pb:SetPoint("CENTER", psBg, "CENTER", 0, 0)
-        -- only the indicator being edited (if it belongs to the profile shown)
-        ns.FillPreviewButton(pb, same and selInd or nil)
+        -- only the indicator being edited
+        ns.FillPreviewButton(pb, selInd, ns.EP())
 
         local s = Sel()
         local strip = s and s.type == "bar" and ns.STRIP_SIDE[s.span]
         local whole = s and (s.type == "border" or s.type == "overlay")
-        local w = same and s and not whole and not strip and pb.ind and pb.ind[selInd]
+        local w = s and not whole and not strip and pb.ind and pb.ind[selInd]
         handle:ClearAllPoints()
         if w then
             handle:SetAllPoints(w)
@@ -1061,8 +1059,7 @@ local function BuildIndicators(p)
             psHint:SetText(L["Drag the indicator to place it wherever you want."])
         else
             handle:Hide()
-            psHint:SetText(same and "" or (L["You are seeing the active profile (\"%s\"). Turn on test mode to see the one you are editing."])
-                :format(tostring(ns.activeName)))
+            psHint:SetText("")
         end
     end
     table.insert(UI.widgets, posSample)

@@ -250,7 +250,6 @@ ns.translations.esES = {
     ["Only the checked ones count."] = "Solo cuentan los marcados.",
     ["None checked: all of them count."] = "Ninguno marcado: cuentan todos.",
     ["Drag the indicator to place it wherever you want."] = "Arrastra el indicador para colocarlo donde quieras.",
-    ["You are seeing the active profile (\"%s\"). Turn on test mode to see the one you are editing."] = "Se ve el perfil activo («%s»). Activa el modo prueba para ver el que editas.",
     ["Magic"] = "Magia",
     ["Curse"] = "Maldición",
     ["Disease"] = "Enfermedad",
