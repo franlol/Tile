@@ -1303,8 +1303,9 @@ end
 local function BuildCatalog(p)
     local _, c = UI.ScrollPage(p)
     c:SetWidth(590)
+    local W = 550   -- width of the wide blocks inside each card
     local myClass = select(2, UnitClass("player"))
-    local Rebuild
+    local Rebuild, st
 
     local function Group() return ns.CatalogByKey[catGroup] end
     local function Sel(g)
@@ -1317,54 +1318,61 @@ local function BuildCatalog(p)
         return catSel[g.key]
     end
 
+    -- A plain block for the stack: its children are placed by Rebuild
+    local function Block(h)
+        local f = CreateFrame("Frame", nil, c)
+        f:SetSize(W, h or 20)
+        return f
+    end
+
     -- 1. group
-    local h1 = UI.Header(c, L["1. Group"])
-    h1:SetWidth(570)
+    local groupGrid = Block()
     local groupBtns = {}
     for i, g in ipairs(ns.Catalog) do
-        local b = UI.Button(c, L[g.name], 186, 22, function()
+        local b = UI.Button(groupGrid, L[g.name], 178, 22, function()
             catGroup = g.key
             Rebuild()
         end)
         b.key = g.key
         groupBtns[i] = b
     end
-    local desc = UI.Note(c, "", 570)
-    desc.text:SetTextColor(0.75, 0.75, 0.75)
+    local desc = UI.Note(c, "", W)
 
     -- 2. classes and spells
-    local h2 = UI.Header(c, L["2. Classes and spells"])
-    h2:SetWidth(570)
-    local recBtn = UI.Button(c, L["Recommended for my class"], 180, 20, function()
+    local selRow = Block(20)
+    local recBtn = UI.Button(selRow, L["Recommended for my class"], 180, 20, function()
         local g = Group()
         wipe(Sel(g))
         for _, e in ipairs(ns.CatalogRecommended(g, myClass)) do Sel(g)[e] = true end
         Rebuild()
     end)
-    local allBtn = UI.Button(c, L["Check all"], 100, 20, function()
+    recBtn:SetPoint("TOPLEFT")
+    local allBtn = UI.Button(selRow, L["Check all"], 100, 20, function()
         for _, e in ipairs(Group().spells) do Sel()[e] = true end
         Rebuild()
     end)
-    local noneBtn = UI.Button(c, L["Uncheck all"], 100, 20, function()
+    allBtn:SetPoint("LEFT", recBtn, "RIGHT", 6, 0)
+    local noneBtn = UI.Button(selRow, L["Uncheck all"], 100, 20, function()
         wipe(Sel())
         Rebuild()
     end)
+    noneBtn:SetPoint("LEFT", allBtn, "RIGHT", 6, 0)
+    local spells = Block()
     local classPool, itemPool = {}, {}
 
     -- 3. add
-    local h3 = UI.Header(c, L["3. Add as indicator"])
-    h3:SetWidth(570)
     local originDD = UI.Dropdown(c, L["From whom"], {
         { "mine", L["Mine only"] }, { "others", L["Others' only"] }, { "any", L["From anyone"] },
-    }, function() return catOrigin[catGroup] or Group().origin end, function(v) catOrigin[catGroup] = v end, 220)
+    }, function() return catOrigin[catGroup] or Group().origin end, function(v) catOrigin[catGroup] = v end)
     local modeDD = UI.Dropdown(c, L["Show when"], {
         { "present", L["Has it"] }, { "missing", L["Missing (one warning per buff)"] },
-    }, function() return catMode[catGroup] or Group().mode or "present" end, function(v) catMode[catGroup] = v end, 220)
-    local result = UI.Note(c, "", 570)
+    }, function() return catMode[catGroup] or Group().mode or "present" end, function(v) catMode[catGroup] = v end)
+    modeDD.showIf = function() return Group().auraType == "HELPFUL" end
+    local result = UI.Note(c, "", W)
     local goBtn = UI.Button(c, L["See in Indicators"], 140, 22, function()
         if ns.OpenIndicators then ns.OpenIndicators() end
     end)
-    goBtn:Hide()
+    goBtn.showIf = function() return goBtn.wanted end
     local addBtn = UI.Button(c, L["Add as indicator"], 220, 26, function()
         local g = Group()
         local entries = {}
@@ -1373,7 +1381,7 @@ local function BuildCatalog(p)
         end
         if #entries == 0 then
             result.text:SetText(L["|cffff7755Check at least one spell in step 2.|r"])
-            goBtn:Hide()
+            goBtn.wanted = false
             Rebuild()
             return
         end
@@ -1390,53 +1398,59 @@ local function BuildCatalog(p)
         ns.ProfileChanged()
         result.text:SetText((L["|cff55ff55Added:|r %s to profile %s. Move and adjust it in Indicators."]):format(
             table.concat(names, ", "), ns.EditedProfileName()))
-        goBtn:Show()
+        goBtn.wanted = true
         UI.RefreshAll()
     end)
+    result.showIf = function() return (result.text:GetText() or "") ~= "" end
 
-    local function Place(f, x, y)
+    -- Same cards as every other page: one per step
+    st = UI.Stack(c, COL1, -6, {
+        UI.Header(c, L["1. Group"]),
+        groupGrid,
+        desc,
+        UI.Header(c, L["2. Classes and spells"]),
+        selRow,
+        spells,
+        UI.Header(c, L["3. Add as indicator"]),
+        originDD,
+        modeDD,
+        addBtn,
+        result,
+        goBtn,
+    })
+
+    local function Place(f, parent, x, y)
         f:ClearAllPoints()
-        f:SetPoint("TOPLEFT", c, "TOPLEFT", x, y)
+        f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
         f:Show()
     end
 
     Rebuild = function()
         local g = Group()
         local sel = Sel(g)
-        local y = -4
 
-        Place(h1, 10, y)
-        y = y - 26
+        -- group buttons, three per row
         for i, b in ipairs(groupBtns) do
             local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
-            Place(b, 10 + col * 192, y - row * 26)
+            Place(b, groupGrid, col * 186, -row * 26)
             local on = b.key == catGroup
             b:SetBackdropColor(on and 0.12 or 0.15, on and 0.3 or 0.15, on and 0.42 or 0.18, 1)
         end
-        y = y - math.ceil(#groupBtns / 3) * 26 - 4
+        groupGrid:SetHeight(math.ceil(#groupBtns / 3) * 26 - 4)
         desc.text:SetText(L[g.desc] .. "  |cff888888(" .. (g.auraType == "HARMFUL" and L["debuffs"] or L["buffs"]) .. ")|r")
         desc:SetHeight(desc.text:GetStringHeight() + 2)
-        Place(desc, 10, y)
-        y = y - desc:GetHeight() - 10
 
-        Place(h2, 10, y)
-        y = y - 28
-        Place(recBtn, 10, y)
-        Place(allBtn, 196, y)
-        Place(noneBtn, 302, y)
-        y = y - 28
-
-        -- classes that bring something to this group
+        -- classes that bring something to this group, each with its spells
         for _, f in ipairs(classPool) do f:Hide() end
         for _, f in ipairs(itemPool) do f:Hide() end
-        local ci, ii = 0, 0
+        local ci, ii, y = 0, 0, 0
         for _, class in ipairs(ns.CLASS_ORDER) do
             local entries = {}
             for _, e in ipairs(g.spells) do if e.class == class then table.insert(entries, e) end end
             if #entries > 0 then
                 ci = ci + 1
                 local ct = classPool[ci]
-                if not ct then ct = Toggle(c, 570) classPool[ci] = ct end
+                if not ct then ct = Toggle(spells, W) classPool[ci] = ct end
                 local n = 0
                 for _, e in ipairs(entries) do if sel[e] then n = n + 1 end end
                 local col = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
@@ -1449,12 +1463,12 @@ local function BuildCatalog(p)
                     for _, e in ipairs(entries) do sel[e] = (not all) or nil end
                     Rebuild()
                 end)
-                Place(ct, 10, y)
+                Place(ct, spells, 0, y)
                 y = y - 22
                 for k, e in ipairs(entries) do
                     ii = ii + 1
                     local it = itemPool[ii]
-                    if not it then it = Toggle(c, 270) it:SetHeight(30) itemPool[ii] = it end
+                    if not it then it = Toggle(spells, 262) it:SetHeight(30) itemPool[ii] = it end
                     local name, icon = ns.SpellKeyInfo(ns.CatalogKey(e))
                     it:SetContent(name, icon or 134400, e.note and L[e.note])
                     it:SetState(sel[e])
@@ -1464,35 +1478,18 @@ local function BuildCatalog(p)
                     end)
                     it.tipID = ns.KeyIDs(ns.CatalogKey(e))[1]
                     local colI, row = (k - 1) % 2, math.floor((k - 1) / 2)
-                    Place(it, 30 + colI * 280, y - row * 32)
+                    Place(it, spells, 20 + colI * 268, y - row * 32)
                 end
                 y = y - math.ceil(#entries / 2) * 32 - 6
             end
         end
+        spells:SetHeight(math.max(1, -y - 6))
 
-        y = y - 6
-        Place(h3, 10, y)
-        y = y - 28
         originDD.Refresh()
-        Place(originDD, 10, y)
-        if g.auraType == "HELPFUL" then
-            modeDD.Refresh()
-            Place(modeDD, 250, y)
-        else
-            modeDD:Hide()
-        end
-        y = y - 44
-        Place(addBtn, 10, y)
-        y = y - 34
-        Place(result, 10, y)
+        modeDD.Refresh()
         result:SetHeight(math.max(14, result.text:GetStringHeight() + 2))
-        y = y - result:GetHeight() - 6
-        if goBtn:IsShown() then
-            Place(goBtn, 10, y)
-            y = y - 28
-        end
-        c:SetHeight(-y + 20)
-        if c.UpdateBar then c.UpdateBar() end
+        st:Layout()
+        UI.FitContent(c, { st })
     end
 
     p.OnShow = function() Rebuild() end
