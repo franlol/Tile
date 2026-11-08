@@ -256,11 +256,18 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
--- «Resucitando» tiene su propio color; el resto de estados, el del texto
+function ns.IsRestText(t)
+    return t == "Bebiendo" or t == "Comiendo" or t == "Comiendo y bebiendo"
+end
+
+-- «Resucitando» y «Bebiendo/Comiendo» tienen su propio color; el resto, el del texto
 function ns.StatusColor(b, text, testClass)
     local T = ns.P.texts.status
     if text == "Resucitando" then
         local c = T.resColor
+        b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    elseif text and ns.IsRestText(text) then
+        local c = T.restColor
         b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
     else
         TextColor(b.status, T, UnitColor(b.unit, b.isPet, testClass))
@@ -369,6 +376,7 @@ function ns.UpdateHealth(b, full)
 
     local text
     local T = ns.P.texts.status
+    local down = true -- desconectado o muerto: se apaga el fondo y el texto de vida
     if R(UnitIsConnected(u)) == false then
         text = "Desconectado"
     elseif R(UnitIsGhost(u)) or R(UnitIsDead(u)) then
@@ -378,16 +386,54 @@ function ns.UpdateHealth(b, full)
         else
             text = R(UnitIsGhost(u)) and "Fantasma" or "Muerto"
         end
+    else
+        -- vivo: puede estar bebiendo o comiendo (lo calcula UpdateRest)
+        down = false
+        text = b.resting
     end
     -- estado y transparencia solo cuando cambian
     if full or text ~= b.cacheStatus then
         b.cacheStatus = text
         b.status:SetText(T.show and text or "")
         ns.StatusColor(b, text)
-        b.health.bg:SetAlpha(text and 0.4 or 1)
-        if text then b.hpText:SetText("") end
+        b.health.bg:SetAlpha((text and down) and 0.4 or 1)
+        if text and down then b.hpText:SetText("") end
     end
-    if not text then HealthText(b, u, cur, max) end
+    if not (text and down) then HealthText(b, u, cur, max) end
+end
+
+-- Bebiendo / comiendo: se mira en las auras (nombres del cliente en inglés
+-- y, por si acaso, en español). En combate no se bebe: ni se mira.
+local REST_AURAS = {
+    { "Drink", "drink" }, { "Beber", "drink" },
+    { "Food", "food" }, { "Comida", "food" }, { "Comer", "food" },
+    { "Food & Drink", "both" }, { "Refreshment", "both" }, { "Refrigerio", "both" },
+}
+local REST_TEXT = { drink = "Bebiendo", food = "Comiendo", both = "Comiendo y bebiendo" }
+ns.REST_TEXT = REST_TEXT
+local GetAuraBySpellName = C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName
+
+local function RestState(u)
+    if not GetAuraBySpellName or InCombatLockdown() then return nil end
+    local drink, food
+    for _, a in ipairs(REST_AURAS) do
+        local ok, aura = pcall(GetAuraBySpellName, u, a[1], "HELPFUL")
+        if ok and aura then
+            if a[2] == "both" then return REST_TEXT.both end
+            if a[2] == "drink" then drink = true else food = true end
+        end
+    end
+    if drink and food then return REST_TEXT.both end
+    return (drink and REST_TEXT.drink) or (food and REST_TEXT.food) or nil
+end
+
+-- Tras cambiar sus auras: si empieza o deja de beber/comer, actualiza el estado
+function ns.UpdateRest(b)
+    local r = ns.P.texts.status.showRest and b.unit and RestState(b.unit) or nil
+    if r ~= b.resting then
+        b.resting = r
+        ns.UpdateHealth(b, true)
+    end
 end
 
 -- Valor de maná/energía/ira: lo que llega en cada tic (UNIT_POWER_UPDATE)
@@ -537,6 +583,7 @@ function ns.UpdateButton(b)
     ns.UpdateThreat(b)
     ns.UpdateRange(b)
     ns.UpdateAuras(b)
+    ns.UpdateRest(b)
 end
 
 function ns.UpdateAllButtons()
@@ -578,6 +625,7 @@ local function SetButtonUnit(b, unit)
     if b.unit == unit then return end
     b:UnregisterAllEvents()
     b.unit = unit
+    b.resting = nil
     if unit then
         for _, e in ipairs(UNIT_EVENTS) do
             pcall(b.RegisterUnitEvent, b, e, unit)
@@ -851,7 +899,10 @@ local rangeElapsed = 0
 gev:SetScript("OnUpdate", function(_, elapsed)
     for b in pairs(auraDirty) do
         auraDirty[b] = nil
-        if b.unit and b:IsVisible() then ns.UpdateAuras(b) end
+        if b.unit and b:IsVisible() then
+            ns.UpdateAuras(b)
+            ns.UpdateRest(b)
+        end
     end
     rangeElapsed = rangeElapsed + elapsed
     if rangeElapsed > 0.25 then
@@ -942,6 +993,7 @@ local function FillTest(b)
     local res = (i == 12) and T.status.showRes
     local dead = (i == 7) or res
     local stext = res and "Resucitando" or (dead and "Muerto" or nil)
+    if not stext and i == 3 and T.status.showRest then stext = "Bebiendo" end
     b.cacheStatus = stext
     b.status:SetText((stext and T.status.show) and stext or "")
     ns.StatusColor(b, stext, class)

@@ -478,6 +478,9 @@ local function BuildTexts(p)
         UI.Check(c, "Avisar si le están resucitando", PB("texts.status.showRes")),
         Cond(UI.Attach(UI.Swatch(c, "Color de «Resucitando»", function() return ns.EP().texts.status.resColor end,
             PAfter, true)), nil, resOn),
+        UI.Check(c, "Avisar si está bebiendo o comiendo", PB("texts.status.showRest")),
+        Cond(UI.Attach(UI.Swatch(c, "Color de «Bebiendo»", function() return ns.EP().texts.status.restColor end,
+            PAfter, true)), nil, function() return ns.EP().texts.status.showRest end),
     })) do nameList[#nameList + 1] = w end
     local a = UI.Stack(c, COL1, -6, nameList)
 

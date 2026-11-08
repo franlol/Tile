@@ -115,6 +115,7 @@ ns.profileDefaults = {
             colorMode = "custom", color = C(0.75, 0.75, 0.75),
             point = "CENTER", x = 0, y = -3,
             showRes = true, resColor = C(0.3, 1, 0.45),   -- «Resucitando» (le están lanzando un resucitar)
+            showRest = true, restColor = C(0.45, 0.75, 1), -- «Bebiendo» / «Comiendo»
         },
         health = {
             show = true, format = "none", hideFull = true,
