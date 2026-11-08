@@ -464,8 +464,18 @@ function ns.UpdatePower(b)
     if c then PowerColor(b, c.r, c.g, c.b) else PowerColor(b, 0.3, 0.5, 1) end
 end
 
+-- En Forever los personajes tienen apellido: UnitName devuelve (nombre,
+-- apellido) y el nombre completo lo da NameUtil.FormatUnitNameForDisplay
+function ns.UnitDisplayName(u)
+    if ns.P.texts.name.surname ~= false and NameUtil and NameUtil.FormatUnitNameForDisplay then
+        local ok, n = pcall(NameUtil.FormatUnitNameForDisplay, u)
+        if ok and n then return n end
+    end
+    return (UnitName(u))
+end
+
 function ns.UpdateName(b)
-    b.name:SetText(UnitName(b.unit))
+    b.name:SetText(ns.UnitDisplayName(b.unit))
 end
 
 -- ¿Se ve ahora este icono de estado? (siempre, solo en la comprobación de
@@ -948,8 +958,10 @@ local TEST_PETS = { party = 2, raid10 = 3, raid20 = 5, raid40 = 10 }
 
 local function TestClass(i) return TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1] end
 local function TestName(i)
-    if i == 1 then return UnitName("player") or TEST_NAMES[1] end -- el 1 eres tú
-    return TEST_NAMES[(i - 1) % #TEST_NAMES + 1]
+    if i == 1 then return ns.UnitDisplayName("player") or TEST_NAMES[1] end -- el 1 eres tú
+    local n = TEST_NAMES[(i - 1) % #TEST_NAMES + 1]
+    if ns.P.texts.name.surname == false then n = n:match("^(%S+)") or n end
+    return n
 end
 
 local function NewTestButton(parent, isPet, i)

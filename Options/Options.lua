@@ -471,6 +471,7 @@ end
 local function BuildTexts(p)
     local _, c = UI.ScrollPage(p)
     local nameList = TextSection(c, "name", "Nombre", {
+        UI.Check(c, "Con apellido", PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
         UI.Slider(c, "Ancho máximo (% del marco)", 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
     local function resOn() return ns.EP().texts.status.showRes end
@@ -1220,7 +1221,7 @@ local function BuildIndicators(p)
     uHealth:SetPoint("TOPLEFT", 1, -1)
     uHealth:SetPoint("BOTTOMLEFT", 1, 1)
     uHealth:SetColorTexture(cc.r * 0.85, cc.g * 0.85, cc.b * 0.85, 1)
-    local uName = UI.Label(unit, UnitName("player") or "Jugador")
+    local uName = UI.Label(unit, ns.UnitDisplayName("player") or "Jugador")
     uName:SetPoint("CENTER")
 
     -- el resto de indicadores del perfil, en tenue, como referencia

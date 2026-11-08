@@ -109,6 +109,7 @@ ns.profileDefaults = {
             show = true, font = FONT, size = 11, outline = "OUTLINE",
             colorMode = "white", color = C(1, 1, 1),
             point = "TOP", x = 0, y = -5, width = 92,
+            surname = true,   -- nombre y apellido (Forever); false = solo el nombre
         },
         status = {
             show = true, font = FONT, size = 10, outline = "OUTLINE",
