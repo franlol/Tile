@@ -557,6 +557,20 @@ SlashCmdList.MENDFRAMES = function(msg)
         ns.SetLocked(false)
     elseif msg == "demo" or msg == "muestra" then
         ns.ToggleDemo()
+    elseif msg == "nativos" then
+        -- diagnóstico temporal: ¿tiene este cliente los componentes nativos de Blizzard?
+        local function T(kind, tmpl)
+            local ok = pcall(CreateFrame, kind, nil, UIParent, tmpl)
+            return ok and "|cff55ff55sí|r" or "|cffff5555no|r"
+        end
+        ns.Print("UIPanelScrollFrameTemplate: " .. T("ScrollFrame", "UIPanelScrollFrameTemplate"))
+        ns.Print("ScrollFrameTemplate: " .. T("ScrollFrame", "ScrollFrameTemplate"))
+        ns.Print("WowScrollBoxList: " .. T("Frame", "WowScrollBoxList"))
+        ns.Print("MinimalScrollBar: " .. T("EventFrame", "MinimalScrollBar"))
+        ns.Print("WowStyle1DropdownTemplate: " .. T("DropdownButton", "WowStyle1DropdownTemplate"))
+        ns.Print("ScrollUtil: " .. (ScrollUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
+            .. "  MenuUtil: " .. (MenuUtil and "|cff55ff55sí|r" or "|cffff5555no|r")
+            .. "  CreateScrollBoxListLinearView: " .. (CreateScrollBoxListLinearView and "|cff55ff55sí|r" or "|cffff5555no|r"))
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
     elseif msg == "brillos" or msg == "glows" then
