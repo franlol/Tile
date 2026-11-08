@@ -210,11 +210,11 @@ local function BuildBars(p)
     local _, c = UI.ScrollPage(p)
     local function Col(path) return function() return UI.Bind(ns.EP, path)() end end
     local barSwatch = UI.Swatch(c, "Color de la barra", Col("bars.customColor"), ns.ProfileChanged)
-    barSwatch.showIf = function() return ns.EP().bars.healthColor == "custom" end
+    barSwatch.enableIf = function() return ns.EP().bars.healthColor == "custom" end
     local bgSwatch = UI.Swatch(c, "Color del fondo", Col("bars.bgCustom"), ns.ProfileChanged)
-    bgSwatch.showIf = function() return ns.EP().bars.bgColor == "custom" end
+    bgSwatch.enableIf = function() return ns.EP().bars.bgColor == "custom" end
     local gradNote = UI.Note(c, "Si en combate el juego oculta la vida, se usa el color de clase.")
-    gradNote.showIf = function() return ns.EP().bars.healthColor == "gradient" end
+    gradNote.enableIf = function() return ns.EP().bars.healthColor == "gradient" end
 
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Vida"),
@@ -269,7 +269,7 @@ local function TextSection(c, key, title, extra)
     local base = "texts." .. key
     local function isCustom() return ns.EP().texts[key].colorMode == "custom" end
     local sw = UI.Swatch(c, "Color", function() return ns.EP().texts[key].color end, ns.ProfileChanged)
-    sw.showIf = isCustom
+    sw.enableIf = isCustom
     local list = {
         UI.Header(c, title),
         UI.Check(c, "Mostrar", PB(base .. ".show")),
@@ -433,6 +433,8 @@ local function BuildSide()
     local function ColEdit(field) return function() return St(true)[field] end end
     local function V(field) return Shown()[field] end
     local function W(w, cond) w.showIf = cond return w end
+    -- en el panel de resaltado todo son sub-opciones: se desactivan sin moverse
+    local function E(w, cond) w.enableIf = cond return w end
     local function hasGlow() return sideCtx ~= nil and V("glow") ~= "none" end
     -- efectos con gráficos de Blizzard (tienen color original)
     local function blizzGlow()
@@ -445,6 +447,9 @@ local function BuildSide()
     fallbackNote.text:SetTextColor(1, 0.55, 0.3)
     fallbackNote.Refresh = function()
         local g = sideCtx and V("glow")
+        -- siempre ocupa el mismo hueco, tenga aviso o no (sin saltos)
+        fallbackNote:SetHeight(28)
+        fallbackNote.text:SetText("")
         if not g or g == "none" then fallbackNote.active = false return end
         local probe = side.probe or CreateFrame("Frame", nil, side)
         side.probe = probe
@@ -457,7 +462,7 @@ local function BuildSide()
         if fallbackNote.active then
             fallbackNote.text:SetText(("Este cliente no tiene «%s»; se verá como «%s»."):format(
                 ns.Glow.NAMES[g] or g, used and ns.Glow.NAMES[used] or "nada"))
-            fallbackNote:SetHeight(fallbackNote.text:GetStringHeight() + 2)
+            fallbackNote:SetHeight(math.max(28, fallbackNote.text:GetStringHeight() + 2))
         end
     end
     table.insert(UI.widgets, fallbackNote)
@@ -465,26 +470,26 @@ local function BuildSide()
     local st = UI.Stack(c, 6, -2, {
         UI.Header(c, "Brillo"),
         UI.Dropdown(c, "Tipo de brillo", ns.Glow.TYPES, SG("glow")),
-        W(UI.Dropdown(c, "Dónde", { { "icon", "En el icono" }, { "frame", "En todo el marco" } }, SG("target")), hasGlow),
-        W(UI.Check(c, "Usar el color original de Blizzard", SG("keepColor")), blizzGlow),
-        W(UI.Swatch(c, "Color del brillo", Col("color"), Changed, true, ColEdit("color")),
+        E(UI.Dropdown(c, "Dónde", { { "icon", "En el icono" }, { "frame", "En todo el marco" } }, SG("target")), hasGlow),
+        E(UI.Check(c, "Usar el color original de Blizzard", SG("keepColor")), blizzGlow),
+        E(UI.Swatch(c, "Color del brillo", Col("color"), Changed, true, ColEdit("color")),
             function() return hasGlow() and not (blizzGlow() and V("keepColor")) end),
-        W(fallbackNote, function() return fallbackNote.active end),
-        W(UI.Slider(c, "Líneas", 4, 16, 1, nil, SG("lines")), function() return V("glow") == "pixel" end),
-        W(UI.Slider(c, "Grosor", 1, 4, 1, nil, SG("thickness")), function() return V("glow") == "pixel" end),
-        W(UI.Slider(c, "Grupos de chispas", 1, 8, 1, nil, SG("particles")), function() return V("glow") == "autocast" end),
-        W(UI.Slider(c, "Tamaño del brillo", 0.5, 2.5, 0.05, UI.pct, SG("glowScale")), hasGlow),
-        W(UI.Slider(c, "Velocidad", 0.05, 1, 0.05, function(v) return ("%d%%"):format(v * 400 + 0.5) end, SG("freq")),
+        fallbackNote,
+        E(UI.Slider(c, "Líneas", 4, 16, 1, nil, SG("lines")), function() return V("glow") == "pixel" end),
+        E(UI.Slider(c, "Grosor", 1, 4, 1, nil, SG("thickness")), function() return V("glow") == "pixel" end),
+        E(UI.Slider(c, "Grupos de chispas", 1, 8, 1, nil, SG("particles")), function() return V("glow") == "autocast" end),
+        E(UI.Slider(c, "Tamaño del brillo", 0.5, 2.5, 0.05, UI.pct, SG("glowScale")), hasGlow),
+        E(UI.Slider(c, "Velocidad", 0.05, 1, 0.05, function(v) return ("%d%%"):format(v * 400 + 0.5) end, SG("freq")),
             hasGlow),
-        W(UI.Slider(c, "Desplazamiento X", -30, 30, 1, nil, SG("offsetX")), hasGlow),
-        W(UI.Slider(c, "Desplazamiento Y", -30, 30, 1, nil, SG("offsetY")), hasGlow),
+        E(UI.Slider(c, "Desplazamiento X", -30, 30, 1, nil, SG("offsetX")), hasGlow),
+        E(UI.Slider(c, "Desplazamiento Y", -30, 30, 1, nil, SG("offsetY")), hasGlow),
 
         UI.Header(c, "Marco"),
         UI.Check(c, "Borde de color en el marco", SG("border")),
-        W(UI.Swatch(c, "Color del borde", Col("borderColor"), Changed, true, ColEdit("borderColor")),
+        E(UI.Swatch(c, "Color del borde", Col("borderColor"), Changed, true, ColEdit("borderColor")),
             function() return V("border") end),
         UI.Check(c, "Teñir la barra de vida", SG("tint")),
-        W(UI.Swatch(c, "Color del tinte", Col("tintColor"), Changed, true, ColEdit("tintColor")),
+        E(UI.Swatch(c, "Color del tinte", Col("tintColor"), Changed, true, ColEdit("tintColor")),
             function() return V("tint") end),
 
         UI.Header(c, "Elemento"),
@@ -493,7 +498,7 @@ local function BuildSide()
 
         UI.Header(c, "Sonido"),
         UI.Dropdown(c, "Sonido al aparecer", ns.SOUNDS, SG("sound")),
-        W(UI.Check(c, "Solo si me lo ponen a mí", SG("soundOnlyMe")), function() return V("sound") ~= "none" end),
+        E(UI.Check(c, "Solo si me lo ponen a mí", SG("soundOnlyMe")), function() return V("sound") ~= "none" end),
     })
 
     local copy = UI.Button(side, "Copiar del indicador", 266, 22, function()
@@ -732,6 +737,8 @@ local function BuildIndicators(p)
     local function hasText() return timed() end
 
     local function W(widget, cond) widget.showIf = cond return widget end
+    -- WE: se ve según el tipo y se desactiva (sin moverse) según una sub-opción
+    local function WE(widget, show, enable) widget.showIf = show widget.enableIf = enable return widget end
 
     -- nombre
     local nameW = CreateFrame("Frame", nil, c)
@@ -1057,26 +1064,27 @@ local function BuildIndicators(p)
         UI.Header(c, "Aspecto"),
         W(UI.Check(c, "Color según tipo (magia, veneno...)", IB("dispelColor")),
             function() return K() == "raiddebuff" or K() == "debuffs" or K() == "dispel" end),
-        W(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true),
-            function() return colored() or (K() == "dispel" and not Sel().dispelColor) end),
+        WE(UI.Swatch(c, "Color", function() return Sel().color end, IndChanged, true),
+            function() return colored() or K() == "dispel" end,
+            function() return colored() or not Sel().dispelColor end),
         W(UI.Check(c, "Borde negro", IB("showBorder")),
             function() local t = T() return notDispel() and t ~= "text" end),
         W(UI.Check(c, "Barrido del tiempo", IB("swipe")),
             function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end),
         W(UI.Slider(c, "Aviso con menos de (s)", 0, 15, 1,
             function(v) return v == 0 and "no" or (v .. " s") end, IB("warnAt")), timed),
-        W(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true),
-            function() return timed() and Sel().warnAt > 0 end),
+        WE(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true),
+            timed, function() return Sel().warnAt > 0 end),
 
         W(UI.Header(c, "Textos"), hasText),
         W(UI.Check(c, "Mostrar tiempo restante", IB("timer")), function() return hasText() and T() ~= "text" end),
         W(UI.Check(c, "Mostrar cargas", IB("stacks")), hasText),
         W(UI.Dropdown(c, "Fuente", ns.FontList, IB("font")), hasText),
         W(UI.Slider(c, "Tamaño del texto", 6, 24, 1, nil, IB("fontSize")), hasText),
-        W(UI.Dropdown(c, "Posición del tiempo", UI.POINTS, IB("timerPoint")),
-            function() return hasText() and T() ~= "text" and Sel().timer end),
-        W(UI.Dropdown(c, "Posición de las cargas", UI.POINTS, IB("stacksPoint")),
-            function() return hasText() and T() ~= "text" and Sel().stacks end),
+        WE(UI.Dropdown(c, "Posición del tiempo", UI.POINTS, IB("timerPoint")),
+            function() return hasText() and T() ~= "text" end, function() return Sel().timer end),
+        WE(UI.Dropdown(c, "Posición de las cargas", UI.POINTS, IB("stacksPoint")),
+            function() return hasText() and T() ~= "text" end, function() return Sel().stacks end),
 
         UI.Header(c, "Resaltado"),
         hlSummary,

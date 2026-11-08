@@ -392,6 +392,22 @@ end
 -- Columna: coloca uno debajo de otro solo los controles visibles
 -- (cada control puede tener showIf = function() return bool end)
 -------------------------------------------------------------------------------
+-- Activar / desactivar un control sin quitarlo del sitio (sin saltos de diseño):
+-- desactivado se ve en gris y una capa invisible se come los clics.
+function UI.SetEnabled(w, on)
+    w:SetAlpha(on and 1 or 0.35)
+    if not w.blocker then
+        if on then return end
+        w.blocker = CreateFrame("Frame", nil, w)
+        w.blocker:SetAllPoints()
+        w.blocker:EnableMouse(true)
+    end
+    w.blocker:SetFrameLevel(w:GetFrameLevel() + 20)
+    w.blocker:SetShown(not on)
+end
+
+-- showIf: el control se quita (para opciones de otro tipo de indicador)
+-- enableIf: el control se queda en su sitio y se desactiva (sub-opciones)
 -- fill: los controles se estiran al ancho del contenido (ventana redimensionable)
 function UI.Stack(content, x, y, list, gap, fill)
     local st = { content = content, x = x, y = y, list = list, gap = gap or 6, fill = fill }
@@ -400,6 +416,7 @@ function UI.Stack(content, x, y, list, gap, fill)
         for _, w in ipairs(self.list) do
             local visible = not w.showIf or w.showIf()
             w:SetShown(visible)
+            if visible and w.enableIf then UI.SetEnabled(w, w.enableIf() and true or false) end
             if visible then
                 w:ClearAllPoints()
                 w:SetPoint("TOPLEFT", self.content, "TOPLEFT", self.x, yy)
