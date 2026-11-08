@@ -835,8 +835,20 @@ end
 -- Modo prueba
 -------------------------------------------------------------------------------
 local TEST_CLASSES = { "WARRIOR", "PRIEST", "MAGE", "ROGUE", "DRUID", "HUNTER", "WARLOCK", "PALADIN", "SHAMAN", "PRIEST" }
-local TEST_NAMES = { "Thrall", "Jaina", "Uther", "Valeera", "Malfurion", "Rexxar", "Guldan", "Tirion", "Nobundo", "Anduin" }
-local NUM_TEST_PETS = 4
+-- nombre y apellido, como los muestra Forever
+local TEST_NAMES = { "Thrall Martillo", "Jaina Valiente", "Uther Luzclara", "Valeera Sangrefría", "Malfurion Tempestira",
+    "Rexxar Colmillo", "Guldan Sombravil", "Tirion Vadín", "Nobundo Marea", "Anduin Lobonegro" }
+local NUM_TEST_PETS = 10
+-- rol de cada clase de prueba (para «Agrupar por: rol»)
+local TEST_ROLE = { WARRIOR = "TANK", PRIEST = "HEALER", PALADIN = "HEALER" }
+-- mascotas que se simulan según el tamaño del grupo
+local TEST_PETS = { party = 2, raid10 = 3, raid20 = 5, raid40 = 10 }
+
+local function TestClass(i) return TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1] end
+local function TestName(i)
+    if i == 1 then return UnitName("player") or TEST_NAMES[1] end -- el 1 eres tú
+    return TEST_NAMES[(i - 1) % #TEST_NAMES + 1]
+end
 
 local function NewTestButton(parent, isPet, i)
     local b = CreateFrame("Frame", nil, parent)
@@ -851,10 +863,10 @@ local function FillTest(b)
     local P = ns.P
     local B, T = P.bars, P.texts
     local i = b.testIndex
-    local class = (not b.isPet) and TEST_CLASSES[(i - 1) % #TEST_CLASSES + 1] or nil
+    local class = (not b.isPet) and TestClass(i) or nil
     ns.UpdateColors(b, class)
 
-    b.name:SetText(b.isPet and ("Mascota " .. i) or TEST_NAMES[(i - 1) % #TEST_NAMES + 1])
+    b.name:SetText(b.isPet and ("Mascota " .. i) or TestName(i))
     local hp = 0.35 + ((i * 37) % 65) / 100
     if i == 4 then hp = 1 end
     b.health:SetMinMaxValues(0, 10000)
@@ -891,9 +903,10 @@ local function FillTest(b)
 
     local E = P.elements
     b.role:Hide()
-    if E.role.show and not b.isPet and i <= 3 then
-        pcall(b.role.SetAtlas, b.role, i == 1 and "roleicon-tiny-tank" or "roleicon-tiny-healer")
-        b.role:Show()
+    if E.role.show and not b.isPet then
+        local role = TEST_ROLE[class] or "DAMAGER"
+        local atlas = role == "TANK" and "roleicon-tiny-tank" or (role == "HEALER" and "roleicon-tiny-healer" or "roleicon-tiny-dps")
+        if pcall(b.role.SetAtlas, b.role, atlas) then b.role:Show() end
     end
     b.leader:SetShown(E.leader.show and i == 1 and not b.isPet)
     b.leader:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
@@ -928,17 +941,47 @@ end
 function ns.LayoutTest()
     local P = ns.P
     local L = P.layout
-    local count = ns.SIZE_TEST[ns.testSize or "raid20"] or 20
+    local size = ns.testSize or "raid20"
+    local count = ns.SIZE_TEST[size] or 20
+    local petCount = TEST_PETS[size] or 5
+
+    -- igual que la cabecera de Blizzard: filtra por grupo, por «mostrarme»
+    -- y por «mostrar en grupo», y ordena según «agrupar por» y el nombre
+    local anyGroup = false
+    for g = 1, 8 do if L.groups[g] then anyGroup = true end end
+    local hideAll = size == "party" and not L.showParty
+    local order = {}
+    local go = GROUP_ORDERS[L.groupBy] or GROUP_ORDERS.GROUP
+    local n = 0
+    for key in go[2]:gmatch("[^,]+") do n = n + 1 order[key] = n end
+    local function SortKey(i)
+        if L.groupBy == "ROLE" then return order[TEST_ROLE[TestClass(i)] or "DAMAGER"] or 99 end
+        if L.groupBy == "CLASS" then return order[TestClass(i)] or 99 end
+        return math.ceil(i / 5)
+    end
+
     local main, pets = {}, {}
     for _, b in ipairs(testButtons) do
+        local i = b.testIndex
         if b.isPet then
-            pets[#pets + 1] = b
-        elseif b.testIndex <= count then
+            if i <= petCount and not hideAll then pets[#pets + 1] = b else b:Hide() end
+        elseif i <= count and not hideAll
+            and (not anyGroup or L.groups[math.ceil(i / 5)])
+            and (i ~= 1 or L.showPlayer) then
             main[#main + 1] = b
         else
             b:Hide()
         end
     end
+    table.sort(main, function(x, y)
+        local kx, ky = SortKey(x.testIndex), SortKey(y.testIndex)
+        if kx ~= ky then return kx < ky end
+        if L.sortByName then
+            local nx, ny = TestName(x.testIndex), TestName(y.testIndex)
+            if nx ~= ny then return nx < ny end
+        end
+        return x.testIndex < y.testIndex
+    end)
     for _, b in ipairs(main) do
         b:SetShown(ns.testing)
         ns.LayoutButton(b, false)

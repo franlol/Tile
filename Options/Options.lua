@@ -164,30 +164,8 @@ local function BuildProfiles(p)
         return out
     end
 
-    -- Botón que pide un segundo clic para confirmar (borrar, restablecer)
     local function ConfirmButton(parent, text, w, func)
-        local b
-        local token = 0
-        local function Disarm()
-            b.armed = nil
-            b.text:SetText(text)
-            b.text:SetTextColor(1, 1, 1)
-        end
-        b = UI.Button(parent, text, w, 20, function()
-            if b.armed then
-                Disarm()
-                func()
-                return
-            end
-            b.armed = true
-            b.text:SetText("¿Seguro?")
-            b.text:SetTextColor(1, 0.45, 0.35)
-            token = token + 1
-            local mine = token
-            C_Timer.After(3, function() if b.armed and token == mine then Disarm() end end)
-        end)
-        b:HookScript("OnHide", function() if b.armed then Disarm() end end)
-        return b
+        return UI.Confirm(UI.Button(parent, text, w, 20, func))
     end
 
     ---------------------------------------------------------------------------
@@ -361,6 +339,14 @@ end
 local function BuildLayout(p)
     local _, c = UI.ScrollPage(p)
     local function E(w, cond) w.enableIf = cond return w end
+    local function petsOn() return ns.EP().pets.enabled end
+    -- en vertical las mascotas van en columnas; en horizontal, en filas
+    local perCol = UI.Slider(c, "Mascotas por columna", 1, 10, 1, nil, PB("pets.perColumn"))
+    local baseRefresh = perCol.Refresh
+    perCol.Refresh = function(self)
+        baseRefresh(self)
+        perCol.label:SetText(ns.EP().layout.orientation == "horizontal" and "Mascotas por fila" or "Mascotas por columna")
+    end
     local a = UI.Stack(c, COL1, -6, {
         UI.Header(c, "Tamaño"),
         UI.Slider(c, "Ancho", 30, 200, 1, nil, PB("layout.width")),
@@ -369,14 +355,14 @@ local function BuildLayout(p)
         UI.Slider(c, "Espacio entre jugadores", 0, 12, 1, nil, PB("layout.spacing")),
         UI.Slider(c, "Espacio entre grupos", 0, 40, 1, nil, PB("layout.groupSpacing")),
         UI.Header(c, "Mascotas"),
-        UI.Check(c, "Mostrar mascotas", PB("pets.enabled")),
-        UI.Check(c, "Pegadas a la banda, como un grupo más", PB("pets.attach")),
-        UI.Check(c, "Mismo tamaño que los jugadores", PB("pets.sameSize")),
-        UI.Attach(E(UI.Slider(c, "Ancho de mascota", 30, 200, 1, nil, PB("pets.width")),
-            function() return not ns.EP().pets.sameSize end)),
-        UI.Attach(E(UI.Slider(c, "Alto de mascota", 12, 100, 1, nil, PB("pets.height")),
-            function() return not ns.EP().pets.sameSize end)),
-        UI.Slider(c, "Mascotas por columna/fila", 1, 10, 1, nil, PB("pets.perColumn")),
+        UI.Check(c, "Mostrar", PB("pets.enabled")),
+        E(UI.Check(c, "Pegadas a la banda, como un grupo más", PB("pets.attach")), petsOn),
+        E(UI.Check(c, "Mismo tamaño que los jugadores", PB("pets.sameSize")), petsOn),
+        UI.Attach(E(UI.Slider(c, "Ancho", 30, 200, 1, nil, PB("pets.width")),
+            function() return petsOn() and not ns.EP().pets.sameSize end)),
+        UI.Attach(E(UI.Slider(c, "Alto", 12, 100, 1, nil, PB("pets.height")),
+            function() return petsOn() and not ns.EP().pets.sameSize end)),
+        E(perCol, petsOn),
     })
     local list = {
         UI.Header(c, "Organización"),
@@ -700,10 +686,10 @@ local function BuildSide()
     copy:SetPoint("BOTTOMLEFT", 12, 40)
     local test = UI.Button(side, "Probar sonido", 120, 22, function() ns.PlayAlert(V("sound"), true) end)
     test:SetPoint("BOTTOMLEFT", 12, 12)
-    local reset = UI.Button(side, "", 140, 22, function()
+    local reset = UI.Confirm(UI.Button(side, "", 140, 22, function()
         if sideCtx and sideCtx.clear then sideCtx.clear() end
         Changed()
-    end)
+    end))
     reset:SetPoint("BOTTOMRIGHT", -12, 12)
 
     side.Refresh = function()
@@ -715,13 +701,13 @@ local function BuildSide()
         local own = sideCtx.load() ~= nil
         if sideCtx.fallback then
             copy:Show()
-            reset.text:SetText("Quitar el propio")
+            if not reset.armed then reset.text:SetText("Quitar el propio") end
             reset:SetShown(own)
             side.state:SetText(own and "|cff55ff55Tiene resaltado propio|r (sustituye al del indicador)."
                 or "|cffaaaaaaAhora usa el del indicador.|r Cambia cualquier opción para crear uno propio.")
         else
             copy:Hide()
-            reset.text:SetText("Restablecer")
+            if not reset.armed then reset.text:SetText("Restablecer") end
             reset:Show()
             side.state:SetText("")
         end
@@ -882,7 +868,7 @@ local function BuildIndicators(p)
         selInd = #list
         IndChanged()
     end)
-    Btn("Borrar", 66, y, 62, function()
+    local delInd = Btn("Borrar", 66, y, 62, function()
         local ind = Sel()
         if not ind then return end
         if ind.kind ~= "aura" then
@@ -892,6 +878,7 @@ local function BuildIndicators(p)
         table.remove(Inds(), selInd)
         IndChanged()
     end)
+    UI.Confirm(delInd)
     Btn("^", 132, y, 30, function()
         local l = Inds()
         if selInd > 1 then l[selInd], l[selInd - 1] = l[selInd - 1], l[selInd] selInd = selInd - 1 IndChanged() end
@@ -1041,14 +1028,14 @@ local function BuildIndicators(p)
                 if i > 1 then l[i], l[i - 1] = l[i - 1], l[i] IndChanged() end
             end)
             r.up:SetPoint("LEFT", 270, 0)
-            r.del = UI.Button(r, "x", 16, 16, function()
+            r.del = UI.Confirm(UI.Button(r, "x", 16, 16, function()
                 local s = Sel()
                 local key = table.remove(s[field], i)
                 if withHighlight and key ~= nil then s.spellStyles[key] = nil end
                 if key ~= nil then s.exact[key] = nil s.ranks[key] = nil end
                 CloseSide()
                 IndChanged()
-            end)
+            end), "?")
             r.del:SetPoint("LEFT", 290, 0)
             rows[i] = r
         end
@@ -1916,10 +1903,10 @@ local function BuildRaid(p)
             dis[row.entry.key] = (not dis[row.entry.key]) or nil
             RaidChanged()
         end)
-        row.del = UI.Button(row, "", 80, 16, function()
+        row.del = UI.Confirm(UI.Button(row, "", 80, 16, function()
             Custom(selKey)[row.entry.key] = nil
             RaidChanged()
-        end)
+        end))
         row.del:SetPoint("LEFT", 424, 0)
         listRows[i] = row
     end
@@ -2024,11 +2011,13 @@ local function BuildRaid(p)
                 else
                     row.styled:Hide()
                 end
+                -- fila reutilizada para otro debuff: no arrastrar la confirmación
+                if row.delKey ~= en.key then row.del.Disarm() row.delKey = en.key end
                 if en.custom then
-                    row.del.text:SetText("Borrar")
+                    if not row.del.armed then row.del.text:SetText("Borrar") end
                     row.del:Show()
                 elseif en.changed then
-                    row.del.text:SetText("Restaurar")
+                    if not row.del.armed then row.del.text:SetText("Restaurar") end
                     row.del:Show()
                 else
                     row.del:Hide()

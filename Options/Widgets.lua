@@ -22,6 +22,36 @@ function UI.Attach(w)
     return w
 end
 
+-- Botón que pide un segundo clic para confirmar (borrar, restablecer...).
+-- El primer clic cambia el texto a «¿Seguro?»; si no se confirma en 3 s, vuelve.
+function UI.Confirm(b, armedText)
+    local orig = b:GetScript("OnClick")
+    local token, saved = 0, nil
+    local function Disarm()
+        if not b.armed then return end
+        b.armed = nil
+        b.text:SetText(saved or "")
+        b.text:SetTextColor(1, 1, 1)
+    end
+    b.Disarm = Disarm
+    b:SetScript("OnClick", function(self, ...)
+        if self.armed then
+            Disarm()
+            if orig then orig(self, ...) end
+            return
+        end
+        saved = self.text:GetText()
+        self.armed = true
+        self.text:SetText(armedText or "¿Seguro?")
+        self.text:SetTextColor(1, 0.45, 0.35)
+        token = token + 1
+        local mine = token
+        C_Timer.After(3, function() if token == mine then Disarm() end end)
+    end)
+    b:HookScript("OnHide", Disarm)
+    return b
+end
+
 UI.widgets = {}     -- controles con Refresh()
 UI.stacks = {}      -- columnas que se recolocan al refrescar
 
