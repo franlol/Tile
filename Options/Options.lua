@@ -628,7 +628,7 @@ local function BuildSide()
     holder:SetPoint("TOPLEFT", 6, -96)
     holder:SetPoint("BOTTOMRIGHT", -6, 70)
     local _, c = UI.ScrollPage(holder)
-    c:SetWidth(262)
+    c:SetWidth(270)
     local function Changed()
         if sideCtx and sideCtx.onChange then sideCtx.onChange() end
         if ns.testing then ns.LayoutTest() end
@@ -820,12 +820,48 @@ local function BuildIndicators(p)
     left:SetPoint("TOPLEFT", 6, -4)
     left:SetSize(196, 520)
     local ROWS = 16
+    local offset = 0
+    local rows = {}
     local listBg = CreateFrame("Frame", nil, left, "BackdropTemplate")
     listBg:SetPoint("TOPLEFT")
     listBg:SetSize(196, ROWS * 20 + 4)
     UI.Backdrop(listBg, { 0.04, 0.04, 0.05, 1 })
+    listBg:EnableMouseWheel(true)
 
-    local list = UI.List(listBg, 20, "Button", function(row)
+    local function RefreshList()
+        local list = Inds()
+        offset = math.max(0, math.min(offset, #list - ROWS))
+        for i, row in ipairs(rows) do
+            local idx = i + offset
+            local ind = list[idx]
+            row.idx = idx
+            if ind then
+                row.name:SetText(ind.name)
+                row.name:SetTextColor(ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45)
+                local tag = KIND_LABEL[ind.kind] ~= "" and KIND_LABEL[ind.kind] or TYPE_LABEL[ind.type] or ""
+                row.tag:SetText(tag)
+                local col = ind.color or { r = 1, g = 1, b = 1 }
+                if ind.kind ~= "aura" then
+                    row.swatch:SetColorTexture(0.6, 0.6, 0.6, 1)
+                else
+                    row.swatch:SetColorTexture(col.r, col.g, col.b, 1)
+                end
+                row.sel:SetShown(idx == selInd)
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+    end
+    listBg:SetScript("OnMouseWheel", function(_, d)
+        offset = math.max(0, offset - d)
+        RefreshList()
+    end)
+
+    for i = 1, ROWS do
+        local row = CreateFrame("Button", nil, listBg)
+        row:SetSize(192, 19)
+        row:SetPoint("TOPLEFT", 2, -2 - (i - 1) * 20)
         row.sel = row:CreateTexture(nil, "BACKGROUND")
         row.sel:SetAllPoints()
         row.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.25)
@@ -837,7 +873,7 @@ local function BuildIndicators(p)
         row.swatch:SetPoint("LEFT", 4, 0)
         row.name = UI.Label(row, "")
         row.name:SetPoint("LEFT", 16, 0)
-        row.name:SetWidth(104)
+        row.name:SetWidth(120)
         row.name:SetWordWrap(false)
         row.tag = UI.Label(row, "")
         row.tag:SetPoint("RIGHT", -4, 0)
@@ -848,29 +884,7 @@ local function BuildIndicators(p)
             CloseSide()
             UI.RefreshAll()
         end)
-    end, function(row, data)
-        local ind = Inds()[data.idx]
-        row.idx = data.idx
-        if not ind then return end
-        row.name:SetText(ind.name)
-        row.name:SetTextColor(ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45, ind.enabled and 1 or 0.45)
-        local tag = KIND_LABEL[ind.kind] ~= "" and KIND_LABEL[ind.kind] or TYPE_LABEL[ind.type] or ""
-        row.tag:SetText(tag)
-        local col = ind.color or { r = 1, g = 1, b = 1 }
-        if ind.kind ~= "aura" then
-            row.swatch:SetColorTexture(0.6, 0.6, 0.6, 1)
-        else
-            row.swatch:SetColorTexture(col.r, col.g, col.b, 1)
-        end
-        row.sel:SetShown(data.idx == selInd)
-    end)
-    list.box:SetPoint("TOPLEFT", 2, -2)
-    list.box:SetPoint("BOTTOMRIGHT", -14, 2)
-
-    local function RefreshList()
-        local items = {}
-        for i = 1, #Inds() do items[i] = { idx = i } end
-        list:SetItems(items)
+        rows[i] = row
     end
 
     local y = -(ROWS * 20 + 10)
@@ -918,7 +932,7 @@ local function BuildIndicators(p)
     right:SetPoint("TOPLEFT", 212, -4)
     right:SetPoint("BOTTOMRIGHT", -4, 4)
     local _, c = UI.ScrollPage(right)
-    c:SetWidth(370)
+    c:SetWidth(380)
     local function K() local s = Sel() return s and s.kind end
     local function T() local s = Sel() return s and EffType(s) end
     local function isAura() return K() == "aura" end
@@ -1746,8 +1760,8 @@ end
 -- Debuffs de banda
 -------------------------------------------------------------------------------
 local selKey = 0
+local listOffset, seenOffset = 0, 0
 local LIST_ROWS, SEEN_ROWS = 12, 5
-local resetRaidScroll = true   -- al cambiar de instancia, las listas vuelven arriba
 
 local function SortedList()
     local out = {}
@@ -1830,7 +1844,7 @@ local function BuildRaid(p)
 
     local dd = UI.Dropdown(p, "Instancia", InstanceOptions, function() return selKey end, function(v)
         selKey = v
-        resetRaidScroll = true
+        listOffset, seenOffset = 0, 0
         Select(nil)
         RefreshRaid()
     end, 230)
@@ -1838,7 +1852,7 @@ local function BuildRaid(p)
 
     local cur = UI.Button(p, "Instancia actual", 110, 18, function()
         selKey = ns.instKey or 0
-        resetRaidScroll = true
+        listOffset, seenOffset = 0, 0
         Select(nil)
         dd.Refresh()
         RefreshRaid()
@@ -1859,9 +1873,23 @@ local function BuildRaid(p)
     scrollInfo:SetPoint("TOPRIGHT", -16, -48)
     scrollInfo:SetTextColor(0.6, 0.6, 0.6)
 
-    local raidList = UI.List(p, 20, "Frame", function(row)
+    local listArea = CreateFrame("Frame", nil, p)
+    listArea:SetPoint("TOPLEFT", 12, -62)
+    listArea:SetSize(570, LIST_ROWS * 20)
+    listArea:EnableMouseWheel(true)
+    listArea:SetScript("OnMouseWheel", function(_, d)
+        listOffset = math.max(0, listOffset - d)
+        RefreshRaid()
+    end)
+
+    local listRows = {}
+    for i = 1, LIST_ROWS do
+        local row = CreateFrame("Frame", nil, listArea)
+        row:SetSize(570, 19)
+        row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
         row.bg = row:CreateTexture(nil, "BACKGROUND")
         row.bg:SetAllPoints()
+        row.bg:SetColorTexture(1, 1, 1, i % 2 == 0 and 0.03 or 0)
         row.sel = row:CreateTexture(nil, "BACKGROUND", nil, 1)
         row.sel:SetAllPoints()
         row.sel:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.22)
@@ -1927,42 +1955,8 @@ local function BuildRaid(p)
             RaidChanged()
         end))
         row.del:SetPoint("LEFT", 424, 0)
-    end, function(row, data)
-        local en = data.entry
-        row.entry = en
-        row.bg:SetColorTexture(1, 1, 1, data.i % 2 == 0 and 0.03 or 0)
-        local name, icon = ns.SpellKeyInfo(en.key)
-        row.icon:SetTexture(icon or 134400)
-        row.name:SetText(name)
-        local g = en.disabled and 0.5 or 1
-        row.name:SetTextColor(g, g, g)
-        row.id:SetText(type(en.key) == "number" and en.key or (select(3, ns.SpellKeyInfo(en.key)) or "buscando..."))
-        row.prio:SetText(en.prio)
-        row.toggle.mark:SetShown(not en.disabled)
-        row.sel:SetShown(en.key == selDebuff)
-        local s = ns.GetDebuffStyle(selKey, en.key)
-        local styled = s and (s.glow ~= "none" or s.border or s.tint or s.pulse or s.sound ~= "none" or s.scale ~= 1)
-        if styled then
-            local c = (s.glow ~= "none" and s.color) or (s.border and s.borderColor) or (s.tint and s.tintColor) or { r = 1, g = 1, b = 1 }
-            row.styled:SetColorTexture(c.r, c.g, c.b, 1)
-            row.styled:Show()
-        else
-            row.styled:Hide()
-        end
-        -- fila reutilizada para otro debuff: no arrastrar la confirmación
-        if row.delKey ~= en.key then row.del.Disarm() row.delKey = en.key end
-        if en.custom then
-            if not row.del.armed then row.del.text:SetText("Borrar") end
-            row.del:Show()
-        elseif en.changed then
-            if not row.del.armed then row.del.text:SetText("Restaurar") end
-            row.del:Show()
-        else
-            row.del:Hide()
-        end
-    end)
-    raidList.box:SetPoint("TOPLEFT", 12, -62)
-    raidList.box:SetSize(556, LIST_ROWS * 20)
+        listRows[i] = row
+    end
 
     local y = -62 - LIST_ROWS * 20 - 10
     local addLbl = UI.Label(p, "Añadir debuff (ID o nombre exacto):")
@@ -1998,7 +1992,19 @@ local function BuildRaid(p)
     end)
     clear:SetPoint("TOPRIGHT", -16, y + 2)
 
-    local seenList = UI.List(p, 20, "Frame", function(row)
+    local seenArea = CreateFrame("Frame", nil, p)
+    seenArea:SetPoint("TOPLEFT", 12, y - 22)
+    seenArea:SetSize(570, SEEN_ROWS * 20)
+    seenArea:EnableMouseWheel(true)
+    seenArea:SetScript("OnMouseWheel", function(_, d)
+        seenOffset = math.max(0, seenOffset - d)
+        RefreshRaid()
+    end)
+    local seenRows = {}
+    for i = 1, SEEN_ROWS do
+        local row = CreateFrame("Frame", nil, seenArea)
+        row:SetSize(570, 19)
+        row:SetPoint("TOPLEFT", 4, -(i - 1) * 20)
         row.icon = row:CreateTexture(nil, "ARTWORK")
         row.icon:SetSize(17, 17)
         row.icon:SetPoint("LEFT")
@@ -2021,33 +2027,78 @@ local function BuildRaid(p)
             RaidChanged()
         end)
         row.add:SetPoint("LEFT", 424, 0)
-    end, function(row, s)
-        row.spellID = s.id
-        row.icon:SetTexture(s.icon or ns.GetSpellIcon(s.id) or 134400)
-        row.name:SetText(s.name or ns.GetSpellName(s.id) or "?")
-        row.id:SetText(s.id)
-        row.count:SetText(s.count .. " veces")
-    end)
-    seenList.box:SetPoint("TOPLEFT", 12, y - 22)
-    seenList.box:SetSize(556, SEEN_ROWS * 20)
+        seenRows[i] = row
+    end
     local seenEmpty = UI.Label(p, "Nada todavía. Entra en la instancia con el registrador activo: los debuffs que no\nestén en la lista aparecerán aquí (cuando el juego deje leerlos).")
     seenEmpty:SetPoint("TOPLEFT", 16, y - 26)
     seenEmpty:SetTextColor(0.6, 0.6, 0.6)
 
     RefreshRaid = function()
         local list = SortedList()
-        local items = {}
-        for i, en in ipairs(list) do items[i] = { entry = en, i = i } end
-        raidList:SetItems(items, resetRaidScroll)
-        scrollInfo:SetText(#list == 0 and "lista vacía" or (#list .. " debuffs"))
+        listOffset = math.max(0, math.min(listOffset, #list - LIST_ROWS))
+        for i, row in ipairs(listRows) do
+            local en = list[i + listOffset]
+            row.entry = en
+            if en then
+                local name, icon = ns.SpellKeyInfo(en.key)
+                row.icon:SetTexture(icon or 134400)
+                row.name:SetText(name)
+                local g = en.disabled and 0.5 or 1
+                row.name:SetTextColor(g, g, g)
+                row.id:SetText(type(en.key) == "number" and en.key or (select(3, ns.SpellKeyInfo(en.key)) or "buscando..."))
+                row.prio:SetText(en.prio)
+                row.toggle.mark:SetShown(not en.disabled)
+                row.sel:SetShown(en.key == selDebuff)
+                local s = ns.GetDebuffStyle(selKey, en.key)
+                local styled = s and (s.glow ~= "none" or s.border or s.tint or s.pulse or s.sound ~= "none" or s.scale ~= 1)
+                if styled then
+                    local c = (s.glow ~= "none" and s.color) or (s.border and s.borderColor) or (s.tint and s.tintColor) or { r = 1, g = 1, b = 1 }
+                    row.styled:SetColorTexture(c.r, c.g, c.b, 1)
+                    row.styled:Show()
+                else
+                    row.styled:Hide()
+                end
+                -- fila reutilizada para otro debuff: no arrastrar la confirmación
+                if row.delKey ~= en.key then row.del.Disarm() row.delKey = en.key end
+                if en.custom then
+                    if not row.del.armed then row.del.text:SetText("Borrar") end
+                    row.del:Show()
+                elseif en.changed then
+                    if not row.del.armed then row.del.text:SetText("Restaurar") end
+                    row.del:Show()
+                else
+                    row.del:Hide()
+                end
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+        if #list > LIST_ROWS then
+            scrollInfo:SetText(("%d-%d de %d (rueda)"):format(listOffset + 1, math.min(#list, listOffset + LIST_ROWS), #list))
+        else
+            scrollInfo:SetText(#list == 0 and "lista vacía" or (#list .. " debuffs"))
+        end
 
         local seen = {}
         for id, s in pairs(ns.db.raid.seen[selKey] or {}) do
             seen[#seen + 1] = { id = id, name = s.name, icon = s.icon, count = s.count or 0 }
         end
         table.sort(seen, function(a, b) return a.count > b.count end)
-        seenList:SetItems(seen, resetRaidScroll)
-        resetRaidScroll = false
+        seenOffset = math.max(0, math.min(seenOffset, #seen - SEEN_ROWS))
+        for i, row in ipairs(seenRows) do
+            local s = seen[i + seenOffset]
+            if s then
+                row.spellID = s.id
+                row.icon:SetTexture(s.icon or ns.GetSpellIcon(s.id) or 134400)
+                row.name:SetText(s.name or ns.GetSpellName(s.id) or "?")
+                row.id:SetText(s.id)
+                row.count:SetText(s.count .. " veces")
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
         seenEmpty:SetShown(#seen == 0)
     end
 
