@@ -287,8 +287,8 @@ function ns.CharProfiles()
     return c
 end
 
-function ns.SizeKey()
-    if ns.testing then return ns.testSize or "raid20" end
+-- Tamaño real del grupo (sin contar el modo prueba)
+function ns.RealSizeKey()
     if IsInRaid() then
         local n = GetNumGroupMembers()
         if n <= 10 then return "raid10" end
@@ -298,8 +298,15 @@ function ns.SizeKey()
     return "party"
 end
 
--- Perfil que se está viendo ahora mismo
+function ns.SizeKey()
+    if ns.testing then return ns.testSize or "raid20" end
+    return ns.RealSizeKey()
+end
+
+-- Perfil que se está viendo ahora mismo. En modo prueba se ve el que se
+-- edita en las opciones: así lo que cambias siempre se ve al momento.
 function ns.ActiveProfileName()
+    if ns.testing and ns.editName and ns.db.profiles[ns.editName] then return ns.editName end
     return ns.CharProfiles()[ns.SizeKey()]
 end
 

@@ -44,108 +44,203 @@ end
 local function BuildProfiles(p)
     local _, c = UI.ScrollPage(p)
 
-    local activeNote = UI.Note(c, "", 520)
-    local nameBox
-    local function NameInput()
-        local n = nameBox:GetText():trim()
-        if n == "" then ns.Print("escribe un nombre para el perfil.") return nil end
-        return n
+    -- Cambia el perfil que se edita (en modo prueba, también el que se ve)
+    local function SetEdit(n)
+        ns.editName = n
+        ns.ActivateProfile()
+        Refresh()
     end
     local function Reassign(old, new)
         for _, chars in pairs(ns.db.chars) do
             for k, v in pairs(chars) do if v == old then chars[k] = new end end
         end
     end
+    -- Tamaños de grupo de este personaje que usan un perfil
+    local function UsedBy(name)
+        local out = {}
+        for _, key in ipairs(ns.SIZE_KEYS) do
+            if ns.CharProfiles()[key] == name then out[#out + 1] = ns.SIZE_NAMES[key] end
+        end
+        return out
+    end
 
-    local actions = CreateFrame("Frame", nil, c)
-    actions:SetSize(520, 46)
-    local lbl = UI.Label(actions, "Nombre:")
-    lbl:SetPoint("TOPLEFT", 0, -4)
-    nameBox = UI.EditBox(actions, 170)
-    nameBox:SetPoint("LEFT", lbl, "RIGHT", 6, 0)
-    local function Btn(text, x, func)
-        local b = UI.Button(actions, text, 80, 20, func)
-        b:SetPoint("TOPLEFT", x, -26)
+    -- Botón que pide un segundo clic para confirmar (borrar, restablecer)
+    local function ConfirmButton(parent, text, w, func)
+        local b
+        local token = 0
+        local function Disarm()
+            b.armed = nil
+            b.text:SetText(text)
+            b.text:SetTextColor(1, 1, 1)
+        end
+        b = UI.Button(parent, text, w, 20, function()
+            if b.armed then
+                Disarm()
+                func()
+                return
+            end
+            b.armed = true
+            b.text:SetText("¿Seguro?")
+            b.text:SetTextColor(1, 0.45, 0.35)
+            token = token + 1
+            local mine = token
+            C_Timer.After(3, function() if b.armed and token == mine then Disarm() end end)
+        end)
+        b:HookScript("OnHide", function() if b.armed then Disarm() end end)
         return b
     end
-    Btn("Nuevo", 0, function()
-        local n = NameInput()
-        if not n then return end
-        if ns.db.profiles[n] then ns.Print("ya existe un perfil con ese nombre.") return end
-        ns.db.profiles[n] = ns.NewProfile()
-        ns.editName = n
-        nameBox:SetText("")
-        Refresh()
-    end)
-    Btn("Copiar", 86, function()
-        local n = NameInput()
-        if not n then return end
-        if ns.db.profiles[n] then ns.Print("ya existe un perfil con ese nombre.") return end
-        ns.db.profiles[n] = ns.DeepCopy(ns.EP())
-        ns.editName = n
-        nameBox:SetText("")
-        Refresh()
-    end)
-    Btn("Renombrar", 172, function()
-        local n = NameInput()
-        local old = ns.EditedProfileName()
-        if not n or n == old then return end
-        if old == "Default" then ns.Print("el perfil Default no se puede renombrar (cópialo).") return end
-        if ns.db.profiles[n] then ns.Print("ya existe un perfil con ese nombre.") return end
-        ns.db.profiles[n] = ns.db.profiles[old]
-        ns.db.profiles[old] = nil
-        Reassign(old, n)
-        ns.editName = n
-        if ns.activeName == old then ns.activeName = n end
-        nameBox:SetText("")
-        Refresh()
-    end)
-    Btn("Borrar", 258, function()
-        local old = ns.EditedProfileName()
-        if old == "Default" then ns.Print("el perfil Default no se puede borrar.") return end
-        ns.db.profiles[old] = nil
-        Reassign(old, "Default")
-        ns.editName = nil
-        ns.ActivateProfile(true)
-        Refresh()
-    end)
-    Btn("Restablecer", 344, function()
+
+    ---------------------------------------------------------------------------
+    -- Perfil que se edita
+    ---------------------------------------------------------------------------
+    local editDD = UI.Dropdown(c, nil, ProfileOptions, ns.EditedProfileName, SetEdit)
+
+    local feedback -- se crea más abajo
+    local function Say(text)
+        feedback.text:SetText(text)
+        feedback.text:SetTextColor(0.4, 0.9, 0.5)
+        feedback:SetHeight(feedback.text:GetStringHeight() + 2)
+        Refresh() -- recolocar: el mensaje puede ocupar otra altura
+    end
+
+    local resetBtn = ConfirmButton(editDD, "Restablecer", 90, function()
         local name = ns.EditedProfileName()
         ns.db.profiles[name] = ns.NewProfile()
         ns.ActivateProfile(true)
         ns.ProfileChanged()
         Refresh()
-        ns.Print(("perfil '%s' restablecido."):format(name))
+        Say(("«%s» ha vuelto a los ajustes por defecto."):format(name))
+    end)
+    resetBtn:SetPoint("LEFT", editDD.button, "RIGHT", 6, 0)
+    local deleteBtn = ConfirmButton(editDD, "Borrar", 70, function()
+        local old = ns.EditedProfileName()
+        if old == "Default" then return end
+        local used = #UsedBy(old) > 0
+        ns.db.profiles[old] = nil
+        Reassign(old, "Default")
+        ns.editName = nil
+        ns.ActivateProfile(true)
+        Refresh()
+        Say(used and ("«%s» borrado. Donde se usaba, ahora se usa Default."):format(old)
+            or ("«%s» borrado."):format(old))
+    end)
+    deleteBtn:SetPoint("LEFT", resetBtn, "RIGHT", 6, 0)
+
+    local usage = UI.Note(c, "", 520)
+    usage.Refresh = function()
+        local name = ns.EditedProfileName()
+        local used = UsedBy(name)
+        if #used > 0 then
+            usage.text:SetText("Lo usa este personaje en: |cffffffff" .. table.concat(used, ", ") .. "|r.")
+        else
+            usage.text:SetText("|cffff8c4dNingún tamaño de grupo lo usa todavía.|r Asígnalo abajo para que se vea en juego (en modo prueba ya lo ves).")
+        end
+        usage:SetHeight(usage.text:GetStringHeight() + 2)
+        UI.SetEnabled(deleteBtn, name ~= "Default")
+    end
+    table.insert(UI.widgets, usage)
+
+    ---------------------------------------------------------------------------
+    -- Crear / duplicar / renombrar
+    ---------------------------------------------------------------------------
+    local actions = CreateFrame("Frame", nil, c)
+    actions:SetSize(520, 48)
+    local lbl = UI.Label(actions, "Nombre:")
+    lbl:SetPoint("TOPLEFT", 0, -4)
+    local nameBox = UI.EditBox(actions, 170)
+    nameBox:SetPoint("LEFT", lbl, "RIGHT", 6, 0)
+    local hint = UI.Label(actions, "")
+    hint:SetPoint("LEFT", nameBox, "RIGHT", 8, 0)
+    hint:SetTextColor(1, 0.55, 0.3)
+
+    local function Btn(text, x, func)
+        local b = UI.Button(actions, text, 100, 20, func)
+        b:SetPoint("TOPLEFT", x, -28)
+        return b
+    end
+    local function Name() return nameBox:GetText():trim() end
+    local function Done(n, msg)
+        nameBox:SetText("")
+        nameBox:ClearFocus()
+        SetEdit(n)
+        Say(msg)
+    end
+    local newBtn = Btn("Crear nuevo", 0, function()
+        local n = Name()
+        ns.db.profiles[n] = ns.NewProfile()
+        Done(n, ("«%s» creado con los ajustes por defecto."):format(n))
+    end)
+    local dupBtn = Btn("Duplicar", 106, function()
+        local n, from = Name(), ns.EditedProfileName()
+        ns.db.profiles[n] = ns.DeepCopy(ns.EP())
+        Done(n, ("«%s» creado como copia de «%s»."):format(n, from))
+    end)
+    local renBtn = Btn("Renombrar", 212, function()
+        local n, old = Name(), ns.EditedProfileName()
+        ns.db.profiles[n] = ns.db.profiles[old]
+        ns.db.profiles[old] = nil
+        Reassign(old, n)
+        if ns.activeName == old then ns.activeName = n end
+        Done(n, ("«%s» ahora se llama «%s»."):format(old, n))
     end)
 
+    -- los botones solo se activan con un nombre válido
+    local function Validate()
+        local n = Name()
+        local exists = n ~= "" and ns.db.profiles[n] ~= nil
+        local ok = n ~= "" and not exists
+        hint:SetText(exists and "ya existe un perfil con ese nombre" or "")
+        UI.SetEnabled(newBtn, ok)
+        UI.SetEnabled(dupBtn, ok)
+        UI.SetEnabled(renBtn, ok and ns.EditedProfileName() ~= "Default")
+    end
+    nameBox:SetScript("OnTextChanged", Validate)
+    nameBox:SetScript("OnEnterPressed", nameBox.ClearFocus)
+    actions.Refresh = Validate
+    table.insert(UI.widgets, actions)
+
+    feedback = UI.Note(c, "«Crear nuevo» empieza con los ajustes por defecto; «Duplicar» copia el perfil que editas. Default no se puede borrar ni renombrar.", 520)
+
+    ---------------------------------------------------------------------------
     local list = {
         UI.Header(c, "Perfil que estás editando"),
-        UI.Dropdown(c, nil, ProfileOptions, ns.EditedProfileName, function(v)
-            ns.editName = v
-            Refresh()
-        end),
-        activeNote,
+        editDD,
+        UI.Attach(usage),
+        UI.Header(c, "Crear o renombrar"),
         actions,
+        UI.Attach(feedback),
         UI.Header(c, "Qué perfil usa este personaje según el grupo"),
     }
     for _, key in ipairs(ns.SIZE_KEYS) do
-        list[#list + 1] = UI.Dropdown(c, ns.SIZE_NAMES[key], ProfileOptions,
+        local dd = UI.Dropdown(c, ns.SIZE_NAMES[key], ProfileOptions,
             function() return ns.CharProfiles()[key] end,
             function(v)
                 ns.CharProfiles()[key] = v
                 ns.ActivateProfile()
                 Refresh()
             end)
+        local edit = UI.Button(dd, "Editar", 70, 18, function() SetEdit(ns.CharProfiles()[key]) end)
+        edit:SetPoint("LEFT", dd.button, "RIGHT", 6, 0)
+        local base = dd.Refresh
+        dd.Refresh = function(self)
+            base(self)
+            local now = ns.RealSizeKey() == key
+            dd.label:SetText(ns.SIZE_NAMES[key] .. (now and "  |cff4fc3f7· tu grupo ahora|r" or ""))
+            UI.SetEnabled(edit, ns.CharProfiles()[key] ~= ns.EditedProfileName())
+        end
+        list[#list + 1] = dd
     end
     list[#list + 1] = UI.Note(c, "Así puedes tener un diseño para grupo, otro para ZG/AQ20 y otro para bandas de 40. El cambio es automático al entrar o salir de un grupo (si estás en combate, se aplica al salir).", 520)
     list[#list + 1] = UI.Header(c, "Vista previa")
     list[#list + 1] = UI.Dropdown(c, "Simular un grupo de", {
         { "party", "5 (grupo)" }, { "raid10", "10 (banda)" }, { "raid20", "20 (banda)" }, { "raid40", "40 (banda)" },
     }, function() return ns.testSize or "raid20" end, function(v)
+        -- simular un tamaño enseña (y edita) el perfil asignado a ese tamaño
+        ns.editName = ns.CharProfiles()[v]
         ns.ToggleTest(true, v)
         Refresh()
     end)
-    list[#list + 1] = UI.Note(c, "El modo prueba muestra el perfil asignado a ese tamaño. Lo que cambies se ve al momento si editas ese mismo perfil.", 520)
+    list[#list + 1] = UI.Note(c, "En modo prueba siempre ves el perfil que estás editando, con el número de jugadores que elijas aquí.", 520)
     list[#list + 1] = UI.Header(c, "General")
     list[#list + 1] = UI.Check(c, "Ocultar marcos de grupo y banda de Blizzard (requiere /reload)",
         function() return ns.db.hideBlizzard end,
@@ -155,8 +250,8 @@ local function BuildProfiles(p)
     UI.FitContent(c, { st })
 
     p.OnShow = function()
-        activeNote.text:SetText(("Activo ahora: |cffffffff%s|r (%s). Si eliges otro, editas ese aunque no se esté viendo."):format(
-            tostring(ns.activeName), ns.SIZE_NAMES[ns.SizeKey()] or "?"))
+        st:Layout()
+        UI.FitContent(c, { st })
     end
 end
 
