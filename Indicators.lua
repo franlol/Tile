@@ -112,6 +112,7 @@ local function TickTimer(w, e, now)
     local cfg = e.cfg
     if w.timerText and (cfg.timer or w.wtype == "text") then w.timerText:SetText(FormatTime(remain)) end
     if w.bar then w.bar:SetValue(remain / e.dur) end
+    if w.drainOn then w.drain:SetValue(remain / e.dur) end
     local warn = cfg.warnAt > 0 and remain <= cfg.warnAt
     if warn ~= e.warned then
         e.warned = warn
@@ -161,6 +162,16 @@ local function NewCooldown(f)
     cd:SetDrawEdge(false)
     if cd.SetHideCountdownNumbers then cd:SetHideCountdownNumbers(true) end
     f.cd = cd
+    -- vaciado (vertical, horizontal o barra fina): alternativa al reloj
+    local drain = CreateFrame("StatusBar", nil, f)
+    drain:SetStatusBarTexture(FLAT)
+    drain:SetMinMaxValues(0, 1)
+    drain:SetFrameLevel(cd:GetFrameLevel())
+    drain.bg = drain:CreateTexture(nil, "BACKGROUND")
+    drain.bg:SetAllPoints()
+    drain.bg:SetTexture(FLAT)
+    drain:Hide()
+    f.drain = drain
     -- textos por encima del barrido
     local top = CreateFrame("Frame", nil, f)
     top:SetAllPoints()
@@ -293,6 +304,37 @@ local function WidgetType(cfg)
     if cfg.kind == "debuffs" then return "icons" end
     if cfg.kind == "dispel" then return cfg.type == "overlay" and "overlay" or "border" end
     return cfg.type
+end
+
+-- Estilo del barrido: el reloj de siempre (normal, al revés o con borde),
+-- una sombra que se vacía en vertical u horizontal, o una barra fina abajo
+local function SetupSweep(w, cfg)
+    local cd, d = w.cd, w.drain
+    if not cd then return end
+    local style = cfg.swipeStyle or "clock"
+    local on = cfg.swipe ~= false and w.wtype ~= "text"
+    local clock = style == "clock" or style == "clockReverse" or style == "clockEdge"
+    cd:SetReverse(style ~= "clockReverse")
+    cd:SetDrawEdge(style == "clockEdge")
+    cd:SetDrawSwipe(on and clock)
+    w.drainOn = on and not clock and d ~= nil
+    if not d then return end
+    if not w.drainOn then d:Hide() return end
+    d:ClearAllPoints()
+    if style == "bar" then
+        local h = math.max(2, math.floor((w:GetHeight() or 10) * 0.15 + 0.5))
+        d:SetPoint("BOTTOMLEFT")
+        d:SetPoint("BOTTOMRIGHT")
+        d:SetHeight(h)
+        d:SetOrientation("HORIZONTAL")
+        d:SetStatusBarColor(1, 1, 1, 0.95)
+        d.bg:SetVertexColor(0, 0, 0, 0.7)
+    else
+        d:SetAllPoints()
+        d:SetOrientation(style == "drainV" and "VERTICAL" or "HORIZONTAL")
+        d:SetStatusBarColor(0, 0, 0, 0.6)
+        d.bg:SetVertexColor(0, 0, 0, 0)
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -434,7 +476,7 @@ local function LayoutWidget(w, cfg, b)
                 icon.border:SetShown(cfg.showBorder ~= false)
                 SetupMouse(icon)
                 StyleTexts(icon, cfg)
-                if icon.cd then icon.cd:SetDrawSwipe(cfg.swipe ~= false) end
+                SetupSweep(icon, cfg)
                 icon:Hide()
             end
         end
@@ -443,7 +485,7 @@ local function LayoutWidget(w, cfg, b)
         SetupMouse(w)
     end
     if w.SetMainColor then w:SetMainColor(cfg.color) end
-    if w.cd then w.cd:SetDrawSwipe(t ~= "text" and cfg.swipe ~= false) end
+    SetupSweep(w, cfg)
 end
 
 -- Crea/reutiliza los widgets de todos los indicadores de un botón
@@ -493,6 +535,28 @@ local function ApplyCooldown(w, unit, aura, cfg)
         cd:SetCooldown(exp - dur, dur)
     else
         cd:Clear()
+    end
+end
+
+local function ApplyDrain(w, unit, aura)
+    local d = w.drain
+    if not d then return end
+    if not w.drainOn then d:Hide() return end
+    -- duración secreta (en combate): la barra se vacía sola
+    if unit and GetAuraDuration and d.SetTimerDuration and aura.auraInstanceID then
+        local ok = pcall(function()
+            local obj = GetAuraDuration(unit, aura.auraInstanceID)
+            if not obj then error("sin duración") end
+            d:SetTimerDuration(obj)
+        end)
+        if ok then d:Show() return end
+    end
+    local dur, exp = aura.duration, aura.expirationTime
+    if not AnyS(dur, exp) and dur and exp and dur > 0 then
+        d:SetValue(math.max(0, (exp - GetTime()) / dur))
+        d:Show()
+    else
+        d:Hide() -- sin duración (aura permanente)
     end
 end
 
@@ -547,6 +611,7 @@ function ns.ShowAura(w, unit, aura, cfg)
     if w.wtype == "icon" then DispelBorder(w, aura, cfg) end
     w:Show()
     ApplyCooldown(w, unit, aura, cfg)
+    ApplyDrain(w, unit, aura)
     ApplyCount(w, unit, aura, cfg)
     ApplyTimer(w, unit, aura, cfg)   -- puede ocultarlo ("solo si quedan menos de")
 end
@@ -556,6 +621,7 @@ function ns.ShowMissing(w, cfg)
     timers[w] = nil
     RememberAura(w, nil, { spellId = ns.KeyIDs(cfg.spells[1] or 0)[1] }, cfg)
     if w.cd then w.cd:Clear() end
+    if w.drain then w.drain:Hide() end
     if w.count then w.count:SetText("") end
     if w.SetMainColor then w:SetMainColor(cfg.color) end
     if w.wtype == "icon" then

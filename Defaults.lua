@@ -177,6 +177,7 @@ ns.indicatorDefaults = {
     timer = false,
     stacks = true,
     swipe = true,
+    swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
     fontSize = 9,
     max = 3,
     grow = "LEFT",

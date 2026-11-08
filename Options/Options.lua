@@ -1148,7 +1148,6 @@ local function BuildIndicators(p)
     local el = CreateFrame("Button", nil, unit, "BackdropTemplate")
     el:SetFrameLevel(unit:GetFrameLevel() + 5)
     el:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
-    el:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
     el.tex = el:CreateTexture(nil, "ARTWORK")
     el.tex:SetPoint("TOPLEFT", 1, -1)
     el.tex:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -1156,8 +1155,15 @@ local function BuildIndicators(p)
     el.text:SetPoint("CENTER")
     el:SetMovable(true)
     el:RegisterForDrag("LeftButton")
-    el:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(1, 1, 1, 1) end)
-    el:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(ACCENT[1], ACCENT[2], ACCENT[3], 1) end)
+    -- al pasar el ratón, un brillo suave indica que se puede arrastrar
+    el.hl = el:CreateTexture(nil, "HIGHLIGHT")
+    el.hl:SetAllPoints()
+    el.hl:SetColorTexture(1, 1, 1, 0.25)
+    local function PaintBorder()
+        local s = Sel()
+        local show = s and EffType(s) ~= "text" and s.showBorder ~= false
+        el:SetBackdropBorderColor(0, 0, 0, show and 1 or 0)
+    end
 
     local function PX(f, pt)
         if pt:find("LEFT") then return f:GetLeft() end
@@ -1231,6 +1237,7 @@ local function BuildIndicators(p)
         end
         el:ClearAllPoints()
         el:SetPoint(s.point, unit, s.point, s.x, s.y)
+        PaintBorder()
         el.text:SetText("")
         if t == "icon" or t == "icons" then
             local icon = 134400
@@ -1327,6 +1334,16 @@ local function BuildIndicators(p)
             function() local t = T() return notDispel() and t ~= "text" end),
         W(UI.Check(c, "Barrido del tiempo", IB("swipe")),
             function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end),
+        WE(UI.Attach(UI.Dropdown(c, "Estilo del barrido", {
+            { "clock", "Reloj" },
+            { "clockReverse", "Reloj inverso (se llena)" },
+            { "clockEdge", "Reloj con borde" },
+            { "drainV", "Vaciado vertical" },
+            { "drainH", "Vaciado horizontal" },
+            { "bar", "Barra fina abajo" },
+        }, function() return Sel().swipeStyle or "clock" end, function(v) Sel().swipeStyle = v IndChanged() end)),
+            function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end,
+            function() return Sel().swipe ~= false end),
         W(UI.Slider(c, "Aviso con menos de (s)", 0, 15, 1,
             function(v) return v == 0 and "no" or (v .. " s") end, IB("warnAt")), timed),
         WE(UI.Attach(UI.Swatch(c, "Color de aviso (en iconos, el borde)", function() return Sel().warnColor end, IndChanged, true)),
