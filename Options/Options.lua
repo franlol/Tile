@@ -738,8 +738,9 @@ local function BuildIndicators(p)
     local function typeIconT() return frameT() and ns.IndicatorTyped(Sel()) end
     local function typeIconOn() return Sel().typeIcon end
 
+    -- W: shown for some indicator types only. WE: the same, and also greyed out
+    -- (without moving) while a sub-option is off
     local function W(widget, cond) widget.showIf = cond return widget end
-    -- WE: shown based on the type and disabled (without moving) based on a sub-option
     local function WE(widget, show, enable) widget.showIf = show widget.enableIf = enable return widget end
 
     -- name
@@ -2006,7 +2007,7 @@ end
 function ns.ToggleOptions()
     if not win then
         CreateWindow()
-        win:Hide() -- CreateFrame leaves it visible: without this the first /tile closed it
+        win:Hide() -- a new frame starts shown: hide it so the toggle below opens it
     end
     if win:IsShown() then
         win:Hide()
