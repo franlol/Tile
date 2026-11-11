@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Core
+-- Tile - Core
 -- Raid frames for healers built for WoW Forever (12.x engine).
 -- In instances and in combat the client can return "secret values": they can
 -- be passed to widgets (SetValue, SetText, SetTexture...) but cannot be
@@ -8,9 +8,24 @@
 
 local ADDON, ns = ...
 local L = ns.L
-_G.MendFrames = ns
+_G.Tile = ns
 
 ns.version = "0.2.0"
+
+-------------------------------------------------------------------------------
+-- Brand color: the green of the icon. Change it here and the whole addon
+-- (texts, headers, underlines, checkmarks, sliders, hovers...) follows.
+-------------------------------------------------------------------------------
+ns.ACCENT_HEX = "45c072"
+ns.ACCENT = {
+    tonumber(ns.ACCENT_HEX:sub(1, 2), 16) / 255,
+    tonumber(ns.ACCENT_HEX:sub(3, 4), 16) / 255,
+    tonumber(ns.ACCENT_HEX:sub(5, 6), 16) / 255,
+}
+-- Text in the brand color (for chat and labels)
+function ns.AccentText(s)
+    return "|cff" .. ns.ACCENT_HEX .. s .. "|r"
+end
 
 -------------------------------------------------------------------------------
 -- Secret values
@@ -35,7 +50,7 @@ end
 -- Utilities
 -------------------------------------------------------------------------------
 function ns.Print(...)
-    print("|cff4fc3f7MendFrames|r:", ...)
+    print(ns.AccentText("Tile") .. ":", ...)
 end
 
 local function CopyDefaults(src, dst)
@@ -363,8 +378,8 @@ end
 -- Load the database
 -------------------------------------------------------------------------------
 local function LoadDB()
-    MendFramesDB = CopyDefaults(ns.dbDefaults, MendFramesDB)
-    ns.db = MendFramesDB
+    TileDB = CopyDefaults(ns.dbDefaults, TileDB)
+    ns.db = TileDB
     ns.SetLanguage(ns.db.language)
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
@@ -397,7 +412,7 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         -- test mode is remembered too
         if ns.db.testing then ns.ToggleTest(true, ns.db.testSize) end
         ns.HideBlizzard()
-        ns.Print(L["loaded. Type |cffffff00/mf|r to open the options."])
+        ns.Print(L["loaded. Type |cffffff00/tile|r to open the options."])
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -427,9 +442,8 @@ end)
 -------------------------------------------------------------------------------
 -- Commands
 -------------------------------------------------------------------------------
-SLASH_MENDFRAMES1 = "/mf"
-SLASH_MENDFRAMES2 = "/mendframes"
-SlashCmdList.MENDFRAMES = function(msg)
+SLASH_TILE1 = "/tile"
+SlashCmdList.TILE = function(msg)
     msg = (msg or ""):lower():trim()
     if msg == "lock" or msg == "bloquear" then
         ns.SetLocked(true)

@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Spell catalog per class (WoW Forever)
+-- Tile - Spell catalog per class (WoW Forever)
 --
 -- Source: foreverdb.net (data extracted from the Forever client, Nov 2026).
 -- Classic spells keep their Classic ID (rank 1). New Forever spells that come

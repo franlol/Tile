@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Options window (/mf)
+-- Tile - Options window (/tile)
 -------------------------------------------------------------------------------
 
 local _, ns = ...
@@ -306,7 +306,7 @@ local function BuildProfiles(p)
         dd.Refresh = function(self)
             base(self)
             local now = ns.RealSizeKey() == key
-            dd.label:SetText(L[ns.SIZE_NAMES[key]] .. (now and ("  |cff4fc3f7· " .. L["your group now"] .. "|r") or ""))
+            dd.label:SetText(L[ns.SIZE_NAMES[key]] .. (now and ("  " .. ns.AccentText("· " .. L["your group now"])) or ""))
             UI.SetEnabled(edit, ns.CharProfiles()[key] ~= ns.EditedProfileName())
         end
         list[#list + 1] = dd
@@ -326,11 +326,14 @@ local function BuildProfiles(p)
     list[#list + 1] = UI.Check(c, L["Hide Blizzard party and raid frames (requires /reload)"],
         function() return ns.db.hideBlizzard end,
         function(v) ns.db.hideBlizzard = v ns.Print(L["applies after /reload."]) end)
+    list[#list + 1] = UI.Check(c, L["Show the minimap button"],
+        function() return not ns.db.minimap.hide end,
+        function(v) ns.db.minimap.hide = not v ns.UpdateMinimapButton() end)
     list[#list + 1] = UI.Dropdown(c, L["Language (requires /reload)"], ns.LANGUAGES,
         function() return ns.db.language end,
         function(v) ns.db.language = v ns.Print(L["applies after /reload."]) end)
 
-    local st = UI.Stack(c, COL1, -6, list)
+    local st = UI.Stack(c, COL1, 0, list)
     UI.FitContent(c, { st })
 
     p.OnShow = function()
@@ -353,7 +356,7 @@ local function BuildLayout(p)
         baseRefresh(self)
         perCol.label:SetText(ns.EP().layout.orientation == "horizontal" and L["Pets per row"] or L["Pets per column"])
     end
-    local a = UI.Stack(c, COL1, -6, {
+    local a = UI.Stack(c, COL1, 0, {
         UI.Header(c, L["Size"]),
         UI.Slider(c, L["Width"], 30, 200, 1, nil, PB("layout.width")),
         UI.Slider(c, L["Height"], 16, 100, 1, nil, PB("layout.height")),
@@ -390,7 +393,7 @@ local function BuildLayout(p)
     for i = 1, 8 do
         list[#list + 1] = UI.Check(c, (L["Group %d"]):format(i), PB("layout.groups." .. i))
     end
-    local b = UI.Stack(c, COL2, -6, list)
+    local b = UI.Stack(c, COL2, 0, list)
     UI.FitContent(c, { a, b })
 end
 
@@ -408,7 +411,7 @@ local function BuildBars(p)
     end
     local power = On("bars.showPower")
 
-    local a = UI.Stack(c, COL1, -6, Flat({
+    local a = UI.Stack(c, COL1, 0, Flat({
         UI.Header(c, L["Health"]),
         UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.healthTex")),
         Smooth("bars.smooth"),
@@ -430,7 +433,7 @@ local function BuildBars(p)
             On("bars.showAbsorb")),
     }))
 
-    local b = UI.Stack(c, COL2, -6, Flat({
+    local b = UI.Stack(c, COL2, 0, Flat({
         UI.Header(c, L["Mana / energy / rage"]),
         UI.Check(c, L["Show"], PB("bars.showPower")),
         Cond(UI.Attach(UI.Check(c, L["Only for mana users"], PB("bars.powerOnlyMana"))), nil, power),
@@ -476,7 +479,7 @@ local function BuildTexts(p)
         UI.Slider(c, L["Max width (% of the frame)"], 30, 100, 1, function(v) return v .. "%" end, PB("texts.name.width")),
     })
     for _, w in ipairs(TextSection(c, "status", L["Status text"])) do nameList[#nameList + 1] = w end
-    local a = UI.Stack(c, COL1, -6, nameList)
+    local a = UI.Stack(c, COL1, 0, nameList)
 
     -- warnings shown in the status text, each one with its color
     local S = function() return ns.EP().texts.status end
@@ -507,7 +510,7 @@ local function BuildTexts(p)
         }, PB("texts.health.format")),
         UI.Check(c, L["Hide at full health"], PB("texts.health.hideFull")),
     })) do alerts[#alerts + 1] = w end
-    local b = UI.Stack(c, COL2, -6, alerts)
+    local b = UI.Stack(c, COL2, 0, alerts)
     UI.FitContent(c, { a, b })
 end
 
@@ -543,8 +546,8 @@ local function BuildElements(p)
     for _, w in ipairs(ElementSection(c, "raidIcon", L["Raid marker (skull, etc.)"])) do l1[#l1 + 1] = w end
     local l2 = ElementSection(c, "leader", L["Leader / assistant"])
     for _, w in ipairs(ElementSection(c, "ready", L["Ready check"])) do l2[#l2 + 1] = w end
-    local a = UI.Stack(c, COL1, -6, l1)
-    local b = UI.Stack(c, COL2, -6, l2)
+    local a = UI.Stack(c, COL1, 0, l1)
+    local b = UI.Stack(c, COL2, 0, l2)
     UI.FitContent(c, { a, b })
 end
 
@@ -580,7 +583,7 @@ local function IB(path) return UI.Bind(Sel, path, IndChanged) end
 local function BuildIndicators(p)
     -- list on the left
     local left = CreateFrame("Frame", nil, p)
-    left:SetPoint("TOPLEFT", 6, -4)
+    left:SetPoint("TOPLEFT", 6, 0)
     left:SetPoint("BOTTOMLEFT", 6, 4)
     left:SetWidth(196)
     -- the list reaches the bottom: as many rows fit as the space left by the
@@ -896,7 +899,7 @@ local function BuildIndicators(p)
                     -- the name warns when there are IDs chosen by hand
                     local n = 0
                     if pick then for _ in pairs(pick) do n = n + 1 end end
-                    r.name:SetText(n > 0 and ("%s |cff4fc3f7(%d)|r"):format(name, n) or name)
+                    r.name:SetText(n > 0 and ("%s %s"):format(name, ns.AccentText("(" .. n .. ")")) or name)
                     local open = IsOpen(s, key)
                     r.ids.text:SetText(open and L["Hide IDs"] or L["Show IDs"])
                     r:ClearAllPoints()
@@ -1081,7 +1084,7 @@ local function BuildIndicators(p)
         return list
     end
 
-    local st = UI.Stack(c, 4, -4, Flat({
+    local st = UI.Stack(c, 4, 0, Flat({
         UI.Header(c, L["Indicator"]),
         nameW,
         UI.Check(c, L["Enabled"], IB("enabled")),
@@ -1404,7 +1407,7 @@ local function BuildCatalog(p)
     result.showIf = function() return (result.text:GetText() or "") ~= "" end
 
     -- Same cards as every other page: one per step
-    st = UI.Stack(c, COL1, -6, {
+    st = UI.Stack(c, COL1, 0, {
         UI.Header(c, L["1. Group"]),
         groupGrid,
         desc,
@@ -1894,8 +1897,8 @@ local function SelectPage(i)
 end
 
 local function CreateWindow()
-    win = CreateFrame("Frame", "MendFramesOptions", UIParent, "BackdropTemplate")
-    win:SetSize(760, 600)
+    win = CreateFrame("Frame", "TileOptions", UIParent, "BackdropTemplate")
+    win:SetSize(760, 606)
     win:SetPoint("CENTER")
     win:SetFrameStrata("DIALOG")
     UI.Backdrop(win, { 0.06, 0.06, 0.08, 0.97 }, { 0.2, 0.2, 0.25, 1 })
@@ -1905,17 +1908,50 @@ local function CreateWindow()
     win:SetScript("OnDragStart", win.StartMoving)
     win:SetScript("OnDragStop", win.StopMovingOrSizing)
     win:SetClampedToScreen(true)
-    table.insert(UISpecialFrames, "MendFramesOptions")
+    table.insert(UISpecialFrames, "TileOptions")
     win:SetScript("OnHide", function() UI.CloseMenu() end)
 
-    local title = UI.Label(win, "MendFrames  |cff888888v" .. ns.version .. "|r", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 14, -12)
-    win.profileLabel = UI.Label(win, "")
-    win.profileLabel:SetPoint("LEFT", title, "RIGHT", 14, -1)
-    win.profileLabel:SetTextColor(0.7, 0.7, 0.7)
+    -- Header: band with a brand-color glow, icon, title, version and the
+    -- profiles underneath; the buttons sit centered on the right
+    local A = ns.ACCENT
+    local header = CreateFrame("Frame", nil, win)
+    header:SetPoint("TOPLEFT", 1, -1)
+    header:SetPoint("TOPRIGHT", -1, -1)
+    header:SetHeight(40)
+    local hbg = header:CreateTexture(nil, "BACKGROUND")
+    hbg:SetAllPoints()
+    hbg:SetColorTexture(0.08, 0.1, 0.15, 1)
+    local glow = header:CreateTexture(nil, "BORDER")
+    glow:SetAllPoints()
+    glow:SetColorTexture(1, 1, 1, 1)
+    if not (CreateColor and pcall(glow.SetGradient, glow, "HORIZONTAL", CreateColor(A[1], A[2], A[3], 0.07), CreateColor(A[1], A[2], A[3], 0))) then
+        glow:SetColorTexture(A[1], A[2], A[3], 0.03)
+    end
+    local hline = header:CreateTexture(nil, "ARTWORK")
+    hline:SetPoint("BOTTOMLEFT")
+    hline:SetPoint("BOTTOMRIGHT")
+    hline:SetHeight(1)
+    hline:SetColorTexture(A[1], A[2], A[3], 0.35)
+
+    local logo = header:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(24, 24)
+    logo:SetPoint("LEFT", 10, 0)
+    logo:SetTexture("Interface\\AddOns\\Tile\\Media\\Icon")
+
+    local title = header:CreateFontString(nil, "OVERLAY")
+    title:SetFont(STANDARD_TEXT_FONT, 14, "")
+    title:SetTextColor(1, 1, 1)
+    title:SetText("Tile")
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 8, 0)
+    local ver = header:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    ver:SetText("v" .. ns.version)
+    ver:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 6, 1)
+    win.profileLabel = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    win.profileLabel:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 8, -1)
+    win.profileLabel:SetTextColor(0.6, 0.64, 0.71)
 
     local close = UI.Button(win, "X", 22, 20, function() win:Hide() end)
-    close:SetPoint("TOPRIGHT", -8, -8)
+    close:SetPoint("RIGHT", header, "RIGHT", -10, 0)
     win.lockBtn = UI.Button(win, "", 100, 20, function() ns.SetLocked(not ns.db.locked) end)
     win.lockBtn:SetPoint("TOPRIGHT", close, "TOPLEFT", -6, 0)
     win.testBtn = UI.Button(win, "", 100, 20, function() ns.ToggleTest() end)
@@ -1925,12 +1961,12 @@ local function CreateWindow()
     local builders = { BuildProfiles, BuildLayout, BuildBars, BuildTexts, BuildElements, BuildIndicators, BuildCatalog, BuildInstances }
     for i, n in ipairs(names) do
         local nb = UI.Button(win, n, 130, 26, function() SelectPage(i) end)
-        nb:SetPoint("TOPLEFT", 10, -44 - (i - 1) * 30)
+        nb:SetPoint("TOPLEFT", 10, -50 - (i - 1) * 30)
         nb.text:ClearAllPoints()
         nb.text:SetPoint("LEFT", 10, 0)
         navs[i] = nb
         local page = CreateFrame("Frame", nil, win)
-        page:SetPoint("TOPLEFT", 148, -44)
+        page:SetPoint("TOPLEFT", 148, -50)
         page:SetPoint("BOTTOMRIGHT", -8, 8)
         builders[i](page)
         page:Hide()
@@ -1970,7 +2006,7 @@ end
 function ns.ToggleOptions()
     if not win then
         CreateWindow()
-        win:Hide() -- CreateFrame leaves it visible: without this the first /mf closed it
+        win:Hide() -- CreateFrame leaves it visible: without this the first /tile closed it
     end
     if win:IsShown() then
         win:Hide()

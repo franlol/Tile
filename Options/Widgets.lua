@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Custom controls for the options window
+-- Tile - Custom controls for the options window
 -- (no Blizzard templates, which change between versions)
 -------------------------------------------------------------------------------
 
@@ -10,7 +10,7 @@ local UI = {}
 ns.UI = UI
 
 local FLAT = "Interface\\Buttons\\WHITE8X8"
-UI.ACCENT = { 0.31, 0.76, 0.97 }
+UI.ACCENT = ns.ACCENT -- brand color (Core.lua)
 local ACCENT = UI.ACCENT
 UI.W = 230          -- standard width of a control
 UI.GAP = 10         -- spacing between controls

@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Frames (secure headers, buttons, updates, test mode)
+-- Tile - Frames (secure headers, buttons, updates, test mode)
 -------------------------------------------------------------------------------
 
 local _, ns = ...
@@ -217,10 +217,6 @@ function ns.LayoutButton(b, isPet)
 
     PlaceText(b.name, T.name, b)
     b.name:SetWidth(math.max(10, w * T.name.width / 100))
-    if isPet then
-        b.name:ClearAllPoints()
-        b.name:SetPoint("CENTER")
-    end
     PlaceText(b.status, T.status, b)
     PlaceText(b.hpText, T.health, b)
 
@@ -582,17 +578,43 @@ function ns.UpdateThreat(b)
     b.aggro:SetShown(t and t >= 2 or false)
 end
 
+-- Friendly spell (by name, any rank) used to check a pet's range, per class
+local PET_RANGE_SPELL = {
+    HUNTER = "Mend Pet",
+    PRIEST = "Lesser Heal",
+    DRUID = "Healing Touch",
+    SHAMAN = "Healing Wave",
+    PALADIN = "Holy Light",
+    WARLOCK = "Health Funnel",
+}
+
 function ns.UpdateRange(b)
     local u = b.unit
     local alpha = ns.P.bars.rangeAlpha
     if R(UnitIsUnit("player", u)) == true then b:SetAlpha(1) return end
     -- too far to be seen at all (another zone, far away): faded
     if R(UnitIsVisible(u)) == false then b:SetAlpha(alpha) return end
+    -- pets: UnitInRange does not check them; a friendly spell of the player's
+    -- class does. nil = the game cannot tell (e.g. Mend Pet on another
+    -- hunter's pet): not faded.
+    if b.isPet then
+        local spell = PET_RANGE_SPELL[select(2, UnitClass("player"))]
+        local ok, petInRange = false, nil
+        if spell and C_Spell and C_Spell.IsSpellInRange then
+            ok, petInRange = pcall(C_Spell.IsSpellInRange, spell, u)
+        end
+        if not ok or petInRange == nil then b:SetAlpha(1) return end
+        if S(petInRange) then
+            if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, petInRange, 1, alpha) end
+            return
+        end
+        b:SetAlpha(petInRange and 1 or alpha)
+        return
+    end
     -- like the Blizzard raid frames: only fade when the game checked the range
-    -- and the unit is out of it. The game does not check pets' range.
+    -- and the unit is out of it
     local inRange, checked = UnitInRange(u)
     if S(checked) then
-        if b.isPet then b:SetAlpha(1) return end
         if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, 1, alpha) end
         return
     end
@@ -671,8 +693,8 @@ end
 
 local function InitButton(header, name)
     local b = _G[name]
-    if not b or b.mfInit then return end
-    b.mfInit = true
+    if not b or b.tileInit then return end
+    b.tileInit = true
     local isPet = header.isPet
     if not InCombatLockdown() then pcall(b.RegisterForClicks, b, "AnyUp") end
     ns.BuildVisuals(b)
@@ -699,8 +721,8 @@ end
 -------------------------------------------------------------------------------
 local INIT_SNIPPET = [[
     local header = self:GetParent()
-    self:SetWidth(header:GetAttribute("mf-width"))
-    self:SetHeight(header:GetAttribute("mf-height"))
+    self:SetWidth(header:GetAttribute("tile-width"))
+    self:SetHeight(header:GetAttribute("tile-height"))
     self:SetAttribute("*type1", "target")
     self:SetAttribute("*type2", "togglemenu")
     header:CallMethod("InitButton", self:GetName())
@@ -712,14 +734,35 @@ local function CreateAnchor(name, label, posKey)
     a:SetMovable(true)
     a:SetClampedToScreen(true)
 
+    -- drag handle: a small upright rectangle with grip dots (2 x 3), green on hover
     local handle = CreateFrame("Button", nil, a, "BackdropTemplate")
-    handle:SetSize(170, 18)
-    handle:SetPoint("BOTTOMLEFT", a, "TOPLEFT", 0, 2)
+    handle:SetSize(16, 30)
+    handle:SetPoint("TOPRIGHT", a, "TOPLEFT", -3, 0)
     handle:SetBackdrop({ bgFile = FLAT, edgeFile = FLAT, edgeSize = 1 })
-    handle:SetBackdropColor(0.05, 0.3, 0.45, 0.9)
-    handle:SetBackdropBorderColor(0.3, 0.8, 1, 1)
-    handle.text = handle:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    handle.text:SetPoint("CENTER")
+    handle:SetBackdropColor(0.08, 0.1, 0.15, 0.95)
+    handle:SetBackdropBorderColor(0.16, 0.2, 0.27, 1)
+    handle.dots = {}
+    for row = 0, 2 do
+        for col = 0, 1 do
+            local d = handle:CreateTexture(nil, "OVERLAY")
+            d:SetTexture("Interface\\AddOns\\Tile\\Media\\Dot")
+            d:SetSize(3, 3)
+            d:SetPoint("CENTER", handle, "CENTER", col == 0 and -2.5 or 2.5, (1 - row) * 6)
+            handle.dots[#handle.dots + 1] = d
+        end
+    end
+    local function Paint(hover)
+        if hover then
+            local c = ns.ACCENT
+            handle:SetBackdropBorderColor(c[1], c[2], c[3], 1)
+        else
+            handle:SetBackdropBorderColor(0.16, 0.2, 0.27, 1)
+        end
+        for _, d in ipairs(handle.dots) do
+            if hover then d:SetVertexColor(unpack(ns.ACCENT)) else d:SetVertexColor(0.6, 0.64, 0.71) end
+        end
+    end
+    Paint(false)
     handle.label = label
     handle:RegisterForDrag("LeftButton")
     handle:RegisterForClicks("LeftButtonUp")
@@ -733,19 +776,23 @@ local function CreateAnchor(name, label, posKey)
         local p, _, rp, x, y = a:GetPoint(1)
         ns.P.pos[posKey] = { p, "UIParent", rp, x, y }
     end)
-    -- click (without dragging): open the options, like /mf
+    -- click (without dragging): open the options, like /tile
     handle:SetScript("OnClick", function(self)
         if self.dragged then self.dragged = false return end
         if ns.OpenOptions then ns.OpenOptions() end
     end)
     handle:SetScript("OnMouseDown", function(self) self.dragged = false end)
     handle:SetScript("OnEnter", function(self)
+        Paint(true)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("MendFrames")
+        GameTooltip:AddLine(self.title or "Tile")
         GameTooltip:AddLine(L["Drag to move · Click to open the options"], 1, 1, 1)
         GameTooltip:Show()
     end)
-    handle:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    handle:SetScript("OnLeave", function()
+        Paint(false)
+        GameTooltip:Hide()
+    end)
     handle:Hide()
     a.handle = handle
     a.posKey = posKey
@@ -772,8 +819,8 @@ local function SetHeaderLayout(h, isPet)
     local LY = P.layout
     local w, hh = LY.width, LY.height
     if isPet then w, hh = ns.PetSize() end
-    h:SetAttribute("mf-width", w)
-    h:SetAttribute("mf-height", hh)
+    h:SetAttribute("tile-width", w)
+    h:SetAttribute("tile-height", hh)
 
     h:SetAttribute("showRaid", true)
     h:SetAttribute("showParty", LY.showParty)
@@ -811,7 +858,7 @@ local function SetHeaderLayout(h, isPet)
     local child = h:GetAttribute("child1")
     while child do
         child:SetSize(w, hh)
-        if child.mfInit then ns.LayoutButton(child, isPet) end
+        if child.tileInit then ns.LayoutButton(child, isPet) end
         i = i + 1
         child = h:GetAttribute("child" .. i)
     end
@@ -853,8 +900,8 @@ end
 
 local function UpdateHandles()
     local name = ns.activeName or "?"
-    ns.anchor.handle.text:SetText(("MendFrames · %s"):format(name))
-    ns.petAnchor.handle.text:SetText((L["Pets · %s"]):format(name))
+    ns.anchor.handle.title = ("Tile · %s"):format(name)
+    ns.petAnchor.handle.title = (L["Pets · %s"]):format(name)
     local unlocked = not ns.db.locked
     ns.anchor.handle:SetShown(unlocked)
     ns.petAnchor.handle:SetShown(unlocked and ns.P.pets.enabled and not ns.P.pets.attach)
@@ -898,7 +945,10 @@ local gev = CreateFrame("Frame")
 for _, e in ipairs({ "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "RAID_TARGET_UPDATE",
     "PLAYER_ROLES_ASSIGNED", "UNIT_PET", "PARTY_LEADER_CHANGED",
     "READY_CHECK", "READY_CHECK_CONFIRM", "READY_CHECK_FINISHED",
-    "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+    "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
+    -- on a fresh login the unit data is not ready yet when the frames are
+    -- created: refresh them once the loading screen ends
+    "PLAYER_ENTERING_WORLD" }) do
     pcall(gev.RegisterEvent, gev, e)
 end
 gev:SetScript("OnEvent", function(_, event)
@@ -923,8 +973,37 @@ gev:SetScript("OnEvent", function(_, event)
         UpdateStateIcons()
     else
         ns.UpdateAllButtons()
+        if event == "PLAYER_ENTERING_WORLD" then
+            -- fonts from other addons (SharedMedia...) may not be loaded yet
+            -- on a fresh login: text set with them stays blank until the font
+            -- is applied again
+            C_Timer.After(0.5, ns.RefreshFonts)
+            C_Timer.After(3, ns.RefreshFonts)
+        end
     end
 end)
+
+-- Applies the text fonts again (via a standard font, so the game really
+-- reloads them) and sets the texts again. Font strings are not protected:
+-- safe in combat.
+local TEXT_KEYS = { name = "name", status = "status", hpText = "health" }
+function ns.RefreshFonts()
+    if not ns.P then return end
+    local T = ns.P.texts
+    for _, b in ipairs(ns.buttons) do
+        for field, key in pairs(TEXT_KEYS) do
+            local fs, t = b[field], T[key]
+            if fs and t then
+                local text = fs:GetText()
+                fs:SetText("")
+                pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, t.size or 10, t.outline or "")
+                ns.SetFont(fs, t.font, t.size or 10, t.outline or "")
+                fs:SetText(text)
+            end
+        end
+    end
+    ns.UpdateAllButtons()
+end
 
 local rangeElapsed = 0
 gev:SetScript("OnUpdate", function(_, elapsed)
@@ -946,14 +1025,14 @@ end)
 -------------------------------------------------------------------------------
 function ns.CreateFrames()
     ns.CompileIndicators()
-    ns.anchor = CreateAnchor("MendFramesAnchor", "MendFrames", "main")
-    ns.petAnchor = CreateAnchor("MendFramesPetAnchor", L["Pets"], "pets")
+    ns.anchor = CreateAnchor("TileAnchor", "Tile", "main")
+    ns.petAnchor = CreateAnchor("TilePetAnchor", L["Pets"], "pets")
     ns.ApplyPositions()
     ns.anchor:SetScale(ns.P.layout.scale)
     ns.petAnchor:SetScale(ns.P.layout.scale)
 
-    ns.header = CreateHeader("MendFramesHeader", ns.anchor, "SecureGroupHeaderTemplate", false)
-    ns.petHeader = CreateHeader("MendFramesPetHeader", ns.petAnchor, "SecureGroupPetHeaderTemplate", true)
+    ns.header = CreateHeader("TileHeader", ns.anchor, "SecureGroupHeaderTemplate", false)
+    ns.petHeader = CreateHeader("TilePetHeader", ns.petAnchor, "SecureGroupPetHeaderTemplate", true)
     AnchorPets()
     ns.header:Show()
     if ns.P.pets.enabled then ns.petHeader:Show() end
@@ -1002,7 +1081,8 @@ local function FillTest(b)
     local P = ns.P
     local B, T = P.bars, P.texts
     local i = b.testIndex
-    local class = (not b.isPet) and TestClass(i) or nil
+    -- test pets: alternately a hunter's and a warlock's (their owner's color)
+    local class = b.isPet and (i % 2 == 1 and "HUNTER" or "WARLOCK") or TestClass(i)
     b.testClass = class
     ns.UpdateColors(b, class)
 

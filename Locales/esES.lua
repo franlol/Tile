@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Spanish translation (esES / esMX)
+-- Tile - Spanish translation (esES / esMX)
 -- Key: English text · value: Spanish text
 -------------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ ns.translations.esES = {
     ["others"] = "de otros",
     ["all"] = "todos",
     ["Missing: %s"] = "Falta: %s",
-    ["loaded. Type |cffffff00/mf|r to open the options."] = "cargado. Escribe |cffffff00/mf|r para abrir las opciones.",
+    ["loaded. Type |cffffff00/tile|r to open the options."] = "cargado. Escribe |cffffff00/tile|r para abrir las opciones.",
     ["frames locked when entering combat."] = "marcos bloqueados al entrar en combate.",
     ["profile: %s (%s)"] = "perfil: %s (%s)",
     ["positions reset."] = "posiciones restablecidas.",
@@ -105,7 +105,7 @@ ns.translations.esES = {
     ["Pets · %s"] = "Mascotas · %s",
     ["cannot unlock in combat."] = "no se puede desbloquear en combate.",
     ["Pets"] = "Mascotas",
-    ["MendFrames · Dark"] = "MendFrames · Oscura",
+    ["Tile · Dark"] = "Tile · Oscura",
     ["Flat"] = "Plano",
     ["Blizzard (raid)"] = "Blizzard (banda)",
     ["Blizzard (resource)"] = "Blizzard (recurso)",
@@ -397,4 +397,10 @@ ns.translations.esES = {
     ["The debuffs each boss puts on your group. In combat the game does not tell addons which debuff is which, so your frames show these like any other debuff: you recognise them by their icon."] = "Los debuffs que cada jefe pone a tu grupo. En combate el juego no les dice a los addons qué debuff es cada uno, así que tus marcos los muestran como cualquier otro: los reconoces por su icono.",
     ["the game flags it as crowd control (stun, fear, sleep, mind control...)."] = "el juego lo marca como control (aturdimiento, miedo, sueño, control mental...).",
     ["any other debuff."] = "cualquier otro debuff.",
+    ["Show the minimap button"] = "Mostrar el botón del minimapa",
+    ["Active profile"] = "Perfil activo",
+    ["Click"] = "Clic",
+    ["Open the options"] = "Abrir las opciones",
+    ["Drag"] = "Arrastrar",
+    ["Move this button"] = "Mover este botón",
 }

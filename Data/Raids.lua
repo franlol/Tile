@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Raids
+-- Tile - Raids
 -- Bosses and order: the client ones (ForeverDB.net data, build 1.60.1.70862).
 -- IDs checked in the Forever client (foreverdb.net/spell/<ID>).
 -- Spells given by name are looked up in the client.

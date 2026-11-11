@@ -1,0 +1,26 @@
+## Interface: 16001
+## Title: Tile
+## Notes: Raid frames for healers: indicators drawn with the game's native auras, profiles per group size.
+## Notes-esES: Marcos de banda para sanadores: indicadores dibujados con las auras nativas del juego, perfiles por tamaño de grupo.
+## Notes-esMX: Marcos de banda para sanadores: indicadores dibujados con las auras nativas del juego, perfiles por tamaño de grupo.
+## Author: franlol
+## Version: 0.2.0
+## IconTexture: Interface\AddOns\Tile\Media\Icon
+## SavedVariables: TileDB
+## OptionalDeps: LibSharedMedia-3.0, SharedMedia, Blizzard_AuraContainer
+
+Locales\Locale.lua
+Locales\esES.lua
+Core.lua
+Defaults.lua
+Catalog.lua
+Instances.lua
+Data\Raids.lua
+Data\Dungeons.lua
+Data\World.lua
+Media.lua
+Indicators.lua
+Frames.lua
+Options\Widgets.lua
+Options\Options.lua
+MinimapButton.lua

@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Dungeons and solo instances
+-- Tile - Dungeons and solo instances
 -- Bosses and order: the client ones (ForeverDB.net data, build 1.60.1.70862);
 -- the game does not provide them (empty journal and group finder in Forever).
 -- Debuffs by name (Classic abilities according to ForeverDB): their IDs are

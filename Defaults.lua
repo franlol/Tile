@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Defaults for profiles and indicators
+-- Tile - Defaults for profiles and indicators
 -------------------------------------------------------------------------------
 
 local _, ns = ...
@@ -24,6 +24,7 @@ ns.dbDefaults = {
     profiles = {},
     chars = {},
     spellIndex = {},     -- name -> IDs index (rebuilt when the client version changes)
+    minimap = { angle = 225, hide = false }, -- minimap button: position (degrees), hidden
 }
 
 -- Profile assigned to each group size (per character)

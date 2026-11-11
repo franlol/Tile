@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - World bosses (open world: matched by zone)
+-- Tile - World bosses (open world: matched by zone)
 -- Zone = the name the game gives (GetRealZoneText, enUS client), at their
 -- Classic spots. If Forever turns them into instances (Storm Cliffs,
 -- The Tainted Scar, Nightmare Grove), they go in Data\Raids.lua.

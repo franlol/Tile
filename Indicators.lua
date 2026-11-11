@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Indicators (Cell style)
+-- Tile - Indicators
 -- Each indicator watches some auras and draws them at a fixed spot of the
 -- frame: icon, several icons, color square, bar, text, border or tint.
 --
@@ -59,7 +59,7 @@ end
 -- because the game changes the vertex color when drawing the type)
 function ns.DispelTintAsset(shape)
     if shape == "solid" then return FLAT end
-    return "Interface\\AddOns\\MendFrames\\Media\\"
+    return "Interface\\AddOns\\Tile\\Media\\"
         .. (shape == "down" and "DispelGradientDown" or "DispelGradientUp")
 end
 

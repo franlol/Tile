@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Translations
+-- Tile - Translations
 --
 -- The keys are the English texts: L["Some text"] returns that text in the
 -- active language, or the key itself when there is no translation (English).

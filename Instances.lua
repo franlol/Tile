@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Instance guide
+-- Tile - Instance guide
 --
 -- Bosses and their debuffs per instance, shown in the Instances page as a
 -- reference. The game does not let addons tell these debuffs apart in combat

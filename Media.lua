@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- MendFrames - Fonts and textures
+-- Tile - Fonts and textures
 -- Blizzard's are always there; if another addon loads LibSharedMedia-3.0,
 -- all of its ones are added too.
 -------------------------------------------------------------------------------
@@ -15,10 +15,10 @@ local FONTS = {
 }
 
 -- Textures shipped with the addon (Media folder)
-local DARK = "Interface\\AddOns\\MendFrames\\Media\\Dark"
+local DARK = "Interface\\AddOns\\Tile\\Media\\Dark"
 
 local TEXTURES = {
-    { "MendFrames · Dark", DARK },
+    { "Tile · Dark", DARK },
     { "Flat", "Interface\\Buttons\\WHITE8X8" },
     { "Blizzard", "Interface\\TargetingFrame\\UI-StatusBar" },
     { "Blizzard (raid)", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
@@ -55,7 +55,7 @@ end
 -- Register our textures in LibSharedMedia so other addons can use them
 local function RegisterMedia()
     local lsm = LSM()
-    if lsm then lsm:Register("statusbar", "MendFrames Dark", DARK) end
+    if lsm then lsm:Register("statusbar", "Tile Dark", DARK) end
 end
 RegisterMedia()
 local regFrame = CreateFrame("Frame")
@@ -139,9 +139,12 @@ function ns.ColorText(fs, t, r, g, b)
     end
 end
 
--- Class color of a unit (if the game lets us read it)
+-- Pets get a fixed green, like Blizzard's raid frames (not their owner's class)
+local PET_COLOR = { r = 0, g = 0.8, b = 0.2 }
+
+-- Class color of a unit (if the game lets us read it); pets use PET_COLOR
 function ns.ClassColorOf(unit, previewClass, isPet)
-    if isPet then return 0.25, 0.75, 0.3 end
+    if isPet then return PET_COLOR.r, PET_COLOR.g, PET_COLOR.b end
     local c = previewClass
     if not c and unit then
         local _, class = UnitClass(unit)
