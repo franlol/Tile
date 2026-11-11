@@ -4,7 +4,8 @@
 ## Notes-esES: Marcos de banda para sanadores: indicadores dibujados con las auras nativas del juego, perfiles por tamaño de grupo.
 ## Notes-esMX: Marcos de banda para sanadores: indicadores dibujados con las auras nativas del juego, perfiles por tamaño de grupo.
 ## Author: franlol
-## Version: 0.2.0
+## X-License: MIT
+## Version: @project-version@
 ## IconTexture: Interface\AddOns\Tile\Media\Icon
 ## SavedVariables: TileDB
 ## OptionalDeps: LibSharedMedia-3.0, SharedMedia, Blizzard_AuraContainer

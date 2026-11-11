@@ -8,9 +8,9 @@
 
 local ADDON, ns = ...
 local L = ns.L
-_G.Tile = ns
-
-ns.version = "0.2.0"
+-- From the TOC; "dev" when running from the repository (not packaged)
+ns.version = C_AddOns.GetAddOnMetadata("Tile", "Version") or ""
+if ns.version:find("^@") then ns.version = "dev" end
 
 -------------------------------------------------------------------------------
 -- Brand color: the green of the icon. Change it here and the whole addon

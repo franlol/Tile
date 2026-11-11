@@ -15,7 +15,6 @@ local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 -- Global database (shared by every character)
 -------------------------------------------------------------------------------
 ns.dbDefaults = {
-    version = 2,
     locked = true,
     testing = false,
     testSize = "raid20",

@@ -1,9 +1,9 @@
-# Sistema
+# System
 Thumbs.db
 desktop.ini
 .DS_Store
 
-# Editores
+# Editors
 .vscode/
 .idea/
 *.swp
