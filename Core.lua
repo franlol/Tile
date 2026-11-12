@@ -207,6 +207,26 @@ function ns.KeyRank(cfg, key)
     if type(r) == "table" and next(r) then return r end
 end
 
+-- A spell of an indicator can be turned off without removing it
+-- (ranks[key] = false): it does not count at all
+function ns.SpellOff(cfg, key)
+    return cfg.ranks ~= nil and cfg.ranks[key] == false
+end
+
+-- The spell keys of an indicator that are on
+function ns.ActiveSpells(cfg)
+    local out = {}
+    for _, key in ipairs(cfg.spells or {}) do
+        if not ns.SpellOff(cfg, key) then out[#out + 1] = key end
+    end
+    return out
+end
+
+-- It has spells, but every one is off: it watches nothing
+function ns.AllSpellsOff(cfg)
+    return cfg.spells ~= nil and #cfg.spells > 0 and #ns.ActiveSpells(cfg) == 0
+end
+
 -- When the index finds new IDs: the indicators are rebuilt with them
 function ns.OnSpellIndexUpdated()
     if ns.ClearIconCache then ns.ClearIconCache() end

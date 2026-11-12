@@ -103,11 +103,14 @@ ns.compiled = {}
 function ns.CompileIndicators()
     wipe(ns.compiled)
     for i, cfg in ipairs(ns.P.indicators) do
-        if cfg.enabled then
+        -- a spell list with every spell turned off watches nothing
+        local watchesNothing = cfg.kind == "aura" and cfg.watch == "spells" and not UnitMeasure(cfg)
+            and ns.AllSpellsOff(cfg)
+        if cfg.enabled and not watchesNothing then
             local c = { index = i, cfg = cfg, kind = cfg.kind }
             if Missing(cfg) then
                 c.byID = {}
-                for _, key in ipairs(cfg.spells) do
+                for _, key in ipairs(ns.ActiveSpells(cfg)) do
                     ns.AddSpellKey(c.byID, nil, key, true, ns.KeyRank(cfg, key))
                 end
             end
@@ -141,9 +144,10 @@ local function Query(cfg)
     -- buffs: by spell (every ID of each one) or all of them when there is no list
     local filter = "HELPFUL" .. ((cfg.mine and not cfg.others) and "|PLAYER" or "")
     local cand = {}
-    if #cfg.spells > 0 then
+    local spells = ns.ActiveSpells(cfg)
+    if #spells > 0 then
         local ids = {}
-        for _, key in ipairs(cfg.spells) do
+        for _, key in ipairs(spells) do
             for _, id in ipairs(ns.KeyIDs(key, ns.KeyRank(cfg, key))) do ids[id] = true end
         end
         cand.includeSpellIDs = ids
@@ -994,7 +998,7 @@ local function ShowMissing(w, cfg)
         w:Show()
         return
     end
-    local key = cfg.spells[1]
+    local key = ns.ActiveSpells(cfg)[1] or cfg.spells[1]
     if wt == "text" then
         local show = cfg.textShow or "time"
         if show == "custom" and (cfg.customText or "") ~= "" then
@@ -1148,11 +1152,12 @@ function ns.TestAuras(b, i, all)
                 if i % 4 == 1 or (focus and i % 3 == 1) then ShowMissing(w, cfg) end
             elseif cfg.kind == "aura" then
                 if (i + c.index) % 3 ~= 0 or (focus and i % 2 == 1) then
-                    local first = cfg.spells[1]
+                    local spells = ns.ActiveSpells(cfg)
+                    local first = spells[1] or cfg.spells[1]
                     if w.wtype == "icons" then
                         local list = {}
-                        for n = 1, math.min(cfg.max, math.max(1, #cfg.spells)) do
-                            list[n] = Fake(cfg.spells[n] or first, n)
+                        for n = 1, math.min(cfg.max, math.max(1, #spells)) do
+                            list[n] = Fake(spells[n] or first, n)
                         end
                         PaintIcons(w, cfg, list)
                     elseif w.wtype == "border" or w.wtype == "overlay" then

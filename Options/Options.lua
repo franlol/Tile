@@ -752,11 +752,12 @@ local function BuildIndicators(container)
     end, { saveOnBlur = true })
 
     ---------------------------------------------------------------------------
-    -- Spells the indicator watches: one list. Each spell is a row (icon,
+    -- Spells the indicator watches: one list. Each spell is a row (box, icon,
     -- how many of its IDs count, x to remove) that opens to show its IDs
-    -- (ranks), each with a check box. All ticked (the default): every ID
-    -- counts, also ranks the game adds later. Untick the ones that should
-    -- not count; the last ticked one stays.
+    -- (ranks), each with a box. Same as every grouped list with boxes: the
+    -- spell box is all / some (dash) / none of its IDs.
+    --   all ticked (the default): every ID counts, also ranks added later
+    --   none: the spell is off (kept in the list, it does not count)
     ---------------------------------------------------------------------------
     local SpellHead, IDRow = Wrapper(), Wrapper()
     local GetSubtext = (C_Spell and C_Spell.GetSpellSubtext) or GetSpellSubtext
@@ -781,15 +782,22 @@ local function BuildIndicators(container)
         end
         return out
     end
-    -- IDs of a spell that count ({ [id] = true }), and how many there are
+    -- IDs of a spell that count ({ [id] = true }), how many, and of how many
     local function Counting(s, key)
         local all = ns.KeyIDs(key)
-        local pick = ns.KeyRank(s, key)
         local set, n = {}, 0
-        for _, id in ipairs(all) do
-            if not pick or pick[id] then set[id] = true n = n + 1 end
+        if not ns.SpellOff(s, key) then
+            local pick = ns.KeyRank(s, key)
+            for _, id in ipairs(all) do
+                if not pick or pick[id] then set[id] = true n = n + 1 end
+            end
         end
         return set, n, #all
+    end
+    -- what the spell box shows: true (all), "partial" (some), false (off)
+    local function SpellState(s, key)
+        if ns.SpellOff(s, key) then return false end
+        return ns.KeyRank(s, key) and "partial" or true
     end
 
     local spellList = UI.List(c, {
@@ -811,25 +819,38 @@ local function BuildIndicators(container)
         end,
         secondary = function(w)
             if not w.header then return tostring(w.value) end
-            local _, n, total = Counting(Sel(), w.value)
+            local s = Sel()
+            if ns.SpellOff(s, w.value) then return L["off"] end
+            local _, n, total = Counting(s, w.value)
             if total == 0 then return L["looking up IDs..."] end
             if n < total then return (L["%d of %d IDs"]):format(n, total) end
             return total == 1 and "" or L["all IDs"]
         end,
-        -- spells have no box (they open); their IDs do
+        -- dimmed: a spell that is off, and the IDs that do not count
+        off = function(w)
+            local s = Sel()
+            if w.header then return ns.SpellOff(s, w.value) end
+            return not Counting(s, w.key)[w.value]
+        end,
         checked = function(w)
-            if w.header then return nil end
-            local pick = ns.KeyRank(Sel(), w.key)
-            return not pick or pick[w.value] and true or false
+            local s = Sel()
+            if w.header then return SpellState(s, w.value) end
+            return Counting(s, w.key)[w.value] and true or false
         end,
         onCheck = function(w, v)
             local s = Sel()
-            local set, n, total = Counting(s, w.key)
-            if not v and set[w.value] and n == 1 then return end   -- the last one stays
-            set[w.value] = v or nil
-            n = n + (v and 1 or -1)
-            -- every ID ticked: back to "all" (new ranks count too)
-            s.ranks[w.key] = n < total and set or nil
+            if w.header then
+                -- the spell box: all IDs (also later ranks) or off
+                s.ranks[w.value] = (not v) and false or nil
+            else
+                local set, n, total = Counting(s, w.key)
+                if (set[w.value] ~= nil) ~= v then n = n + (v and 1 or -1) end
+                set[w.value] = v or nil
+                -- none: off; every one: back to "all" (later ranks count too)
+                if n == 0 then s.ranks[w.key] = false
+                elseif n >= total then s.ranks[w.key] = nil
+                else s.ranks[w.key] = set end
+            end
             IndChanged()
         end,
         onToggle = function(h) h.closed = not h.closed end,
@@ -1049,7 +1070,7 @@ local function BuildIndicators(container)
         UI.Note(c, L["Buffs (by ID or name; any rank works). No spells = all buffs. The game decides the order."]),
         addRow,
         spellList,
-        UI.Note(c, L["Open a spell to choose which of its IDs (ranks) count. All ticked: every ID, also ranks added later."]),
+        UI.Note(c, L["Untick a spell to turn it off without removing it. Open it to choose which of its IDs (ranks) count; all ticked: every ID, also ranks added later."]),
 
         HeaderIf(L["What it watches"], function() return K() == "raiddebuff" end),
         UI.Note(c, L["Shows the most important boss debuff on the player. The game decides which ones are boss debuffs."]),
