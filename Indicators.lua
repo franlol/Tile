@@ -210,8 +210,13 @@ local function SweepColor(cfg)
     return c.r, c.g, c.b, c.a or 1
 end
 
+-- The cooldown goes inside a frame that clips it to the icon: on icons that
+-- are not square, the game draws the clock edge (spark) past the icon's sides
 local function NewCooldown(f)
-    local cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+    local clip = CreateFrame("Frame", nil, f)
+    clip:SetAllPoints()
+    clip:SetClipsChildren(true)
+    local cd = CreateFrame("Cooldown", nil, clip, "CooldownFrameTemplate")
     cd:SetAllPoints()
     cd:SetHideCountdownNumbers(true)
     return cd
