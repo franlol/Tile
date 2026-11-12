@@ -816,22 +816,47 @@ local function CreateAnchor(name, label, posKey)
     handle.label = label
     handle:RegisterForDrag("LeftButton")
     handle:RegisterForClicks("LeftButtonUp")
-    handle:SetScript("OnDragStart", function(self)
-        if InCombatLockdown() then return end
-        self.dragged = true
-        a:StartMoving()
-    end)
-    handle:SetScript("OnDragStop", function()
-        a:StopMovingOrSizing()
+    -- Manual drag measured from the mouse-down spot: StartMoving only begins
+    -- after the drag threshold and keeps that gap between cursor and frame.
+    local function Cursor()
+        local x, y = GetCursorPosition()
+        local s = a:GetEffectiveScale()
+        return x / s, y / s
+    end
+    local EndDrag
+    local function Follow(self)
+        if InCombatLockdown() then EndDrag(self) return end
+        local d = self.drag
+        local cx, cy = Cursor()
+        a:ClearAllPoints()
+        a:SetPoint(d.p, UIParent, d.rp, d.x + cx - d.cx, d.y + cy - d.cy)
+    end
+    function EndDrag(self)
+        self:SetScript("OnUpdate", nil)
+        if not self.drag then return end
+        self.drag = nil
         local p, _, rp, x, y = a:GetPoint(1)
         ns.P.pos[posKey] = { p, "UIParent", rp, x, y }
+    end
+    handle:SetScript("OnDragStart", function(self)
+        if InCombatLockdown() or not self.down then return end
+        self.dragged = true
+        local p, _, rp, x, y = a:GetPoint(1)
+        self.drag = { p = p, rp = rp, x = x, y = y, cx = self.down[1], cy = self.down[2] }
+        self:SetScript("OnUpdate", Follow)
+        Follow(self)
     end)
+    handle:SetScript("OnDragStop", EndDrag)
+    handle:SetScript("OnHide", EndDrag)
     -- click (without dragging): open the options, like /tile
     handle:SetScript("OnClick", function(self)
         if self.dragged then self.dragged = false return end
         if ns.OpenOptions then ns.OpenOptions() end
     end)
-    handle:SetScript("OnMouseDown", function(self) self.dragged = false end)
+    handle:SetScript("OnMouseDown", function(self)
+        self.dragged = false
+        self.down = { Cursor() }
+    end)
     handle:SetScript("OnEnter", function(self)
         Paint(true)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
