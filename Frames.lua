@@ -58,6 +58,31 @@ local function NewBar(parent)
     return bar
 end
 
+-- Status icon: a texture inside its own frame (the box), with an optional
+-- background and border. The rest of the code shows and hides the texture;
+-- the box follows it so the background and border never stay alone.
+local function SyncHolder(tex)
+    tex.holder:SetShown(tex:IsShown())
+end
+
+local function NewElement(parent)
+    local h = CreateFrame("Frame", nil, parent)
+    h.bg = h:CreateTexture(nil, "BACKGROUND")
+    h.bg:SetAllPoints()
+    h.bg:Hide()
+    h.edges = {}
+    for i = 1, 4 do
+        h.edges[i] = h:CreateTexture(nil, "BORDER")
+        h.edges[i]:Hide()
+    end
+    local tex = h:CreateTexture(nil, "OVERLAY")
+    tex.holder = h
+    hooksecurefunc(tex, "Show", SyncHolder)
+    hooksecurefunc(tex, "Hide", SyncHolder)
+    hooksecurefunc(tex, "SetShown", SyncHolder)
+    return tex
+end
+
 function ns.BuildVisuals(b)
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints()
@@ -91,11 +116,11 @@ function ns.BuildVisuals(b)
     b.status = overlay:CreateFontString(nil, "OVERLAY")
     b.hpText = overlay:CreateFontString(nil, "OVERLAY")
 
-    b.role = overlay:CreateTexture(nil, "OVERLAY")
-    b.leader = overlay:CreateTexture(nil, "OVERLAY")
-    b.raidIcon = overlay:CreateTexture(nil, "OVERLAY")
+    b.role = NewElement(overlay)
+    b.leader = NewElement(overlay)
+    b.raidIcon = NewElement(overlay)
     b.raidIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-    b.ready = overlay:CreateTexture(nil, "OVERLAY", nil, 7)
+    b.ready = NewElement(overlay)
     b.ready:Hide()
     -- layer for the status icons that go above the indicators
     b.topLayer = CreateFrame("Frame", nil, b)
@@ -122,11 +147,36 @@ local function PlaceText(fs, t, b)
     fs:SetShown(t.show)
 end
 
+-- Places a status icon: layer (priority), position, size, background and border.
+-- The box grows by "pad" around the icon; the border goes outside the box.
 local function PlaceElement(tex, e, b)
-    tex:SetParent(e.onTop and b.topLayer or b.overlay)
+    local h = tex.holder
+    local layer = e.onTop and b.topLayer or b.overlay
+    h:SetParent(layer)
+    h:SetFrameLevel(layer:GetFrameLevel())
+    local pad = (e.bg or e.border) and (e.pad or 0) or 0
+    local s = e.size + pad * 2
+    h:ClearAllPoints()
+    h:SetPoint(e.point, b, e.point, e.x, e.y)
+    h:SetSize(s, s)
     tex:ClearAllPoints()
-    tex:SetPoint(e.point, b, e.point, e.x, e.y)
-    tex:SetSize(e.size, e.size)
+    tex:SetPoint("TOPLEFT", pad, -pad)
+    tex:SetPoint("BOTTOMRIGHT", -pad, pad)
+
+    local c = e.bgColor
+    h.bg:SetColorTexture(c.r, c.g, c.b, c.a or 1)
+    h.bg:SetShown(e.bg and true or false)
+
+    local t, bc = math.max(1, e.borderSize or 1), e.borderColor
+    local E = h.edges
+    E[1]:SetPoint("TOPLEFT", -t, t)          E[1]:SetPoint("TOPRIGHT", t, t)          E[1]:SetHeight(t)
+    E[2]:SetPoint("BOTTOMLEFT", -t, -t)      E[2]:SetPoint("BOTTOMRIGHT", t, -t)      E[2]:SetHeight(t)
+    E[3]:SetPoint("TOPLEFT", -t, 0)          E[3]:SetPoint("BOTTOMLEFT", -t, 0)       E[3]:SetWidth(t)
+    E[4]:SetPoint("TOPRIGHT", t, 0)          E[4]:SetPoint("BOTTOMRIGHT", t, 0)       E[4]:SetWidth(t)
+    for i = 1, 4 do
+        E[i]:SetColorTexture(bc.r, bc.g, bc.b, bc.a or 1)
+        E[i]:SetShown(e.border and true or false)
+    end
 end
 
 -- Fits the health bar depending on whether there is a mana bar

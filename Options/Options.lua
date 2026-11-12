@@ -576,11 +576,24 @@ local function ElementSection(c, key, title)
             { "ooc", L["Out of combat"] },
         }, PB("elements." .. key .. ".when"))), nil, on)
     end
+    local P = "elements." .. key .. "."
+    local function bgOn() return on() and root().bg end
+    local function borderOn() return on() and root().border end
+    local function boxOn() return on() and (root().bg or root().border) end
     return {
         list,
-        Cond(UI.Check(c, L["Above the indicators"], PB("elements." .. key .. ".onTop")), nil, on),
-        Cond(Slider(c, L["Size"], 6, 40, 1, UI.px, PB("elements." .. key .. ".size")), nil, on),
+        Cond(UI.Attach(UI.Segmented(c, L["Priority"], {
+            { false, L["Below the indicators"] },
+            { true, L["Above the indicators"] },
+        }, PB(P .. "onTop"))), nil, on),
+        Cond(Slider(c, L["Size"], 6, 40, 1, UI.px, PB(P .. "size")), nil, on),
         PositionBlock(c, root, ns.ProfileChanged, { enableIf = on }),
+        Cond(UI.Check(c, L["Background"], PB(P .. "bg")), nil, on),
+        Cond(UI.Attach(Swatch(c, L["Color"], function() return root().bgColor end, nil, true)), nil, bgOn),
+        Cond(UI.Check(c, L["Border"], PB(P .. "border")), nil, on),
+        Cond(UI.Attach(Swatch(c, L["Border color"], function() return root().borderColor end, nil, true)), nil, borderOn),
+        Cond(UI.Attach(Slider(c, L["Thickness"], 1, 6, 1, UI.px, PB(P .. "borderSize"))), nil, borderOn),
+        Cond(Slider(c, L["Padding"], 0, 8, 1, UI.px, PB(P .. "pad")), nil, boxOn),
     }
 end
 

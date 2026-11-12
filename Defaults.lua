@@ -11,6 +11,14 @@ ns.FLAT, ns.FONT = FLAT, FONT
 
 local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 
+-- Status icon: its own settings plus the shared background and border ones
+local function Element(t)
+    t.bg, t.bgColor = false, C(0, 0, 0, 0.6)
+    t.border, t.borderColor, t.borderSize = false, C(0, 0, 0, 1), 1
+    t.pad = 1
+    return t
+end
+
 -------------------------------------------------------------------------------
 -- Global database (shared by every character)
 -------------------------------------------------------------------------------
@@ -125,11 +133,12 @@ ns.profileDefaults = {
     },
     elements = {
         -- when: always | ready (only during ready checks) | ooc (out of combat)
-        -- onTop: above the indicators
-        role     = { show = true, when = "always", onTop = false, point = "TOPLEFT", x = 2, y = -2, size = 10 },
-        leader   = { show = true, when = "always", onTop = false, point = "TOPLEFT", x = 12, y = -1, size = 9 },
-        raidIcon = { show = true, when = "always", onTop = false, point = "TOP", x = 0, y = 5, size = 12 },
-        ready    = { show = true, when = "ready", onTop = true, point = "CENTER", x = 0, y = 0, size = 18 },
+        -- onTop: priority, true = drawn above the indicators
+        -- bg / border: optional box behind the icon (pad = space around the icon)
+        role     = Element({ show = true, when = "always", onTop = false, point = "TOPLEFT", x = 2, y = -2, size = 10 }),
+        leader   = Element({ show = true, when = "always", onTop = false, point = "TOPLEFT", x = 12, y = -1, size = 9 }),
+        raidIcon = Element({ show = true, when = "always", onTop = false, point = "TOP", x = 0, y = 5, size = 12 }),
+        ready    = Element({ show = true, when = "ready", onTop = true, point = "CENTER", x = 0, y = 0, size = 18 }),
     },
     -- colors per debuff type (indicator borders and tint)
     dispelColors = {
