@@ -600,21 +600,6 @@ local function BuildElements(container)
 end
 
 -------------------------------------------------------------------------------
--- Two pages side by side: a narrow one on the left (a list to pick from)
--- and the rest on the right (what was picked)
--------------------------------------------------------------------------------
-local function Split(container, leftWidth)
-    local left = CreateFrame("Frame", nil, container)
-    left:SetPoint("TOPLEFT")
-    left:SetPoint("BOTTOMLEFT")
-    left:SetWidth(leftWidth)
-    local right = CreateFrame("Frame", nil, container)
-    right:SetPoint("TOPLEFT", left, "TOPRIGHT", 6, 0)
-    right:SetPoint("BOTTOMRIGHT")
-    return UI.Page(left, 1), UI.Page(right, 1)
-end
-
--------------------------------------------------------------------------------
 -- Indicators
 -------------------------------------------------------------------------------
 local selInd = 1
@@ -641,7 +626,7 @@ local IndChanged = ns.ProfileChanged
 local function IB(path) return UI.Bind(Sel, path, IndChanged) end
 
 local function BuildIndicators(container)
-    local leftPage, rightPage = Split(container, 250)
+    local leftPage, rightPage = UI.Split(container, 250)
 
     ---------------------------------------------------------------------------
     -- Left: the indicators. Check box = on/off, click = edit, drag = order.
@@ -1183,7 +1168,7 @@ local catGroup = "hots"
 local catSel, catOrigin, catMode = {}, {}, {}
 
 local function BuildCatalog(container)
-    local leftPage, rightPage = Split(container, 210)
+    local leftPage, rightPage = UI.Split(container, 210)
     local c = rightPage.content
     local myClass = select(2, UnitClass("player"))
 
@@ -1352,7 +1337,7 @@ end
 -- the game's crowd control flag.
 -------------------------------------------------------------------------------
 local function BuildInstances(container)
-    local leftPage, rightPage = Split(container, 210)
+    local leftPage, rightPage = UI.Split(container, 210)
     local selKey, picked
     local query = ""
     local Instance, Debuff = Wrapper(), Wrapper()
