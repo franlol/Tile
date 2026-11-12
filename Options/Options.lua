@@ -904,62 +904,74 @@ local function BuildIndicators(container)
     handle.hl = handle:CreateTexture(nil, "HIGHLIGHT")
     handle.hl:SetAllPoints()
     handle.hl:SetColorTexture(1, 1, 1, 0.25)
-    handle:SetMovable(true)
     handle:RegisterForDrag("LeftButton")
 
-    local function PX(f, pt)
-        if pt:find("LEFT") then return f:GetLeft() end
-        if pt:find("RIGHT") then return f:GetRight() end
-        return (f:GetLeft() + f:GetRight()) / 2
-    end
-    local function PY(f, pt)
-        if pt:find("TOP") then return f:GetTop() end
-        if pt:find("BOTTOM") then return f:GetBottom() end
-        return (f:GetTop() + f:GetBottom()) / 2
-    end
     local function Round(v) return math.floor(v + 0.5) end
     local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
-    -- manual drag: StartMoving does not track the cursor well inside the
-    -- scaled preview, so follow the cursor in pb's own coordinate space
+    -- Manual drag. The indicator itself (handle.w) follows the cursor, and
+    -- the drop is worked out only from numbers taken at the start (its box
+    -- inside pb) plus how far the cursor moved, all in pb's own scale, so it
+    -- does not depend on frame geometry that may be re-laid out mid-drag.
+    local drag
     local function CursorInPB()
         local x, y = GetCursorPosition()
         local sc = pb:GetEffectiveScale()
         return x / sc, y / sc
     end
-    local function FollowCursor(self)
+    local function DragBox()
         local x, y = CursorInPB()
-        self:ClearAllPoints()
-        self:SetPoint("BOTTOMLEFT", pb, "BOTTOMLEFT",
-            self.dragX + x - self.dragCX, self.dragY + y - self.dragCY)
+        return drag.left + x - drag.cx, drag.bottom + y - drag.cy
+    end
+    local function FollowCursor()
+        if not drag then return end
+        local l, b = DragBox()
+        drag.w:ClearAllPoints()
+        drag.w:SetPoint("BOTTOMLEFT", pb, "BOTTOMLEFT", l, b)
     end
     handle:SetScript("OnDragStart", function(self)
-        local w, h = self:GetSize()
-        self.dragX = self:GetLeft() - pb:GetLeft()
-        self.dragY = self:GetBottom() - pb:GetBottom()
-        self.dragCX, self.dragCY = CursorInPB()
-        self:ClearAllPoints()
-        self:SetSize(w, h)
-        FollowCursor(self)
+        local w = self.w
+        if not w or not w:GetLeft() or not pb:GetLeft() then return end
+        local cx, cy = CursorInPB()
+        drag = {
+            w = w, cx = cx, cy = cy,
+            left = w:GetLeft() - pb:GetLeft(),
+            bottom = w:GetBottom() - pb:GetBottom(),
+            width = w:GetWidth(), height = w:GetHeight(),
+        }
         self:SetScript("OnUpdate", FollowCursor)
+        FollowCursor()
     end)
-    handle:SetScript("OnHide", function(self) self:SetScript("OnUpdate", nil) end)
+    handle:SetScript("OnHide", function(self)
+        self:SetScript("OnUpdate", nil)
+        drag = nil
+    end)
     handle:SetScript("OnDragStop", function(self)
         self:SetScript("OnUpdate", nil)
+        if not drag then return end
+        local l, b = DragBox()
+        local W, H = drag.width, drag.height
+        drag = nil
         local s = Sel()
         if not s then posSample.Refresh() return end
+        local PW, PH = pb:GetWidth(), pb:GetHeight()
         -- third of the frame where the center lands -> anchor point
-        local cx = (self:GetLeft() + self:GetRight()) / 2
-        local cy = (self:GetTop() + self:GetBottom()) / 2
-        local fx = (cx - pb:GetLeft()) / pb:GetWidth()
-        local fy = (cy - pb:GetBottom()) / pb:GetHeight()
+        local fx = (l + W / 2) / PW
+        local fy = (b + H / 2) / PH
         local v = fy > 2 / 3 and "TOP" or (fy < 1 / 3 and "BOTTOM" or "")
         local h = fx < 1 / 3 and "LEFT" or (fx > 2 / 3 and "RIGHT" or "")
         local pt = v .. h
         if pt == "" then pt = "CENTER" end
+        local x, y
+        if h == "LEFT" then x = l
+        elseif h == "RIGHT" then x = l + W - PW
+        else x = l + W / 2 - PW / 2 end
+        if v == "BOTTOM" then y = b
+        elseif v == "TOP" then y = b + H - PH
+        else y = b + H / 2 - PH / 2 end
         s.point = pt
-        s.x = Clamp(Round(PX(self, pt) - PX(pb, pt)), -80, 80)
-        s.y = Clamp(Round(PY(self, pt) - PY(pb, pt)), -60, 60)
+        s.x = Clamp(Round(x), -80, 80)
+        s.y = Clamp(Round(y), -60, 60)
         Repaint()
     end)
 
@@ -981,6 +993,7 @@ local function BuildIndicators(container)
         local whole = s and (s.type == "border" or s.type == "overlay")
         local w = s and not whole and not strip and pb.ind and pb.ind[selInd]
         handle:ClearAllPoints()
+        handle.w = w or nil
         if w then
             handle:SetAllPoints(w)
             handle:Show()
