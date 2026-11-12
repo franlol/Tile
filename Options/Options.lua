@@ -920,11 +920,34 @@ local function BuildIndicators(container)
     local function Round(v) return math.floor(v + 0.5) end
     local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
-    handle:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    -- manual drag: StartMoving does not track the cursor well inside the
+    -- scaled preview, so follow the cursor in pb's own coordinate space
+    local function CursorInPB()
+        local x, y = GetCursorPosition()
+        local sc = pb:GetEffectiveScale()
+        return x / sc, y / sc
+    end
+    local function FollowCursor(self)
+        local x, y = CursorInPB()
+        self:ClearAllPoints()
+        self:SetPoint("BOTTOMLEFT", pb, "BOTTOMLEFT",
+            self.dragX + x - self.dragCX, self.dragY + y - self.dragCY)
+    end
+    handle:SetScript("OnDragStart", function(self)
+        local w, h = self:GetSize()
+        self.dragX = self:GetLeft() - pb:GetLeft()
+        self.dragY = self:GetBottom() - pb:GetBottom()
+        self.dragCX, self.dragCY = CursorInPB()
+        self:ClearAllPoints()
+        self:SetSize(w, h)
+        FollowCursor(self)
+        self:SetScript("OnUpdate", FollowCursor)
+    end)
+    handle:SetScript("OnHide", function(self) self:SetScript("OnUpdate", nil) end)
     handle:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
+        self:SetScript("OnUpdate", nil)
         local s = Sel()
-        if not s then return end
+        if not s then posSample.Refresh() return end
         -- third of the frame where the center lands -> anchor point
         local cx = (self:GetLeft() + self:GetRight()) / 2
         local cy = (self:GetTop() + self:GetBottom()) / 2
