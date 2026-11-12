@@ -815,44 +815,30 @@ local function CreateAnchor(name, label, posKey)
     Paint(false)
     handle.label = label
     handle:RegisterForClicks("LeftButtonUp")
-    -- Manual drag that starts on mouse down (no drag threshold), so the
-    -- frames stick to the cursor from the very first pixel.
-    local function Cursor()
-        local x, y = GetCursorPosition()
-        local s = a:GetEffectiveScale()
-        return x / s, y / s
-    end
-    local EndDrag
-    local function Follow(self)
-        if InCombatLockdown() then EndDrag(self) return end
-        local d = self.drag
-        local dx, dy = Cursor()
-        dx, dy = dx - d.cx, dy - d.cy
-        -- a tiny wobble while clicking still counts as a click
-        if math.abs(dx) + math.abs(dy) > 3 then self.dragged = true end
-        a:ClearAllPoints()
-        a:SetPoint(d.p, UIParent, d.rp, d.x + dx, d.y + dy)
-    end
-    function EndDrag(self)
-        self:SetScript("OnUpdate", nil)
-        if not self.drag then return end
-        self.drag = nil
+    -- Move on mouse down (not OnDragStart): the drag threshold would leave a
+    -- gap between the cursor and the frames. If the frames did not move, it
+    -- was a click.
+    local function StopMoving(self)
+        if not self.moving then return end
+        self.moving = false
+        a:StopMovingOrSizing()
+        local left, top = a:GetLeft(), a:GetTop()
+        self.dragged = left ~= self.startLeft or top ~= self.startTop
         local p, _, rp, x, y = a:GetPoint(1)
         ns.P.pos[posKey] = { p, "UIParent", rp, x, y }
     end
     handle:SetScript("OnMouseDown", function(self, button)
         self.dragged = false
         if button ~= "LeftButton" or InCombatLockdown() then return end
-        local p, _, rp, x, y = a:GetPoint(1)
-        local cx, cy = Cursor()
-        self.drag = { p = p, rp = rp, x = x, y = y, cx = cx, cy = cy }
-        self:SetScript("OnUpdate", Follow)
+        self.startLeft, self.startTop = a:GetLeft(), a:GetTop()
+        self.moving = true
+        a:StartMoving()
     end)
-    handle:SetScript("OnMouseUp", EndDrag)
-    handle:SetScript("OnHide", EndDrag)
+    handle:SetScript("OnMouseUp", StopMoving)
+    handle:SetScript("OnHide", StopMoving)
     -- click (without dragging): open the options, like /tile
     handle:SetScript("OnClick", function(self)
-        if self.dragged then self.dragged = false return end
+        if self.dragged then return end
         if ns.OpenOptions then ns.OpenOptions() end
     end)
     handle:SetScript("OnEnter", function(self)
