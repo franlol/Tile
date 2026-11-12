@@ -9,6 +9,7 @@
 --
 -- Each group holds a single aura type (buff or debuff). The "from whom"
 -- (mine / others / anyone) is chosen when adding it.
+-- icon: spell whose icon stands for the group in the options.
 -- family: equivalent spells (e.g. Fortitude and Prayer of Fortitude); in
 -- "missing" mode one indicator is created per family.
 -------------------------------------------------------------------------------
@@ -28,6 +29,7 @@ ns.CLASS_NAMES.GENERAL = "General"
 ns.Catalog = {
     {
         key = "hots",
+        icon = 139,
         name = "HoTs and shields",
         desc = "Heals over time and shields on allies.",
         auraType = "HELPFUL",
@@ -52,6 +54,7 @@ ns.Catalog = {
     },
     {
         key = "defensives",
+        icon = 871,
         name = "Defensives",
         desc = "Damage reductions and immunities. Useful to know when a tank or a player is protected.",
         auraType = "HELPFUL",
@@ -80,6 +83,7 @@ ns.Catalog = {
     },
     {
         key = "raidbuffs",
+        icon = 1126,
         name = "Raid buffs",
         desc = "Long raid buffs. Usually added in \"Missing\" mode and out of combat only: one warning is created per buff.",
         auraType = "HELPFUL",
@@ -112,6 +116,7 @@ ns.Catalog = {
     },
     {
         key = "externals",
+        icon = 10060,
         name = "Boosts and utility",
         desc = "Useful buffs cast on other players.",
         auraType = "HELPFUL",

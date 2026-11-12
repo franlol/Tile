@@ -1183,18 +1183,75 @@ local function BuildCatalog(container)
         return catSel[g.key]
     end
 
-    -- Left: the groups
-    local groupList = UI.List(leftPage.content, {
-        items = function() return ns.Catalog end,
-        label = function(g) return L[g.name] end,
-        tag = function(g) return g.auraType == "HARMFUL" and L["debuffs"] or L["buffs"] end,
-        selected = function(g) return g.key == catGroup end,
-        onSelect = function(_, g) catGroup = g.key end,
-        rows = #ns.Catalog,
-    })
+    -- Left: the groups, one tile each (icon, name, kind, how many are checked)
+    local TH, TGAP = 44, 6
+    local TM, AC = UI.theme, UI.theme.accent
+    local ACHEX = ("|cff%02x%02x%02x"):format(AC[1] * 255, AC[2] * 255, AC[3] * 255)
+    local tiles = UI.Row(leftPage.content, #ns.Catalog * (TH + TGAP) - TGAP)
+    tiles.buttons = {}
+    local function PaintTile(b)
+        local on = b.group.key == catGroup
+        if on then
+            b:SetBackdropColor(AC[1] * 0.25, AC[2] * 0.25, AC[3] * 0.25, 1)
+            b:SetBackdropBorderColor(AC[1], AC[2], AC[3], 1)
+        else
+            b:SetBackdropColor(unpack(TM.field))
+            if b:IsMouseOver() then b:SetBackdropBorderColor(AC[1], AC[2], AC[3], 0.6)
+            else b:SetBackdropBorderColor(unpack(TM.border)) end
+        end
+        b.mark:SetShown(on)
+        b.name:SetTextColor(unpack(on and TM.text or { 0.85, 0.85, 0.85 }))
+    end
+    for i, g in ipairs(ns.Catalog) do
+        local b = CreateFrame("Button", nil, tiles, "BackdropTemplate")
+        local y = -(i - 1) * (TH + TGAP)
+        b:SetPoint("TOPLEFT", 0, y)
+        b:SetPoint("TOPRIGHT", 0, y)
+        b:SetHeight(TH)
+        UI.Backdrop(b, TM.field, TM.border)
+        b.group = g
+        b.mark = b:CreateTexture(nil, "OVERLAY")
+        b.mark:SetPoint("TOPLEFT", 1, -1)
+        b.mark:SetPoint("BOTTOMLEFT", 1, 1)
+        b.mark:SetWidth(3)
+        b.mark:SetColorTexture(AC[1], AC[2], AC[3], 1)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(28, 28)
+        b.icon:SetPoint("LEFT", 10, 0)
+        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        b.name = UI.Text(b, L[g.name], TM.titleFont)
+        b.name:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 8, 0)
+        b.name:SetPoint("RIGHT", -8, 0)
+        b.name:SetWordWrap(false)
+        b.kind = UI.Text(b, g.auraType == "HARMFUL" and L["debuffs"] or L["buffs"], TM.labelFont, TM.muted)
+        b.kind:SetPoint("BOTTOMLEFT", b.icon, "BOTTOMRIGHT", 8, 0)
+        b.count = UI.Text(b, "", TM.labelFont, TM.muted)
+        b.count:SetPoint("BOTTOM", b.icon, "BOTTOM", 0, 0)
+        b.count:SetPoint("RIGHT", -8, 0)
+        b.count:SetJustifyH("RIGHT")
+        UI.Tip(b, L[g.name], L[g.desc])
+        b:HookScript("OnEnter", PaintTile)
+        b:HookScript("OnLeave", PaintTile)
+        b:SetScript("OnClick", function()
+            catGroup = g.key
+            UI.RefreshAll()
+        end)
+        tiles.buttons[i] = b
+    end
+    tiles.Refresh = function()
+        for _, b in ipairs(tiles.buttons) do
+            local g = b.group
+            b.icon:SetTexture(select(2, ns.SpellKeyInfo(g.icon)) or "Interface\\Icons\\INV_Misc_QuestionMark")
+            local n, sel = 0, Sel(g)
+            for _, e in ipairs(g.spells) do if sel[e] then n = n + 1 end end
+            b.count:SetText(((n > 0) and (ACHEX .. n .. "|r") or "0") .. "/" .. #g.spells)
+            PaintTile(b)
+        end
+    end
+    table.insert(UI.widgets, tiles)
     Cards(leftPage, 1, {
         Header(L["Groups"]),
-        groupList,
+        tiles,
     })
 
     -- Right: what the group is for, then its spells
