@@ -1220,7 +1220,6 @@ local function BuildIndicators(p)
         WE(UI.Attach(UI.Dropdown(c, L["Sweep style"], {
             { "clock", L["Clock"] },
             { "clockReverse", L["Reverse clock (fills up)"] },
-            { "clockEdge", L["Clock with edge"] },
             { "drainV", L["Vertical fill (bottom to top)"] },
             { "drainH", L["Horizontal fill (left to right)"] },
             { "bar", L["Thin bar at the bottom (grows)"] },
@@ -1228,6 +1227,9 @@ local function BuildIndicators(p)
             sweepT, sweepOn),
         WE(UI.Attach(UI.Swatch(c, L["Sweep color"], function() return Sel().swipeColor end, IndChanged, true)),
             sweepT, sweepOn),
+        WE(UI.Attach(UI.Check(c, L["Spark"], IB("swipeSpark"))), sweepT, sweepOn),
+        WE(UI.Attach(UI.Swatch(c, L["Spark color"], function() return Sel().sparkColor end, IndChanged, true)),
+            sweepT, function() return sweepOn() and Sel().swipeSpark end),
 
         -- in the "Text" type, this is the text itself: it goes where the indicator is, with its color
         W(UI.Header(c, L["Time text"]), function() return hasText() and T() ~= "text" end),

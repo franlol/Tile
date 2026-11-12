@@ -170,8 +170,10 @@ ns.indicatorDefaults = {
     -- "Text" type: what it shows (time | custom | name | stacks | caster)
     textShow = "time",
     customText = "",
-    swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
+    swipeStyle = "clock",   -- clock | clockReverse | drainV | drainH | bar
     swipeColor = C(0, 0, 0, 0.6),   -- sweep shade (the "thin bar" style: its background)
+    swipeSpark = false,     -- spark on the moving end of the sweep (any style)
+    sparkColor = C(1, 1, 1, 1),
     iconFit = "crop",       -- icons not square: crop (keeps proportions) | stretch
     max = 3,
     grow = "LEFT",
@@ -250,6 +252,11 @@ end
 -- Fills an indicator with the defaults it is missing
 function ns.FixIndicator(ind)
     ns.CopyDefaults(ns.indicatorDefaults, ind)
+    -- the old "clock with edge" style is now the clock with a spark
+    if ind.swipeStyle == "clockEdge" then
+        ind.swipeStyle = "clock"
+        ind.swipeSpark = true
+    end
     return ind
 end
 

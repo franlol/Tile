@@ -92,7 +92,7 @@ end
 
 local function ClockSweep(cfg)
     local s = cfg.swipeStyle or "clock"
-    return s == "clock" or s == "clockReverse" or s == "clockEdge"
+    return s == "clock" or s == "clockReverse"
 end
 
 -------------------------------------------------------------------------------
@@ -225,7 +225,33 @@ local function NewDrain(f)
     d.bg = d:CreateTexture(nil, "BACKGROUND")
     d.bg:SetAllPoints()
     d.bg:SetTexture(FLAT)
+    -- spark: a line that follows the end of the fill
+    d.spark = d:CreateTexture(nil, "OVERLAY")
+    d.spark:SetTexture(FLAT)
+    d.spark:SetBlendMode("ADD")
     return d
+end
+
+local function SparkColor(cfg)
+    local c = cfg.sparkColor or ns.indicatorDefaults.sparkColor
+    return c.r, c.g, c.b, c.a or 1
+end
+
+-- The spark sits on the moving end of the fill (the right or the top)
+local function PlaceSpark(drain, cfg, vertical, th)
+    local spark, fill = drain.spark, drain:GetStatusBarTexture()
+    spark:ClearAllPoints()
+    if vertical then
+        spark:SetPoint("BOTTOMLEFT", fill, "TOPLEFT", 0, -th / 2)
+        spark:SetPoint("BOTTOMRIGHT", fill, "TOPRIGHT", 0, -th / 2)
+        spark:SetHeight(th)
+    else
+        spark:SetPoint("TOPLEFT", fill, "TOPRIGHT", -th / 2, 0)
+        spark:SetPoint("BOTTOMLEFT", fill, "BOTTOMRIGHT", -th / 2, 0)
+        spark:SetWidth(th)
+    end
+    spark:SetVertexColor(SparkColor(cfg))
+    spark:SetShown(cfg.swipeSpark and true or false)
 end
 
 -- Layer above the sweep for the texts
@@ -240,8 +266,14 @@ local function StyleSweep(cd, drain, cfg, h)
     local style = cfg.swipeStyle or "clock"
     if cd then
         cd:SetReverse(style ~= "clockReverse")
-        cd:SetDrawEdge(style == "clockEdge")
         cd:SetSwipeColor(SweepColor(cfg))
+        -- spark of the clock: its edge
+        cd:SetDrawEdge(cfg.swipeSpark and true or false)
+        if cd.SetEdgeColor then
+            cd:SetEdgeColor(SparkColor(cfg))
+        elseif cd.SetEdgeTexture then
+            cd:SetEdgeTexture("Interface\\Cooldown\\edge", SparkColor(cfg))
+        end
     end
     if not drain then return end
     drain:ClearAllPoints()
@@ -253,11 +285,14 @@ local function StyleSweep(cd, drain, cfg, h)
         drain:SetOrientation("HORIZONTAL")
         drain:SetStatusBarColor(1, 1, 1, 0.95)
         drain.bg:SetVertexColor(SweepColor(cfg))
+        PlaceSpark(drain, cfg, false, 1)
     else
         drain:SetAllPoints()
-        drain:SetOrientation(style == "drainV" and "VERTICAL" or "HORIZONTAL")
+        local vertical = style == "drainV"
+        drain:SetOrientation(vertical and "VERTICAL" or "HORIZONTAL")
         drain:SetStatusBarColor(SweepColor(cfg))
         drain.bg:SetVertexColor(0, 0, 0, 0)
+        PlaceSpark(drain, cfg, vertical, (h or 10) >= 16 and 2 or 1)
     end
 end
 
