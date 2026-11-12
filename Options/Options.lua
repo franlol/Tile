@@ -1176,14 +1176,15 @@ local function BuildIndicators(container)
 end
 
 -------------------------------------------------------------------------------
--- Catalog: group -> classes and spells -> add as indicator
+-- Catalog. Left, the groups. Right, the chosen group: its spells by class
+-- (tick the ones to add) and how to add them as indicators.
 -------------------------------------------------------------------------------
 local catGroup = "hots"
 local catSel, catOrigin, catMode = {}, {}, {}
 
 local function BuildCatalog(container)
-    local page = UI.Page(container, 1)
-    local c = page.content
+    local leftPage, rightPage = Split(container, 210)
+    local c = rightPage.content
     local myClass = select(2, UnitClass("player"))
 
     local function Group() return ns.CatalogByKey[catGroup] end
@@ -1197,8 +1198,8 @@ local function BuildCatalog(container)
         return catSel[g.key]
     end
 
-    -- 1. group: a short list, every group in sight
-    local groupList = UI.List(c, {
+    -- Left: the groups
+    local groupList = UI.List(leftPage.content, {
         items = function() return ns.Catalog end,
         label = function(g) return L[g.name] end,
         tag = function(g) return g.auraType == "HARMFUL" and L["debuffs"] or L["buffs"] end,
@@ -1206,11 +1207,17 @@ local function BuildCatalog(container)
         onSelect = function(_, g) catGroup = g.key end,
         rows = #ns.Catalog,
     })
+    Cards(leftPage, 1, {
+        Header(L["Groups"]),
+        groupList,
+    })
+
+    -- Right: what the group is for, then its spells
     local desc = UI.Note(c, "")
     desc.Refresh = function() desc:SetText(L[Group().desc]) end
     table.insert(UI.widgets, desc)
 
-    -- 2. classes and spells: one group per class, the class box checks all
+    -- one group per class, the class box checks all
     -- of its spells (a dash: some of them)
     local headers = {}   -- [group key .. class] = header row (keeps open/closed)
     local function Rows()
@@ -1263,7 +1270,7 @@ local function BuildCatalog(container)
             end
         end,
         onToggle = function(h) h.closed = not h.closed end,
-        rows = 12,
+        rows = 14,
     })
     local selButtons = UI.Buttons(c, {
         { L["Recommended for my class"], function()
@@ -1282,7 +1289,7 @@ local function BuildCatalog(container)
         end },
     })
 
-    -- 3. add
+    -- Add: how, and the button
     local result = UI.Note(c, "")
     local wanted = false
     local addBtn = UI.Buttons(c, { { L["Add as indicator"], function()
@@ -1292,7 +1299,7 @@ local function BuildCatalog(container)
             if Sel(g)[e] then table.insert(entries, e) end
         end
         if #entries == 0 then
-            result:SetText(L["|cffff7755Check at least one spell in step 2.|r"])
+            result:SetText(L["|cffff7755Check at least one spell.|r"])
             wanted = false
             UI.RefreshAll()
             return
@@ -1318,14 +1325,12 @@ local function BuildCatalog(container)
     end } })
     goBtn.showIf = function() return wanted end
 
-    Cards(page, 1, {
-        Header(L["1. Group"]),
-        groupList,
+    Cards(rightPage, 1, {
+        Header(L[Group().name], function() return L[Group().name] end),
         desc,
-        Header(L["2. Classes and spells"]),
         selButtons,
         spells,
-        Header(L["3. Add as indicator"]),
+        Header(L["Add as indicator"]),
         UI.Segmented(c, L["From whom"], {
             { "mine", L["Mine"] }, { "others", L["Others'"] }, { "any", L["Anyone"] },
         }, function() return catOrigin[catGroup] or Group().origin end, function(v) catOrigin[catGroup] = v end),
