@@ -225,8 +225,8 @@ local function NewDrain(f)
     d.bg = d:CreateTexture(nil, "BACKGROUND")
     d.bg:SetAllPoints()
     d.bg:SetTexture(FLAT)
-    -- spark: the game's cast bar spark, on the end of the fill. Its glow is
-    -- bigger than the bar, so it is clipped to the icon.
+    -- spark: the game's cast bar spark, on the end of the fill. It is sized
+    -- to fit the icon; the clip only trims it at the very start and end.
     d.clip = CreateFrame("Frame", nil, d)
     d.clip:SetAllPoints(f)
     d.clip:SetClipsChildren(true)
@@ -244,21 +244,28 @@ local function SparkColor(cfg)
 end
 
 -- The spark sits on the moving end of the fill (the right or the top).
--- cross: the bar's size across the fill (its height, or its width if vertical)
-local function PlaceSpark(drain, cfg, vertical, cross)
+-- It is exactly as long as the bar is thick (cross), so it never sticks out
+-- of the icon's sides, whatever its proportions. Its thickness depends on
+-- the icon's short side. bottom: it rises from the bar's bottom edge (the
+-- "thin bar" style, so it shows over the icon instead of below it).
+local SPARK_IN, SPARK_OUT = 0.2, 0.8   -- the spark's part of the texture (its glow is longer)
+local function PlaceSpark(drain, cfg, vertical, cross, short, bottom)
     local spark, fill = drain.spark, drain:GetStatusBarTexture()
-    local across = math.max(8, cross * 2)
-    local along = math.min(16, math.max(6, math.floor(cross * 0.6 + 0.5)))
+    local along = math.min(10, math.max(4, math.floor(short * 0.35 + 0.5)))
     spark:ClearAllPoints()
     if vertical then
         spark:SetPoint("CENTER", fill, "TOP")
-        spark:SetSize(across, along)
+        spark:SetSize(cross, along)
         -- the texture is a vertical line: turned 90 degrees
-        spark:SetTexCoord(0, 1, 1, 1, 0, 0, 1, 0)
+        spark:SetTexCoord(0, SPARK_OUT, 1, SPARK_OUT, 0, SPARK_IN, 1, SPARK_IN)
     else
-        spark:SetPoint("CENTER", fill, "RIGHT")
-        spark:SetSize(along, across)
-        spark:SetTexCoord(0, 1, 0, 1)
+        if bottom then
+            spark:SetPoint("BOTTOM", fill, "BOTTOMRIGHT")
+        else
+            spark:SetPoint("CENTER", fill, "RIGHT")
+        end
+        spark:SetSize(along, cross)
+        spark:SetTexCoord(0, 1, SPARK_IN, SPARK_OUT)
     end
     spark:SetVertexColor(SparkColor(cfg))
     spark:SetShown(cfg.swipeSpark and true or false)
@@ -287,6 +294,9 @@ local function StyleSweep(cd, drain, cfg, h)
     end
     if not drain then return end
     drain:ClearAllPoints()
+    local pw, ph = drain:GetParent():GetSize()
+    pw, ph = (pw and pw > 0) and pw or 10, (ph and ph > 0) and ph or 10
+    local short = math.min(pw, ph)
     if style == "bar" then
         local size = math.max(2, math.floor((h or 10) * 0.15 + 0.5))
         drain:SetPoint("BOTTOMLEFT")
@@ -295,15 +305,14 @@ local function StyleSweep(cd, drain, cfg, h)
         drain:SetOrientation("HORIZONTAL")
         drain:SetStatusBarColor(1, 1, 1, 0.95)
         drain.bg:SetVertexColor(SweepColor(cfg))
-        PlaceSpark(drain, cfg, false, size * 2)
+        PlaceSpark(drain, cfg, false, math.min(ph, size * 3), short, true)
     else
         drain:SetAllPoints()
         local vertical = style == "drainV"
         drain:SetOrientation(vertical and "VERTICAL" or "HORIZONTAL")
         drain:SetStatusBarColor(SweepColor(cfg))
         drain.bg:SetVertexColor(0, 0, 0, 0)
-        local pw, ph = drain:GetParent():GetSize()
-        PlaceSpark(drain, cfg, vertical, (vertical and pw or ph) or 10)
+        PlaceSpark(drain, cfg, vertical, vertical and pw or ph, short)
     end
 end
 
