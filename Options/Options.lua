@@ -1273,12 +1273,12 @@ local function BuildCatalog(container)
         rows = 14,
     })
     local selButtons = UI.Buttons(c, {
-        { L["Recommended for my class"], function()
+        { L["Recommended"], function()
             local g = Group()
             wipe(Sel(g))
             for _, e in ipairs(ns.CatalogRecommended(g, myClass)) do Sel(g)[e] = true end
             UI.RefreshAll()
-        end },
+        end, nil, L["Checks only the spells recommended for your class."] },
         { L["Check all"], function()
             for _, e in ipairs(Group().spells) do Sel()[e] = true end
             UI.RefreshAll()
