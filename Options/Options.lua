@@ -841,7 +841,7 @@ local function BuildIndicators(container)
             local s = Sel()
             if w.header then
                 -- the spell box: all IDs (also later ranks) or off
-                s.ranks[w.value] = (not v) and false or nil
+                if v then s.ranks[w.value] = nil else s.ranks[w.value] = false end
             else
                 local set, n, total = Counting(s, w.key)
                 if (set[w.value] ~= nil) ~= v then n = n + (v and 1 or -1) end
