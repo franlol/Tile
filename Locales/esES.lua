@@ -442,10 +442,10 @@ ns.translations.esES = {
     ["Spells"] = "Hechizos",
     ["%d of %d IDs"] = "%d de %d IDs",
     ["all IDs"] = "todos los IDs",
-    ["IDs of %s."] = "IDs de %s.",
     ["No spells yet: every buff counts."] = "Sin hechizos: cuenta cualquier bufo.",
-    ["Drag a row to change the order. The ones below are drawn on top."] = "Arrastra una fila para cambiar el orden. Los de abajo se dibujan encima.",
-    ["Built-in indicators cannot be deleted; turn them off with their check box."] = "Los indicadores de serie no se pueden borrar; apágalos con su casilla.",
+    ["Open a spell to choose which of its IDs (ranks) count. All ticked: every ID, also ranks added later."] = "Abre un hechizo para elegir qué IDs (rangos) cuentan. Todos marcados: cualquier ID, también rangos que se añadan después.",
+    ["Drag a row to change the order: the ones below are drawn on top. Built-in ones have no x: turn them off with their box."] = "Arrastra una fila para cambiar el orden: los de abajo se dibujan encima. Los de serie no tienen x: apágalos con su casilla.",
+    ["Puts the selected profile back to the default settings."] = "Devuelve el perfil seleccionado a los ajustes por defecto.",
     ["Green dot: you are here."] = "Punto verde: estás aquí.",
     ["\"Missing\" adds one warning per buff."] = "\"Le falta\" añade un aviso por cada bufo.",
 }

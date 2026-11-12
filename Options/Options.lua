@@ -66,6 +66,17 @@ local function Cards(page, col, list)
     end
 end
 
+-- Same table for the same value, so a list keeps knowing its rows between
+-- refreshes (selection, open groups, the row waiting to be removed)
+local function Wrapper()
+    local cache = {}
+    return function(v)
+        local w = cache[v]
+        if not w then w = { value = v } cache[v] = w end
+        return w
+    end
+end
+
 local function Both(a, b)
     if not a then return b end
     if not b then return a end
@@ -211,15 +222,35 @@ local function BuildProfiles(container)
     ---------------------------------------------------------------------------
     -- Profile being edited
     ---------------------------------------------------------------------------
+    -- click = edit it; x deletes it (not Default); where it was used, Default
+    -- takes its place
+    local Row = Wrapper()
     local profiles = UI.List(c, {
-        items = ProfileOptions,
-        label = function(o) return o[2] end,
-        secondary = function(o) return table.concat(UsedBy(o[1]), ", ") end,
-        tag = function(o)
-            if o[1] == ns.activeName then return L["active"], ns.ACCENT end
+        items = function()
+            local out = {}
+            for i, o in ipairs(ProfileOptions()) do out[i] = Row(o[1]) end
+            return out
         end,
-        selected = function(o) return o[1] == ns.EditedProfileName() end,
-        onSelect = function(_, o) SetEdit(o[1]) end,
+        label = function(w) return w.value end,
+        secondary = function(w) return table.concat(UsedBy(w.value), ", ") end,
+        tag = function(w)
+            if w.value == ns.activeName then return L["active"], ns.ACCENT end
+        end,
+        selected = function(w) return w.value == ns.EditedProfileName() end,
+        onSelect = function(_, w) SetEdit(w.value) end,
+        canRemove = function(w) return w.value ~= "Default" end,
+        onRemove = function(_, w)
+            local old = w.value
+            if old == "Default" then return end
+            local used = #UsedBy(old) > 0
+            local editing = old == ns.EditedProfileName()
+            ns.db.profiles[old] = nil
+            Reassign(old, "Default")
+            if editing then ns.SetEditName(nil) end
+            ns.ActivateProfile(true)
+            Say(used and (L["\"%s\" deleted. Where it was used, Default is used now."]):format(old)
+                or (L["\"%s\" deleted."]):format(old))
+        end,
         rows = 6,
     })
 
@@ -241,25 +272,9 @@ local function BuildProfiles(container)
             ns.ActivateProfile(true)
             ns.ProfileChanged()
             Say((L["\"%s\" is back to the default settings."]):format(name))
-        end, "danger" },
-        { L["Delete"], function()
-            local old = ns.EditedProfileName()
-            if old == "Default" then return end
-            local used = #UsedBy(old) > 0
-            ns.db.profiles[old] = nil
-            Reassign(old, "Default")
-            ns.SetEditName(nil)
-            ns.ActivateProfile(true)
-            Say(used and (L["\"%s\" deleted. Where it was used, Default is used now."]):format(old)
-                or (L["\"%s\" deleted."]):format(old))
-        end, "danger" },
+        end, "danger", L["Puts the selected profile back to the default settings."] },
     })
     UI.Confirm(actions.buttons[1], L["Sure?"])
-    UI.Confirm(actions.buttons[2], L["Sure?"])
-    actions.Refresh = function()
-        UI.SetEnabled(actions.buttons[2], ns.EditedProfileName() ~= "Default")
-    end
-    table.insert(UI.widgets, actions)
 
     ---------------------------------------------------------------------------
     -- Create / duplicate / rename
@@ -599,17 +614,6 @@ local function Split(container, leftWidth)
     return UI.Page(left, 1), UI.Page(right, 1)
 end
 
--- Same table for the same value, so a list keeps knowing its rows between
--- refreshes (selection, the row waiting to be removed)
-local function Wrapper()
-    local cache = {}
-    return function(v)
-        local w = cache[v]
-        if not w then w = { value = v } cache[v] = w end
-        return w
-    end
-end
-
 -------------------------------------------------------------------------------
 -- Indicators
 -------------------------------------------------------------------------------
@@ -637,7 +641,7 @@ local IndChanged = ns.ProfileChanged
 local function IB(path) return UI.Bind(Sel, path, IndChanged) end
 
 local function BuildIndicators(container)
-    local leftPage, rightPage = Split(container, 236)
+    local leftPage, rightPage = Split(container, 250)
 
     ---------------------------------------------------------------------------
     -- Left: the indicators. Check box = on/off, click = edit, drag = order.
@@ -674,34 +678,28 @@ local function BuildIndicators(container)
             elseif from > selInd and to <= selInd then selInd = selInd + 1 end
             IndChanged()
         end,
+        -- built-in ones have no x: they are turned off with their box
+        canRemove = function(d) return d.kind == "aura" end,
+        onRemove = function(i)
+            table.remove(Inds(), i)
+            if i < selInd or selInd > #Inds() then selInd = math.max(1, selInd - 1) end
+            IndChanged()
+        end,
         rows = 18,
     })
-    local buttons = UI.Buttons(lc, {
-        { L["New"], function()
-            local l = Inds()
-            table.insert(l, ns.FixIndicator({ name = L["New indicator"] }))
-            selInd = #l
-            Repaint()
-        end },
-        { L["Delete"], function()
-            local ind = Sel()
-            if not ind or ind.kind ~= "aura" then return end
-            table.remove(Inds(), selInd)
-            Repaint()
-        end, "danger", L["Built-in indicators cannot be deleted; turn them off with their check box."] },
-    })
-    UI.Confirm(buttons.buttons[2], L["Sure?"])
-    buttons.Refresh = function()
-        local s = Sel()
-        UI.SetEnabled(buttons.buttons[2], s ~= nil and s.kind == "aura")
-    end
-    table.insert(UI.widgets, buttons)
     Cards(leftPage, 1, {
         Header(L["Indicators"]),
         list,
-        buttons,
-        UI.Buttons(lc, { { L["Add from the catalog..."], function() if ns.OpenCatalog then ns.OpenCatalog() end end } }),
-        UI.Note(lc, L["Drag a row to change the order. The ones below are drawn on top."]),
+        UI.Buttons(lc, {
+            { L["New"], function()
+                local l = Inds()
+                table.insert(l, ns.FixIndicator({ name = L["New indicator"] }))
+                selInd = #l
+                Repaint()
+            end },
+            { L["Catalog"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
+        }),
+        UI.Note(lc, L["Drag a row to change the order: the ones below are drawn on top. Built-in ones have no x: turn them off with their box."]),
     })
 
     ---------------------------------------------------------------------------
@@ -754,57 +752,98 @@ local function BuildIndicators(container)
     end, { saveOnBlur = true })
 
     ---------------------------------------------------------------------------
-    -- Spells the indicator watches: a list (icon, how many IDs count, x to
-    -- remove). The selected spell shows its IDs below, each with a check box:
-    -- with none checked they all count; if some are checked, only those.
+    -- Spells the indicator watches: one list. Each spell is a row (icon,
+    -- how many of its IDs count, x to remove) that opens to show its IDs
+    -- (ranks), each with a check box. All ticked (the default): every ID
+    -- counts, also ranks the game adds later. Untick the ones that should
+    -- not count; the last ticked one stays.
     ---------------------------------------------------------------------------
-    local SpellRow, IDRow = Wrapper(), Wrapper()
-    local pickedKey = {}   -- [indicator] = spell key whose IDs are shown
+    local SpellHead, IDRow = Wrapper(), Wrapper()
+    local GetSubtext = (C_Spell and C_Spell.GetSpellSubtext) or GetSpellSubtext
 
     local function SpellRows()
         local s = Sel()
         local out = {}
-        for i, key in ipairs(s and s.spells or {}) do out[i] = SpellRow(key) end
+        for _, key in ipairs(s and s.spells or {}) do
+            local h = SpellHead(key)
+            h.header = true
+            if h.closed == nil then h.closed = true end
+            local all = ns.KeyIDs(key)
+            h.leaf = #all <= 1   -- one ID (or still looking): nothing to choose
+            out[#out + 1] = h
+            if not h.closed and not h.leaf then
+                for _, id in ipairs(all) do
+                    local w = IDRow(id)
+                    w.key = key
+                    out[#out + 1] = w
+                end
+            end
+        end
         return out
     end
-    -- the spell whose IDs are shown: the one clicked, or the first one
-    local function PickedKey()
-        local s = Sel()
-        if not s or not s.spells then return nil end
-        local k = pickedKey[s]
-        for _, key in ipairs(s.spells) do if key == k then return k end end
-        return s.spells[1]
-    end
-    local function Picked(s, key)
+    -- IDs of a spell that count ({ [id] = true }), and how many there are
+    local function Counting(s, key)
+        local all = ns.KeyIDs(key)
         local pick = ns.KeyRank(s, key)
-        local n = 0
-        if pick then for _ in pairs(pick) do n = n + 1 end end
-        return pick, n
+        local set, n = {}, 0
+        for _, id in ipairs(all) do
+            if not pick or pick[id] then set[id] = true n = n + 1 end
+        end
+        return set, n, #all
     end
 
     local spellList = UI.List(c, {
         items = SpellRows,
-        label = function(w) return (ns.SpellKeyInfo(w.value)) end,
-        lead = "icon",
-        icon = function(w) return select(2, ns.SpellKeyInfo(w.value)) end,
-        spell = function(w) return ns.KeyIDs(w.value)[1] end,
-        secondary = function(w)
-            local all = ns.KeyIDs(w.value)
-            if #all == 0 then return L["looking up IDs..."] end
-            local _, n = Picked(Sel(), w.value)
-            if n > 0 then return (L["%d of %d IDs"]):format(n, #all) end
-            return L["all IDs"]
+        richHeaders = true,
+        label = function(w)
+            if w.header then return (ns.SpellKeyInfo(w.value)) end
+            local sub = GetSubtext and GetSubtext(w.value)
+            return (sub and sub ~= "") and sub or ("ID " .. w.value)
         end,
-        selected = function(w) return w.value == PickedKey() end,
-        onSelect = function(_, w) pickedKey[Sel()] = w.value end,
-        onRemove = function(i)
+        lead = "icon",
+        icon = function(w)
+            if w.header then return select(2, ns.SpellKeyInfo(w.value)) end
+            return ns.GetSpellIcon(w.value)
+        end,
+        spell = function(w)
+            if w.header then return ns.KeyIDs(w.value)[1] end
+            return w.value
+        end,
+        secondary = function(w)
+            if not w.header then return tostring(w.value) end
+            local _, n, total = Counting(Sel(), w.value)
+            if total == 0 then return L["looking up IDs..."] end
+            if n < total then return (L["%d of %d IDs"]):format(n, total) end
+            return total == 1 and "" or L["all IDs"]
+        end,
+        -- spells have no box (they open); their IDs do
+        checked = function(w)
+            if w.header then return nil end
+            local pick = ns.KeyRank(Sel(), w.key)
+            return not pick or pick[w.value] and true or false
+        end,
+        onCheck = function(w, v)
             local s = Sel()
-            local key = table.remove(s.spells, i)
-            if key ~= nil then s.ranks[key] = nil end
+            local set, n, total = Counting(s, w.key)
+            if not v and set[w.value] and n == 1 then return end   -- the last one stays
+            set[w.value] = v or nil
+            n = n + (v and 1 or -1)
+            -- every ID ticked: back to "all" (new ranks count too)
+            s.ranks[w.key] = n < total and set or nil
+            IndChanged()
+        end,
+        onToggle = function(h) h.closed = not h.closed end,
+        canRemove = function(w) return w.header end,
+        onRemove = function(_, w)
+            local s = Sel()
+            for i, key in ipairs(s.spells) do
+                if key == w.value then table.remove(s.spells, i) break end
+            end
+            s.ranks[w.value] = nil
             IndChanged()
         end,
         empty = L["No spells yet: every buff counts."],
-        rows = 6,
+        rows = 8,
     })
 
     -- type a name or ID, Enter or the button adds it
@@ -814,7 +853,6 @@ local function BuildIndicators(container)
         local key = ns.ParseSpellInput(addBox:GetText())
         if not key then return end
         table.insert(Sel().spells, key)
-        pickedKey[Sel()] = key
         addBox:SetText("")
         addBox:ClearFocus()
         Repaint()
@@ -823,46 +861,6 @@ local function BuildIndicators(container)
     addBox:SetPoint("TOPLEFT")
     addBox:SetPoint("RIGHT", addBtn, "LEFT", -6, 0)
     addBox:SetScript("OnEnterPressed", function() addBtn:Click() end)
-
-    local idsNote = UI.Note(c, "")
-    idsNote.Refresh = function()
-        local s, key = Sel(), PickedKey()
-        if not s or key == nil then return end
-        local _, n = Picked(s, key)
-        idsNote:SetText((L["IDs of %s."]):format("|cffffffff" .. ((ns.SpellKeyInfo(key)) or "?") .. "|r") .. " "
-            .. (n > 0 and L["Only the checked ones count."] or L["None checked: all of them count."]))
-    end
-    table.insert(UI.widgets, idsNote)
-
-    local idList = UI.List(c, {
-        items = function()
-            local key = PickedKey()
-            local out = {}
-            if key ~= nil then
-                for i, id in ipairs(ns.KeyIDs(key)) do out[i] = IDRow(id) end
-            end
-            return out
-        end,
-        label = function(w) return tostring(w.value) end,
-        lead = "icon",
-        icon = function(w) return ns.GetSpellIcon(w.value) end,
-        spell = function(w) return w.value end,
-        checked = function(w)
-            local pick = ns.KeyRank(Sel(), PickedKey())
-            return pick and pick[w.value] and true or false
-        end,
-        onCheck = function(w, v)
-            local s, key = Sel(), PickedKey()
-            local pick = s.ranks[key]
-            if type(pick) ~= "table" then pick = {} s.ranks[key] = pick end
-            pick[w.value] = v or nil
-            if not next(pick) then s.ranks[key] = nil end
-            IndChanged()
-        end,
-        empty = L["looking up IDs..."],
-        rows = 4,
-    })
-    local function hasSpells() return listWatch() and PickedKey() ~= nil end
 
     ---------------------------------------------------------------------------
     -- Frame preview: it is a real frame (the same code as test mode) with the
@@ -1049,10 +1047,9 @@ local function BuildIndicators(container)
 
         HeaderIf(L["Spells"], listWatch),
         UI.Note(c, L["Buffs (by ID or name; any rank works). No spells = all buffs. The game decides the order."]),
-        spellList,
         addRow,
-        W(idsNote, hasSpells),
-        W(UI.Attach(idList), hasSpells),
+        spellList,
+        UI.Note(c, L["Open a spell to choose which of its IDs (ranks) count. All ticked: every ID, also ranks added later."]),
 
         HeaderIf(L["What it watches"], function() return K() == "raiddebuff" end),
         UI.Note(c, L["Shows the most important boss debuff on the player. The game decides which ones are boss debuffs."]),
