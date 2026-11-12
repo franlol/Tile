@@ -5,6 +5,7 @@
 ## Notes-esMX: Marcos de banda para sanadores: indicadores dibujados con las auras nativas del juego, perfiles por tamaño de grupo.
 ## Author: franlol
 ## X-License: MIT
+## X-Curse-Project-ID: 1799499
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\Tile\Media\Icon
 ## SavedVariables: TileDB
