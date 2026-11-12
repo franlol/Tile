@@ -11,6 +11,9 @@
 ## SavedVariables: TileDB
 ## OptionalDeps: LibSharedMedia-3.0, SharedMedia, Blizzard_AuraContainer
 
+Libs\LibStub\LibStub.lua
+Libs\LibFlatyUI-1.0\LibFlatyUI-1.0.lua
+
 Locales\Locale.lua
 Locales\esES.lua
 Core.lua
@@ -23,6 +26,6 @@ Data\World.lua
 Media.lua
 Indicators.lua
 Frames.lua
-Options\Widgets.lua
+Options\UI.lua
 Options\Options.lua
 MinimapButton.lua
