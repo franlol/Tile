@@ -210,8 +210,9 @@ local function SweepColor(cfg)
     return c.r, c.g, c.b, c.a or 1
 end
 
--- The cooldown goes inside a frame that clips it to the icon: on icons that
--- are not square, the game draws the clock edge (spark) past the icon's sides
+-- The cooldown goes inside a frame that clips it to the icon (overflow:hidden).
+-- StyleSweep makes it square, so on icons that are not square the sweep is
+-- not stretched and its edge (spark) moves with it
 local function NewCooldown(f)
     local clip = CreateFrame("Frame", nil, f)
     clip:SetAllPoints()
@@ -287,6 +288,13 @@ end
 local function StyleSweep(cd, drain, cfg, h)
     local style = cfg.swipeStyle or "clock"
     if cd then
+        -- the clock is square (the icon's longest side) and the icon clips it,
+        -- like overflow:hidden: the sweep and its edge stay together
+        local w, h = cd:GetParent():GetParent():GetSize()
+        local side = math.max(w or 0, h or 0, 1)
+        cd:ClearAllPoints()
+        cd:SetPoint("CENTER")
+        cd:SetSize(side, side)
         cd:SetReverse(style ~= "clockReverse")
         cd:SetSwipeColor(SweepColor(cfg))
         -- spark of the clock: its edge
