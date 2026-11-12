@@ -239,7 +239,6 @@ local function BuildProfiles(container)
             return out
         end,
         label = function(w) return w.value end,
-        secondary = function(w) return table.concat(UsedBy(w.value), ", ") end,
         tag = function(w)
             if w.value == ns.activeName then return L["active"], ns.ACCENT end
         end,
@@ -260,17 +259,6 @@ local function BuildProfiles(container)
         end,
         rows = 6,
     })
-
-    local usage = UI.Note(c, "")
-    usage.Refresh = function()
-        local used = UsedBy(ns.EditedProfileName())
-        if #used > 0 then
-            usage:SetText((L["Used by this character in: %s."]):format("|cffffffff" .. table.concat(used, ", ") .. "|r"))
-        else
-            usage:SetText(L["|cffff8c4dNo group size uses it yet.|r Assign it below to see it in game (in test mode you already see it)."])
-        end
-    end
-    table.insert(UI.widgets, usage)
 
     local actions = UI.Buttons(c, {
         { L["Reset"], function()
@@ -362,7 +350,6 @@ local function BuildProfiles(container)
     Cards(page, 1, {
         Header(L["Profile in use"]),
         profiles,
-        UI.Attach(usage),
         actions,
         Header(L["Create or rename"]),
         nameRow,
