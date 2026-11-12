@@ -970,10 +970,13 @@ local function BuildIndicators(p)
     end
     local spellsW = SpellList("spells")
 
-    -- square size (icon)
-    local sizeW = UI.Slider(c, L["Size"], 4, 50, 1, nil,
-        function() local s = Sel() return s and s.width end,
-        function(v) local s = Sel() s.width, s.height = v, v IndChanged() end)
+    -- has its own width and height (not the frame border or tint)
+    local function sized() return rect() or iconLike() end
+    -- border around icons, squares and bars
+    local function borderT() local t = T() return notDispel() and t ~= "text" end
+    local function borderOn() return Sel().showBorder ~= false end
+    local function sweepT() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end
+    local function sweepOn() return Sel().swipe ~= false end
 
     ---------------------------------------------------------------------------
     -- Frame preview: it is a real frame (the same code as test mode) with every
@@ -1156,9 +1159,12 @@ local function BuildIndicators(p)
         PositionBlock(c, Sel, IndChanged, { showIf = function()
             return notDispel() and not (T() == "bar" and ns.STRIP_SIDE[Sel().span])
         end }),
-        W(sizeW, iconLike),
-        W(UI.Slider(c, L["Width"], 1, 120, 1, nil, IB("width")), rect),
-        W(UI.Attach(UI.Slider(c, L["Height"], 1, 60, 1, nil, IB("height"))), rect),
+        W(UI.Slider(c, L["Width"], 1, 120, 1, nil, IB("width")), sized),
+        W(UI.Attach(UI.Slider(c, L["Height"], 1, 60, 1, nil, IB("height"))), sized),
+        WE(UI.Attach(UI.Dropdown(c, L["Image fit"], {
+            { "crop", L["Crop (keeps proportions)"] },
+            { "stretch", L["Stretch"] },
+        }, IB("iconFit"))), iconLike, function() return Sel().width ~= Sel().height end),
         W(UI.Dropdown(c, L["Span"], {
             { "none", L["No (its own width and height)"] },
             { "width", L["Full width, over the frame"] },
@@ -1204,10 +1210,13 @@ local function BuildIndicators(p)
         WE(UI.Attach(UI.Swatch(c, L["Color"], function() return Sel().color end, IndChanged, true)),
             function() return colored() or frameT() end,
             function() return colored() or not Sel().dispelColor end),
-        W(UI.Check(c, L["Black border"], IB("showBorder")),
-            function() local t = T() return notDispel() and t ~= "text" end),
-        W(UI.Check(c, L["Time sweep"], IB("swipe")),
-            function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end),
+        W(UI.Check(c, L["Border"], IB("showBorder")), borderT),
+        WE(UI.Attach(UI.Swatch(c, L["Border color"], function() return Sel().borderColor end, IndChanged, true)),
+            borderT, borderOn),
+        WE(UI.Attach(UI.Note(c, L["With \"Color by type\", it is used for debuffs that have no type."], 340)),
+            function() return borderT() and iconLike() and ns.IndicatorTyped(Sel()) and Sel().dispelColor end, borderOn),
+        WE(UI.Attach(UI.Slider(c, L["Border thickness"], 1, 4, 1, nil, IB("borderSize"))), borderT, borderOn),
+        W(UI.Check(c, L["Time sweep"], IB("swipe")), sweepT),
         WE(UI.Attach(UI.Dropdown(c, L["Sweep style"], {
             { "clock", L["Clock"] },
             { "clockReverse", L["Reverse clock (fills up)"] },
@@ -1216,8 +1225,9 @@ local function BuildIndicators(p)
             { "drainH", L["Horizontal fill (left to right)"] },
             { "bar", L["Thin bar at the bottom (grows)"] },
         }, function() return Sel().swipeStyle or "clock" end, function(v) Sel().swipeStyle = v IndChanged() end)),
-            function() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end,
-            function() return Sel().swipe ~= false end),
+            sweepT, sweepOn),
+        WE(UI.Attach(UI.Swatch(c, L["Sweep color"], function() return Sel().swipeColor end, IndChanged, true)),
+            sweepT, sweepOn),
 
         -- in the "Text" type, this is the text itself: it goes where the indicator is, with its color
         W(UI.Header(c, L["Time text"]), function() return hasText() and T() ~= "text" end),

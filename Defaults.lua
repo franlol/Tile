@@ -171,6 +171,8 @@ ns.indicatorDefaults = {
     textShow = "time",
     customText = "",
     swipeStyle = "clock",   -- clock | clockReverse | clockEdge | drainV | drainH | bar
+    swipeColor = C(0, 0, 0, 0.6),   -- sweep shade (the "thin bar" style: its background)
+    iconFit = "crop",       -- icons not square: crop (keeps proportions) | stretch
     max = 3,
     grow = "LEFT",
     spacing = 1,
@@ -182,7 +184,9 @@ ns.indicatorDefaults = {
         point = "CENTER", x = 0, y = 0 },
     stacksText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
         point = "BOTTOMRIGHT", x = 0, y = 0 },
-    showBorder = true,       -- black border for icons, squares and bars
+    showBorder = true,       -- border for icons, squares and bars
+    borderColor = C(0, 0, 0, 1),
+    borderSize = 1,
     barOrient = "HORIZONTAL",
     barReverse = false,
     -- bar: what it measures (time | stacks | absorb | heal) and whether it spans a whole side

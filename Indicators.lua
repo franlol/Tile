@@ -173,6 +173,43 @@ local function NewBorder(f)
     return t
 end
 
+local function BorderColor(cfg)
+    local c = cfg.borderColor or ns.indicatorDefaults.borderColor
+    return c.r, c.g, c.b, c.a or 1
+end
+
+-- Border of icons, squares and bars: thickness, color and whether it shows
+local function StyleBorder(t, cfg)
+    local s = math.max(1, cfg.borderSize or 1)
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", -s, s)
+    t:SetPoint("BOTTOMRIGHT", s, -s)
+    t:SetColorTexture(BorderColor(cfg))
+    t:SetShown(cfg.showBorder ~= false)
+end
+
+-- Icon texture: without the icon's own frame and, when the indicator is not
+-- square, cropped to its proportions ("stretch" deforms it instead)
+local ICON_IN, ICON_SPAN = 0.08, 0.84
+local function IconCoords(tex, cfg, w, h)
+    local l, r, t, b = ICON_IN, ICON_IN + ICON_SPAN, ICON_IN, ICON_IN + ICON_SPAN
+    if cfg.iconFit ~= "stretch" and w and h and w > 0 and h > 0 then
+        if w > h then
+            local cut = ICON_SPAN * (1 - h / w) / 2
+            t, b = t + cut, b - cut
+        elseif h > w then
+            local cut = ICON_SPAN * (1 - w / h) / 2
+            l, r = l + cut, r - cut
+        end
+    end
+    tex:SetTexCoord(l, r, t, b)
+end
+
+local function SweepColor(cfg)
+    local c = cfg.swipeColor or ns.indicatorDefaults.swipeColor
+    return c.r, c.g, c.b, c.a or 1
+end
+
 local function NewCooldown(f)
     local cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
     cd:SetAllPoints()
@@ -204,6 +241,7 @@ local function StyleSweep(cd, drain, cfg, h)
     if cd then
         cd:SetReverse(style ~= "clockReverse")
         cd:SetDrawEdge(style == "clockEdge")
+        cd:SetSwipeColor(SweepColor(cfg))
     end
     if not drain then return end
     drain:ClearAllPoints()
@@ -214,11 +252,11 @@ local function StyleSweep(cd, drain, cfg, h)
         drain:SetHeight(size)
         drain:SetOrientation("HORIZONTAL")
         drain:SetStatusBarColor(1, 1, 1, 0.95)
-        drain.bg:SetVertexColor(0, 0, 0, 0.7)
+        drain.bg:SetVertexColor(SweepColor(cfg))
     else
         drain:SetAllPoints()
         drain:SetOrientation(style == "drainV" and "VERTICAL" or "HORIZONTAL")
-        drain:SetStatusBarColor(0, 0, 0, 0.6)
+        drain:SetStatusBarColor(SweepColor(cfg))
         drain.bg:SetVertexColor(0, 0, 0, 0)
     end
 end
@@ -306,8 +344,8 @@ end
 -------------------------------------------------------------------------------
 -- Native button: the game assigns it an aura and fills its pieces
 -------------------------------------------------------------------------------
-local function DispelColorMap(cfg, noneR, noneG, noneB)
-    local map = { None = CreateColor(noneR, noneG, noneB) }
+local function DispelColorMap(cfg, noneR, noneG, noneB, noneA)
+    local map = { None = CreateColor(noneR, noneG, noneB, noneA) }
     for _, kind in ipairs(DISPEL_KINDS) do
         map[kind] = CreateColor(FrameColor(cfg, kind))
     end
@@ -391,22 +429,23 @@ local function BuildAuraButton(button, cfg, wt)
 
     local w, h = button:GetSize()
     local border = NewBorder(button)
-    border:SetShown(cfg.showBorder ~= false)
+    StyleBorder(border, cfg)
     if wt == "icon" and Typed(cfg) and cfg.dispelColor and cfg.showBorder ~= false then
-        AddDispelTexture(button, border, DispelColorMap(cfg, 0, 0, 0))
+        -- white base: the game paints it with the type color (no type: the border color)
+        border:SetColorTexture(1, 1, 1, 1)
+        AddDispelTexture(button, border, DispelColorMap(cfg, BorderColor(cfg)))
     end
     local above = button
     if wt == "icon" then
         local icon = button:CreateTexture(nil, "ARTWORK")
         icon:SetAllPoints()
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        IconCoords(icon, cfg, w, h)
         button:SetIcon(icon)
     elseif wt == "square" then
         local tex = button:CreateTexture(nil, "ARTWORK")
         tex:SetAllPoints()
         tex:SetColorTexture(cfg.color.r, cfg.color.g, cfg.color.b, cfg.color.a or 1)
     elseif wt == "bar" then
-        border:SetColorTexture(0, 0, 0, 0.8)
         local bg = button:CreateTexture(nil, "BORDER")
         bg:SetAllPoints()
         bg:SetColorTexture(0, 0, 0, 0.5)
@@ -583,7 +622,6 @@ creators.bar = function(parent)
     local f = CreateFrame("Frame", nil, parent)
     f.wtype = "bar"
     f.border = NewBorder(f)
-    f.border:SetColorTexture(0, 0, 0, 0.8)
     f.bg = f:CreateTexture(nil, "BORDER")
     f.bg:SetAllPoints()
     f.bg:SetColorTexture(0, 0, 0, 0.5)
@@ -642,8 +680,8 @@ end
 
 -- Style of an own icon or square (the same as its native button)
 local function StyleIconWidget(f, cfg)
-    f.border:SetShown(cfg.showBorder ~= false)
-    f.border:SetColorTexture(0, 0, 0, 1)
+    StyleBorder(f.border, cfg)
+    if f.wtype == "icon" then IconCoords(f.tex, cfg, f:GetSize()) end
     StyleSweep(f.cd, f.drain, cfg, f:GetHeight())
     f.swipeOn = cfg.swipe ~= false and ClockSweep(cfg)
     f.cd:SetDrawSwipe(f.swipeOn)
@@ -697,7 +735,7 @@ local function LayoutWidget(w, cfg, b)
         if cfg.span == "width" then w:SetWidth(math.max(1, fw - 2)) else w:SetHeight(math.max(1, fh - 2)) end
     end
     if t == "bar" then
-        w.border:SetShown(cfg.showBorder ~= false)
+        StyleBorder(w.border, cfg)
         w.bar:SetOrientation(cfg.barOrient == "VERTICAL" and "VERTICAL" or "HORIZONTAL")
         w.bar:SetReverseFill(cfg.barReverse and true or false)
         local c = cfg.color
@@ -854,9 +892,9 @@ local function PaintAura(w, cfg, a)
     if wt == "icon" then
         w.tex:SetTexture(a.icon)
         w.tex:SetDesaturated(false)
-        local r, g, b = 0, 0, 0
+        local r, g, b
         if Typed(cfg) and cfg.dispelColor and a.dispelName then r, g, b = ns.DispelColor(a.dispelName) end
-        w.border:SetColorTexture(r, g, b, 1)
+        if r then w.border:SetColorTexture(r, g, b, 1) else w.border:SetColorTexture(BorderColor(cfg)) end
     end
     if wt == "bar" then
         if cfg.barMeasure == "stacks" then
@@ -906,7 +944,7 @@ local function ShowMissing(w, cfg)
         local _, icon = ns.SpellKeyInfo(key)
         w.tex:SetTexture(icon or ns.QUESTION_ICON)
         w.tex:SetDesaturated(true)
-        w.border:SetColorTexture(0, 0, 0, 1)
+        w.border:SetColorTexture(BorderColor(cfg))
     elseif wt == "bar" then
         w.bar:SetMinMaxValues(0, 1)
         w.bar:SetValue(1)
