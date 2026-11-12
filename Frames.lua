@@ -837,7 +837,6 @@ local function CreateAnchor(name, label, posKey)
         self:SetScript("OnUpdate", nil)
         if not self.drag then return end
         self.drag = nil
-        if not self.dragged then return end
         local p, _, rp, x, y = a:GetPoint(1)
         ns.P.pos[posKey] = { p, "UIParent", rp, x, y }
     end
