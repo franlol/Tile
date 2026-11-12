@@ -193,10 +193,17 @@ local function BuildProfiles(container)
     local page = UI.Page(container, 2)
     local c = page.content
 
-    -- Changes the profile being edited (in test mode, also the one shown)
-    local function SetEdit(n)
+    -- Uses a profile now: it is edited and shown, and the current group size
+    -- (the simulated one in test mode) uses it from now on
+    local function Use(n)
         ns.SetEditName(n)
+        ns.CharProfiles()[ns.SizeKey()] = n
         ns.ActivateProfile()
+    end
+    -- A new profile: every group size of this character uses it
+    local function UseEverywhere(n)
+        for _, key in ipairs(ns.SIZE_KEYS) do ns.CharProfiles()[key] = n end
+        Use(n)
     end
     local function Reassign(old, new)
         for _, chars in pairs(ns.db.chars) do
@@ -212,7 +219,7 @@ local function BuildProfiles(container)
         return out
     end
 
-    local HELP = L["\"Create new\" starts with the default settings; \"Duplicate\" copies the profile you are editing. Default cannot be deleted or renamed."]
+    local HELP = L["\"Create new\" starts with the default settings; \"Duplicate\" copies the selected profile. A new profile is used for every group size. Default cannot be deleted or renamed."]
     local feedback = UI.Note(c, HELP)
     local function Say(text)
         feedback:SetText("|cff66e680" .. text .. "|r")
@@ -222,7 +229,7 @@ local function BuildProfiles(container)
     ---------------------------------------------------------------------------
     -- Profile being edited
     ---------------------------------------------------------------------------
-    -- click = edit it; x deletes it (not Default); where it was used, Default
+    -- click = use it now (and edit it); x deletes it (not Default); where it was used, Default
     -- takes its place
     local Row = Wrapper()
     local profiles = UI.List(c, {
@@ -237,7 +244,7 @@ local function BuildProfiles(container)
             if w.value == ns.activeName then return L["active"], ns.ACCENT end
         end,
         selected = function(w) return w.value == ns.EditedProfileName() end,
-        onSelect = function(_, w) SetEdit(w.value) end,
+        onSelect = function(_, w) Use(w.value) end,
         canRemove = function(w) return w.value ~= "Default" end,
         onRemove = function(_, w)
             local old = w.value
@@ -291,10 +298,10 @@ local function BuildProfiles(container)
     nameBox:SetPoint("TOPLEFT", 0, -14)
     nameBox:SetPoint("TOPRIGHT", 0, -14)
     local function Name() return nameBox:GetText():trim() end
-    local function Done(n, msg)
+    local function Done(n, msg, everywhere)
         nameBox:SetText("")
         nameBox:ClearFocus()
-        SetEdit(n)
+        if everywhere then UseEverywhere(n) else Use(n) end
         Say(msg)
     end
 
@@ -302,12 +309,12 @@ local function BuildProfiles(container)
         { L["Create new"], function()
             local n = Name()
             ns.db.profiles[n] = ns.NewProfile()
-            Done(n, (L["\"%s\" created with the default settings."]):format(n))
+            Done(n, (L["\"%s\" created with the default settings."]):format(n), true)
         end },
         { L["Duplicate"], function()
             local n, from = Name(), ns.EditedProfileName()
             ns.db.profiles[n] = ns.DeepCopy(ns.EP())
-            Done(n, (L["\"%s\" created as a copy of \"%s\"."]):format(n, from))
+            Done(n, (L["\"%s\" created as a copy of \"%s\"."]):format(n, from), true)
         end },
         { L["Rename"], function()
             local n, old = Name(), ns.EditedProfileName()
@@ -334,7 +341,7 @@ local function BuildProfiles(container)
     table.insert(UI.widgets, create)
 
     ---------------------------------------------------------------------------
-    local sizes = { Header(L["Which profile this character uses for each group size"]) }
+    local sizes = { Header(L["Profile per group size"]) }
     for _, key in ipairs(ns.SIZE_KEYS) do
         local dd = UI.Dropdown(c, L[ns.SIZE_NAMES[key]], ProfileOptions,
             function() return ns.CharProfiles()[key] end,
@@ -353,7 +360,7 @@ local function BuildProfiles(container)
     sizes[#sizes + 1] = UI.Note(c, L["This way you can have one layout for parties, another for ZG/AQ20 and another for 40-player raids. It switches automatically when you join or leave a group (in combat, it applies when combat ends)."])
 
     Cards(page, 1, {
-        Header(L["Profile you are editing"]),
+        Header(L["Profile in use"]),
         profiles,
         UI.Attach(usage),
         actions,
@@ -374,15 +381,19 @@ local function BuildProfiles(container)
         end),
         UI.Note(c, L["In test mode you always see the profile you are editing, with the number of players chosen here."]),
         Header(L["General"]),
-        UI.Check(c, L["Hide Blizzard party and raid frames (requires /reload)"],
+        -- hiding applies at once; showing them again needs a reload
+        UI.Check(c, L["Hide Blizzard party and raid frames"],
             function() return ns.db.hideBlizzard end,
-            function(v) ns.db.hideBlizzard = v ns.Print(L["applies after /reload."]) end),
+            function(v) ns.db.hideBlizzard = v if v then ns.HideBlizzard() end end),
         UI.Check(c, L["Show the minimap button"],
             function() return not ns.db.minimap.hide end,
             function(v) ns.db.minimap.hide = not v ns.UpdateMinimapButton() end),
-        UI.Segmented(c, L["Language (requires /reload)"], ns.LANGUAGES,
+        UI.Segmented(c, L["Language"], ns.LANGUAGES,
             function() return ns.db.language end,
-            function(v) ns.db.language = v ns.Print(L["applies after /reload."]) end),
+            function(v) ns.db.language = v end),
+        -- only while something waits for a reload
+        Cond(UI.Note(c, L["|cffff8c4dReload the interface to apply the changes.|r"]), ns.NeedsReload),
+        Cond(UI.Buttons(c, { { L["Reload now"], ReloadUI } }), ns.NeedsReload),
     })
 end
 

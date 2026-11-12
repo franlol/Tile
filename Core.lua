@@ -384,6 +384,7 @@ hiddenParent:Hide()
 function ns.HideBlizzard()
     if not ns.db.hideBlizzard then return end
     ns.RunOOC("hideBlizzard", function()
+        ns.blizzHidden = true
         for _, name in ipairs({ "CompactRaidFrameManager", "CompactRaidFrameContainer", "CompactPartyFrame", "PartyFrame" }) do
             local f = _G[name]
             if f then
@@ -392,6 +393,13 @@ function ns.HideBlizzard()
             end
         end
     end)
+end
+
+-- General options that only apply after /reload: the language, and showing
+-- the Blizzard frames again once they were hidden
+function ns.NeedsReload()
+    local lang = ns.translations[ns.db.language] and ns.db.language or "enUS"
+    return lang ~= ns.language or (ns.blizzHidden and not ns.db.hideBlizzard) or false
 end
 
 -------------------------------------------------------------------------------
