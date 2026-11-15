@@ -1171,18 +1171,22 @@ local function FillTest(b)
     -- one example of each state
     local TS = T.status
     local stext, skey
-    if i == 7 then stext, skey = L["Dead"], "dead"
+    -- (Offline in the first group: the text color is seen at any test size)
+    if i == 5 then stext, skey = L["Offline"], "offline"
+    elseif i == 7 then stext, skey = L["Dead"], "dead"
     elseif i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
     elseif i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
     elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
     elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
     local dead = skey == "dead" or skey == "res"
+    local down = dead or skey == "offline"
     b.cacheStatus, b.statusKey = stext, skey
     b.status:SetText((stext and TS.show) and stext or "")
     ns.StatusColor(b, skey, class)
-    if dead then
+    b.health.bg:SetAlpha(down and 0.4 or 1)   -- like the real frames
+    if dead then b.health:SetValue(0) end
+    if down then
         b.hpText:SetText("")
-        b.health:SetValue(0)
     else
         HealthText(b, nil, math.floor(hp * 10000), 10000)
     end

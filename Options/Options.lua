@@ -520,7 +520,7 @@ local function BuildTexts(container)
     local function statusOn() return S().show end
     local alerts = {
         Header(L["What the status text shows"]),
-        Cond(UI.Note(c, L["Always: \"Offline\", \"Dead\" and \"Ghost\". Plus the ones you enable (if there are several, the first one shows):"]), nil, statusOn),
+        Cond(UI.Note(c, L["Always: \"Offline\", \"Dead\" and \"Ghost\", in the status text color. Plus the ones you enable, each in its own color (if there are several, the first one shows):"]), nil, statusOn),
     }
     for _, st in ipairs({
         { "showRes", "resColor", L["\"Resurrecting\""] },
