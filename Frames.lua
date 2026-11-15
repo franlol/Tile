@@ -753,7 +753,9 @@ local function InitButton(header, name)
     if not b or b.tileInit then return end
     b.tileInit = true
     local isPet = header.isPet
-    if not InCombatLockdown() then pcall(b.RegisterForClicks, b, "AnyUp") end
+    -- clicks (target / menu) cannot be registered in combat: a button created
+    -- in combat gets them as soon as it ends
+    ns.RunOOC("clicks:" .. name, function() pcall(b.RegisterForClicks, b, "AnyUp") end)
     ns.BuildVisuals(b)
     ns.LayoutButton(b, isPet)
     b:SetScript("OnEvent", OnButtonEvent)
