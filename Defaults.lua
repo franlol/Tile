@@ -11,6 +11,17 @@ ns.FLAT, ns.FONT = FLAT, FONT
 
 local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 
+-- States of the status text: their switch, color and text (English key)
+ns.STATUS_STATES = {
+    offline = { show = "showOffline", color = "offlineColor", text = "Offline" },
+    res = { show = "showRes", color = "resColor", text = "Resurrecting" },
+    dead = { show = "showDead", color = "deadColor", text = "Dead" },
+    ghost = { show = "showGhost", color = "ghostColor", text = "Ghost" },
+    charm = { show = "showCharm", color = "charmColor", text = "Charmed" },
+    summon = { show = "showSummon", color = "summonColor", text = "Summon" },
+    afk = { show = "showAFK", color = "afkColor", text = "AFK" },
+}
+
 -- A color from one of the game's tables (or r, g, b if it is missing)
 local function GameColor(t, r, g, b)
     if t and t.r then return C(t.r, t.g, t.b) end
@@ -147,6 +158,7 @@ ns.profileDefaults = {
             show = true, font = FONT, size = 10, outline = "OUTLINE",
             point = "CENTER", x = 0, y = -3,
             -- states, by priority (the first one that applies shows), each with its color
+            order = { "offline", "res", "dead", "ghost", "charm", "summon", "afk" },
             showOffline = true, offlineColor = C(0.75, 0.75, 0.75),
             showRes = true, resColor = C(0.3, 1, 0.45),        -- someone is casting a resurrection on them
             showDead = true, deadColor = C(0.75, 0.75, 0.75),
@@ -357,6 +369,17 @@ function ns.FixProfile(p)
         end
     end
     if type(st) == "table" then st.colorMode, st.color = nil, nil end
+    -- priority of the states: every known one exactly once (missing ones at the end)
+    if type(st) == "table" and type(st.order) == "table" then
+        local order, seen = {}, {}
+        for _, k in ipairs(st.order) do
+            if ns.STATUS_STATES[k] and not seen[k] then order[#order + 1], seen[k] = k, true end
+        end
+        for _, k in ipairs(ns.profileDefaults.texts.status.order) do
+            if not seen[k] then order[#order + 1] = k end
+        end
+        st.order = order
+    end
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health

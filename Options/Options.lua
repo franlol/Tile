@@ -511,14 +511,57 @@ local function TextSection(c, key, title, extra)
     }
 end
 
+local selState = "offline"   -- status text state being edited
+
 local function BuildTexts(container)
     local page = UI.Page(container, 2)
     local c = page.content
 
-    -- Status text: one look for every state, then the states by priority,
-    -- each with its switch and its color
+    -- Status text: one look for every state, then the states in a list.
+    -- Check box = on/off, drag = priority, click = its color below.
     local S = function() return ns.EP().texts.status end
+    local STATES = ns.STATUS_STATES
     local function statusOn() return S().show end
+    local function Sel() return STATES[selState] end
+
+    local states = UI.List(c, {
+        items = function() return S().order end,
+        label = function(k) return L[STATES[k].text] end,
+        off = function(k) return not S()[STATES[k].show] end,
+        checked = function(k) return S()[STATES[k].show] and true or false end,
+        onCheck = function(k, v) S()[STATES[k].show] = v Repaint() end,
+        lead = "swatch",
+        color = function(k)
+            local col = S()[STATES[k].color]
+            return { col.r, col.g, col.b }
+        end,
+        selected = function(k) return k == selState end,
+        onSelect = function(_, k) selState = k end,
+        onReorder = function(from, to)
+            local order = S().order
+            table.insert(order, to, table.remove(order, from))
+            Repaint()
+        end,
+        rows = #S().order,
+    })
+
+    -- color of the selected state, named after it
+    local stateColor = Swatch(c, L["Color"], function() return S()[Sel().color] end, nil, true)
+    local baseRefresh = stateColor.Refresh
+    stateColor.Refresh = function(self)
+        baseRefresh(self)
+        stateColor.label:SetText(("%s · %s"):format(L["Color"], L[Sel().text]))
+    end
+
+    -- what the selected state means, when its name is not enough
+    local HINTS = {
+        charm = "Mind controlled: they can attack you.",
+        summon = "Pending, accepted or declined.",
+    }
+    local hint = UI.Note(c, "")
+    hint.Refresh = function() hint:SetText(L[HINTS[selState] or ""]) end
+    table.insert(UI.widgets, hint)
+
     local status = {
         Header(L["Status text"]),
         TextBlock(c, S, ns.ProfileChanged, {
@@ -526,23 +569,12 @@ local function BuildTexts(container)
             enableIf = statusOn,
             colorIf = function() return false end,   -- each state has its own color
         }),
-        Cond(UI.Note(c, L["States, by priority: when several apply, the first one shows."]), nil, statusOn),
+        Cond(UI.Note(c, L["States: drag to change the priority. When several apply, the top one shows."]), nil, statusOn),
+        Cond(states, nil, statusOn),
+        Cond(UI.Attach(stateColor), nil, statusOn),
+        Cond(UI.Attach(hint), function() return HINTS[selState] ~= nil end, statusOn),
+        UI.Note(c, L["Drinking and eating is an indicator (Indicators tab)."]),
     }
-    for _, st in ipairs({
-        { "showOffline", "offlineColor", L["Offline"] },
-        { "showRes", "resColor", L["Resurrecting"] },
-        { "showDead", "deadColor", L["Dead"] },
-        { "showGhost", "ghostColor", L["Ghost"] },
-        { "showCharm", "charmColor", L["Charmed"], L["Mind controlled: they can attack you."] },
-        { "showSummon", "summonColor", L["Summon"], L["Pending, accepted or declined."] },
-        { "showAFK", "afkColor", L["AFK"] },
-    }) do
-        local function on() return statusOn() and S()[st[1]] end
-        status[#status + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
-        if st[4] then status[#status + 1] = Cond(UI.Attach(UI.Note(c, st[4])), nil, statusOn) end
-        status[#status + 1] = Cond(UI.Attach(Swatch(c, L["Color"], function() return S()[st[2]] end, nil, true)), nil, on)
-    end
-    status[#status + 1] = UI.Note(c, L["Drinking and eating is an indicator (Indicators tab)."])
 
     Cards(page, 1, {
         TextSection(c, "name", L["Name"], {

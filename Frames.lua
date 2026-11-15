@@ -348,50 +348,48 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
--- Status text: every state has its own switch and color
--- key -> { switch, color }
-local STATUS_KEYS = {
-    offline = { "showOffline", "offlineColor" }, res = { "showRes", "resColor" },
-    dead = { "showDead", "deadColor" }, ghost = { "showGhost", "ghostColor" },
-    charm = { "showCharm", "charmColor" }, summon = { "showSummon", "summonColor" },
-    afk = { "showAFK", "afkColor" },
-}
+-- Status text: every state has its own switch and color (ns.STATUS_STATES)
 function ns.StatusColor(b, key)
-    local s = key and STATUS_KEYS[key]
-    local c = s and ns.P.texts.status[s[2]]
+    local s = key and ns.STATUS_STATES[key]
+    local c = s and ns.P.texts.status[s.color]
     if c then b.status:SetTextColor(c.r, c.g, c.b, c.a or 1) else b.status:SetTextColor(1, 1, 1, 1) end
-end
-
--- Text of a state, or nil when its switch is off
-local function StatusText(key, text)
-    return ns.P.texts.status[STATUS_KEYS[key][1]] and text or nil
 end
 
 local SUMMON_TEXT = { [1] = "Summon", [2] = "Summon accepted", [3] = "Summon declined" }
 
--- What the status text says: text (nil when that state is turned off), key
--- (for the color) and whether they are "down" (offline or dead: the
--- background and health text are dimmed, even with the state turned off).
--- In order: Offline > Resurrecting > Dead/Ghost > Charmed > Summon > AFK
-local function StatusOf(u)
-    local T = ns.P.texts.status
-    if R(UnitIsConnected(u)) == false then return StatusText("offline", L["Offline"]), "offline", true end
-    local ghost = R(UnitIsGhost(u))
-    if ghost or R(UnitIsDead(u)) then
-        if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
-            return L["Resurrecting"], "res", true
-        end
-        if ghost then return StatusText("ghost", L["Ghost"]), "ghost", true end
-        return StatusText("dead", L["Dead"]), "dead", true
-    end
-    if T.showCharm and UnitIsCharmed and R(UnitIsCharmed(u)) then return L["Charmed"], "charm", false end
-    if T.showSummon and C_IncomingSummon and C_IncomingSummon.IncomingSummonStatus then
+-- Whether each state applies to a unit: its text, or nil
+local STATE_TEXT = {
+    offline = function(u) return R(UnitIsConnected(u)) == false and L["Offline"] or nil end,
+    res = function(u)
+        local deadish = R(UnitIsGhost(u)) or R(UnitIsDead(u))
+        return deadish and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) and L["Resurrecting"] or nil
+    end,
+    ghost = function(u) return R(UnitIsGhost(u)) and L["Ghost"] or nil end,
+    dead = function(u) return not R(UnitIsGhost(u)) and R(UnitIsDead(u)) and L["Dead"] or nil end,
+    charm = function(u) return UnitIsCharmed and R(UnitIsCharmed(u)) and L["Charmed"] or nil end,
+    summon = function(u)
+        if not (C_IncomingSummon and C_IncomingSummon.IncomingSummonStatus) then return nil end
         local ok, st = pcall(C_IncomingSummon.IncomingSummonStatus, u)
         st = ok and R(st)
-        if st and SUMMON_TEXT[st] then return L[SUMMON_TEXT[st]], "summon", false end
+        return st and SUMMON_TEXT[st] and L[SUMMON_TEXT[st]] or nil
+    end,
+    afk = function(u) return UnitIsAFK and R(UnitIsAFK(u)) and L["AFK"] or nil end,
+}
+
+-- What the status text says: text and key (for the color) of the first
+-- state turned on that applies, in the profile's order; and whether they
+-- are "down" (offline or dead: the background and health text are dimmed,
+-- whatever the text shows)
+local function StatusOf(u)
+    local T = ns.P.texts.status
+    local down = R(UnitIsConnected(u)) == false or R(UnitIsGhost(u)) or R(UnitIsDead(u)) or false
+    for _, key in ipairs(T.order) do
+        if T[ns.STATUS_STATES[key].show] then
+            local text = STATE_TEXT[key](u)
+            if text then return text, key, down end
+        end
     end
-    if T.showAFK and UnitIsAFK and R(UnitIsAFK(u)) then return L["AFK"], "afk", false end
-    return nil
+    return nil, nil, down
 end
 
 function ns.UpdateColors(b, testClass, testPct)
