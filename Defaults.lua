@@ -145,13 +145,15 @@ ns.profileDefaults = {
         },
         status = {
             show = true, font = FONT, size = 10, outline = "OUTLINE",
-            colorMode = "custom", color = C(0.75, 0.75, 0.75),
             point = "CENTER", x = 0, y = -3,
-            -- extra states (each with its own color); Offline, Dead and Ghost always
-            showRes = true, resColor = C(0.3, 1, 0.45),        -- "Resurrecting": someone is casting a resurrection on them
-            showCharm = true, charmColor = C(1, 0.4, 0.8),     -- "Charmed": mind controlled
-            showSummon = true, summonColor = C(0.7, 0.55, 1),  -- "Summon": pending, accepted or declined
-            showAFK = true, afkColor = C(1, 0.8, 0.3),         -- "AFK": away
+            -- states, by priority (the first one that applies shows), each with its color
+            showOffline = true, offlineColor = C(0.75, 0.75, 0.75),
+            showRes = true, resColor = C(0.3, 1, 0.45),        -- someone is casting a resurrection on them
+            showDead = true, deadColor = C(0.75, 0.75, 0.75),
+            showGhost = true, ghostColor = C(0.75, 0.75, 0.75),
+            showCharm = true, charmColor = C(1, 0.4, 0.8),     -- mind controlled
+            showSummon = true, summonColor = C(0.7, 0.55, 1),  -- pending, accepted or declined
+            showAFK = true, afkColor = C(1, 0.8, 0.3),         -- away
         },
         health = {
             show = false, format = "deficit", hideFull = true,
@@ -345,6 +347,16 @@ end
 function ns.FixProfile(p)
     local inds = p.indicators
     p.indicators = nil
+    -- the old status text color (Offline, Dead and Ghost shared it) is now
+    -- the color of each of those states
+    local st = type(p.texts) == "table" and p.texts.status
+    if type(st) == "table" and st.offlineColor == nil and st.colorMode then
+        local c = st.colorMode == "white" and C(1, 1, 1) or (st.colorMode == "custom" and st.color)
+        if c then
+            st.offlineColor, st.deadColor, st.ghostColor = ns.DeepCopy(c), ns.DeepCopy(c), ns.DeepCopy(c)
+        end
+    end
+    if type(st) == "table" then st.colorMode, st.color = nil, nil end
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health

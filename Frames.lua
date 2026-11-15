@@ -348,33 +348,41 @@ function ns.UpdateBarColor(b, testClass, testPct)
     b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
 end
 
--- Status text color: the extra states have their own; the rest
--- (Offline, Dead, Ghost) use the text color
-local STATUS_COLOR = { res = "resColor", charm = "charmColor", summon = "summonColor", afk = "afkColor" }
-function ns.StatusColor(b, key, testClass)
-    local T = ns.P.texts.status
-    local c = key and STATUS_COLOR[key] and T[STATUS_COLOR[key]]
-    if c then
-        b.status:SetTextColor(c.r, c.g, c.b, c.a or 1)
-    else
-        TextColor(b.status, T, UnitColor(b.unit, b.isPet, testClass))
-    end
+-- Status text: every state has its own switch and color
+-- key -> { switch, color }
+local STATUS_KEYS = {
+    offline = { "showOffline", "offlineColor" }, res = { "showRes", "resColor" },
+    dead = { "showDead", "deadColor" }, ghost = { "showGhost", "ghostColor" },
+    charm = { "showCharm", "charmColor" }, summon = { "showSummon", "summonColor" },
+    afk = { "showAFK", "afkColor" },
+}
+function ns.StatusColor(b, key)
+    local s = key and STATUS_KEYS[key]
+    local c = s and ns.P.texts.status[s[2]]
+    if c then b.status:SetTextColor(c.r, c.g, c.b, c.a or 1) else b.status:SetTextColor(1, 1, 1, 1) end
+end
+
+-- Text of a state, or nil when its switch is off
+local function StatusText(key, text)
+    return ns.P.texts.status[STATUS_KEYS[key][1]] and text or nil
 end
 
 local SUMMON_TEXT = { [1] = "Summon", [2] = "Summon accepted", [3] = "Summon declined" }
 
--- What the status text says: text, key (for the color) and whether they are
--- "down" (offline or dead: the background and health text are dimmed). In order:
--- Offline > Resurrecting > Ghost/Dead > Charmed > Summon > AFK
+-- What the status text says: text (nil when that state is turned off), key
+-- (for the color) and whether they are "down" (offline or dead: the
+-- background and health text are dimmed, even with the state turned off).
+-- In order: Offline > Resurrecting > Dead/Ghost > Charmed > Summon > AFK
 local function StatusOf(u)
     local T = ns.P.texts.status
-    if R(UnitIsConnected(u)) == false then return L["Offline"], "offline", true end
+    if R(UnitIsConnected(u)) == false then return StatusText("offline", L["Offline"]), "offline", true end
     local ghost = R(UnitIsGhost(u))
     if ghost or R(UnitIsDead(u)) then
         if T.showRes and UnitHasIncomingResurrection and R(UnitHasIncomingResurrection(u)) then
             return L["Resurrecting"], "res", true
         end
-        return ghost and L["Ghost"] or L["Dead"], "dead", true
+        if ghost then return StatusText("ghost", L["Ghost"]), "ghost", true end
+        return StatusText("dead", L["Dead"]), "dead", true
     end
     if T.showCharm and UnitIsCharmed and R(UnitIsCharmed(u)) then return L["Charmed"], "charm", false end
     if T.showSummon and C_IncomingSummon and C_IncomingSummon.IncomingSummonStatus then
@@ -391,7 +399,7 @@ function ns.UpdateColors(b, testClass, testPct)
     local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
     ns.UpdateBarColor(b, testClass, testPct)
     TextColor(b.name, T.name, r, g, bl)
-    ns.StatusColor(b, b.statusKey, testClass)
+    ns.StatusColor(b, b.statusKey)
     TextColor(b.hpText, T.health, r, g, bl)
 end
 
@@ -490,7 +498,7 @@ function ns.UpdateHealth(b, full)
 
     local text, key, down = StatusOf(u)
     -- status and transparency only when they change
-    if full or text ~= b.cacheStatus then
+    if full or text ~= b.cacheStatus or key ~= b.statusKey then
         b.cacheStatus, b.statusKey = text, key
         b.status:SetText(ns.P.texts.status.show and text or "")
         ns.StatusColor(b, key)
@@ -1171,18 +1179,19 @@ local function FillTest(b)
     -- one example of each state
     local TS = T.status
     local stext, skey
-    -- (Offline in the first group: the text color is seen at any test size)
-    if i == 5 then stext, skey = L["Offline"], "offline"
-    elseif i == 7 then stext, skey = L["Dead"], "dead"
+    -- (the first group has two, so they are seen at any test size)
+    if i == 5 and TS.showOffline then stext, skey = L["Offline"], "offline"
+    elseif i == 7 and TS.showDead then stext, skey = L["Dead"], "dead"
+    elseif i == 8 and TS.showGhost then stext, skey = L["Ghost"], "ghost"
     elseif i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
     elseif i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
     elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
     elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
-    local dead = skey == "dead" or skey == "res"
+    local dead = skey == "dead" or skey == "ghost" or skey == "res"
     local down = dead or skey == "offline"
     b.cacheStatus, b.statusKey = stext, skey
     b.status:SetText((stext and TS.show) and stext or "")
-    ns.StatusColor(b, skey, class)
+    ns.StatusColor(b, skey)
     b.health.bg:SetAlpha(down and 0.4 or 1)   -- like the real frames
     if dead then b.health:SetValue(0) end
     if down then

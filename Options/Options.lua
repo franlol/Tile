@@ -515,25 +515,34 @@ local function BuildTexts(container)
     local page = UI.Page(container, 2)
     local c = page.content
 
-    -- warnings shown in the status text, each one with its color
+    -- Status text: one look for every state, then the states by priority,
+    -- each with its switch and its color
     local S = function() return ns.EP().texts.status end
     local function statusOn() return S().show end
-    local alerts = {
-        Header(L["What the status text shows"]),
-        Cond(UI.Note(c, L["Always: \"Offline\", \"Dead\" and \"Ghost\", in the status text color. Plus the ones you enable, each in its own color (if there are several, the first one shows):"]), nil, statusOn),
+    local status = {
+        Header(L["Status text"]),
+        TextBlock(c, S, ns.ProfileChanged, {
+            show = { PB("texts.status.show") },
+            enableIf = statusOn,
+            colorIf = function() return false end,   -- each state has its own color
+        }),
+        Cond(UI.Note(c, L["States, by priority: when several apply, the first one shows."]), nil, statusOn),
     }
     for _, st in ipairs({
-        { "showRes", "resColor", L["\"Resurrecting\""] },
-        { "showCharm", "charmColor", L["\"Charmed\""], L["Mind controlled: they can attack you."] },
-        { "showSummon", "summonColor", L["\"Summon\""], L["They have a pending, accepted or declined summon."] },
-        { "showAFK", "afkColor", L["\"AFK\""] },
+        { "showOffline", "offlineColor", L["Offline"] },
+        { "showRes", "resColor", L["Resurrecting"] },
+        { "showDead", "deadColor", L["Dead"] },
+        { "showGhost", "ghostColor", L["Ghost"] },
+        { "showCharm", "charmColor", L["Charmed"], L["Mind controlled: they can attack you."] },
+        { "showSummon", "summonColor", L["Summon"], L["Pending, accepted or declined."] },
+        { "showAFK", "afkColor", L["AFK"] },
     }) do
         local function on() return statusOn() and S()[st[1]] end
-        alerts[#alerts + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
-        if st[4] then alerts[#alerts + 1] = Cond(UI.Attach(UI.Note(c, st[4])), nil, statusOn) end
-        alerts[#alerts + 1] = Cond(UI.Attach(Swatch(c, L["Color"], function() return S()[st[2]] end, nil, true)), nil, on)
+        status[#status + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
+        if st[4] then status[#status + 1] = Cond(UI.Attach(UI.Note(c, st[4])), nil, statusOn) end
+        status[#status + 1] = Cond(UI.Attach(Swatch(c, L["Color"], function() return S()[st[2]] end, nil, true)), nil, on)
     end
-    alerts[#alerts + 1] = UI.Note(c, L["They use the font, size and position of the status text. Drinking and eating is an indicator (Indicators tab)."])
+    status[#status + 1] = UI.Note(c, L["Drinking and eating is an indicator (Indicators tab)."])
 
     Cards(page, 1, {
         TextSection(c, "name", L["Name"], {
@@ -551,10 +560,7 @@ local function BuildTexts(container)
         }),
     })
 
-    Cards(page, 2, {
-        TextSection(c, "status", L["Status text"]),
-        alerts,
-    })
+    Cards(page, 2, status)
 end
 
 -------------------------------------------------------------------------------
