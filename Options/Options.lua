@@ -1624,7 +1624,7 @@ local function BuildColors(container)
         { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
         { "none", L["No type (border and tint)"] },
     }) do
-        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2], 18), function() return ns.EP().dispelColors[d[1]] end)
+        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2], 22), function() return ns.EP().dispelColors[d[1]] end)
     end
 
     local reset = UI.Buttons(c, {
