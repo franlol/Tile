@@ -515,14 +515,6 @@ local function BuildTexts(container)
     local page = UI.Page(container, 2)
     local c = page.content
 
-    Cards(page, 1, {
-        TextSection(c, "name", L["Name"], {
-            UI.Check(c, L["With surname"], PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
-            Slider(c, L["Max width (% of the frame)"], 30, 100, 1, UI.percent, PB("texts.name.width")),
-        }),
-        TextSection(c, "status", L["Status text"]),
-    })
-
     -- warnings shown in the status text, each one with its color
     local S = function() return ns.EP().texts.status end
     local function statusOn() return S().show end
@@ -531,23 +523,25 @@ local function BuildTexts(container)
         Cond(UI.Note(c, L["Always: \"Offline\", \"Dead\" and \"Ghost\". Plus the ones you enable (if there are several, the first one shows):"]), nil, statusOn),
     }
     for _, st in ipairs({
-        { "showRes", "resColor", L["\"Resurrecting\""], L["Someone is casting a resurrection on them."] },
+        { "showRes", "resColor", L["\"Resurrecting\""] },
         { "showCharm", "charmColor", L["\"Charmed\""], L["Mind controlled: they can attack you."] },
         { "showSummon", "summonColor", L["\"Summon\""], L["They have a pending, accepted or declined summon."] },
-        { "showAFK", "afkColor", L["\"AFK\""], L["They are away (AFK)."] },
+        { "showAFK", "afkColor", L["\"AFK\""] },
     }) do
         local function on() return statusOn() and S()[st[1]] end
         alerts[#alerts + 1] = Cond(UI.Check(c, st[3], PB("texts.status." .. st[1])), nil, statusOn)
-        alerts[#alerts + 1] = Cond(UI.Attach(UI.Note(c, st[4])), nil, statusOn)
+        if st[4] then alerts[#alerts + 1] = Cond(UI.Attach(UI.Note(c, st[4])), nil, statusOn) end
         alerts[#alerts + 1] = Cond(UI.Attach(Swatch(c, L["Color"], function() return S()[st[2]] end, nil, true)), nil, on)
     end
     alerts[#alerts + 1] = UI.Note(c, L["They use the font, size and position of the status text. Drinking and eating is an indicator (Indicators tab)."])
 
-    Cards(page, 2, {
-        alerts,
+    Cards(page, 1, {
+        TextSection(c, "name", L["Name"], {
+            UI.Check(c, L["With surname"], PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
+            Slider(c, L["Max width (% of the frame)"], 30, 100, 1, UI.percent, PB("texts.name.width")),
+        }),
         TextSection(c, "health", L["Health text"], {
             UI.Dropdown(c, L["Format"], {
-                { "none", L["No text"] },
                 { "deficit", L["Missing health (-1.2k)"] },
                 { "percent", L["Percentage (85%)"] },
                 { "current", L["Current health (3.4k)"] },
@@ -555,6 +549,11 @@ local function BuildTexts(container)
             }, PB("texts.health.format")),
             UI.Check(c, L["Hide at full health"], PB("texts.health.hideFull")),
         }),
+    })
+
+    Cards(page, 2, {
+        TextSection(c, "status", L["Status text"]),
+        alerts,
     })
 end
 

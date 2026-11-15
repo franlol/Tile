@@ -418,7 +418,7 @@ end
 local function HealthText(b, u, cur, max)
     local t = ns.P.texts.health
     local fs = b.hpText
-    if not t.show or t.format == "none" then fs:SetText("") return end
+    if not t.show then fs:SetText("") return end
     if not AnyS(cur, max) then
         if not max or max <= 0 or (t.hideFull and cur >= max) then fs:SetText("") return end
         if t.format == "deficit" then fs:SetText("-" .. Abbrev(max - cur))

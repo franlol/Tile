@@ -154,7 +154,7 @@ ns.profileDefaults = {
             showAFK = true, afkColor = C(1, 0.8, 0.3),         -- "AFK": away
         },
         health = {
-            show = true, format = "none", hideFull = true,
+            show = false, format = "deficit", hideFull = true,
             font = FONT, size = 9, outline = "OUTLINE",
             colorMode = "custom", color = C(1, 1, 1),
             point = "BOTTOM", x = 0, y = 5,
@@ -346,6 +346,9 @@ function ns.FixProfile(p)
     local inds = p.indicators
     p.indicators = nil
     ns.CopyDefaults(ns.profileDefaults, p)
+    -- the old "No text" health format is now the Show box turned off
+    local ht = p.texts.health
+    if ht.format == "none" then ht.show, ht.format = false, "deficit" end
     if type(inds) ~= "table" then
         local _, class = UnitClass("player")
         inds = ns.DefaultIndicators(class)
