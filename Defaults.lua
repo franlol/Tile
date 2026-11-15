@@ -11,6 +11,35 @@ ns.FLAT, ns.FONT = FLAT, FONT
 
 local function C(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 
+-- A color from one of the game's tables (or r, g, b if it is missing)
+local function GameColor(t, r, g, b)
+    if t and t.r then return C(t.r, t.g, t.b) end
+    return C(r, g, b)
+end
+
+-- Starting colors of the Colors page: the game's own
+local function ClassDefaults()
+    local fallback = {
+        WARRIOR = { 0.78, 0.61, 0.43 }, PALADIN = { 0.96, 0.55, 0.73 }, HUNTER = { 0.67, 0.83, 0.45 },
+        ROGUE = { 1, 0.96, 0.41 }, PRIEST = { 1, 1, 1 }, SHAMAN = { 0, 0.44, 0.87 },
+        MAGE = { 0.25, 0.78, 0.92 }, WARLOCK = { 0.53, 0.53, 0.93 }, DRUID = { 1, 0.49, 0.04 },
+    }
+    local t = {}
+    for token, f in pairs(fallback) do
+        t[token] = GameColor(RAID_CLASS_COLORS and RAID_CLASS_COLORS[token], f[1], f[2], f[3])
+    end
+    return t
+end
+
+local function PowerDefaults()
+    local P = PowerBarColor
+    return {
+        MANA = GameColor(P and P.MANA, 0, 0, 1),
+        RAGE = GameColor(P and P.RAGE, 1, 0, 0),
+        ENERGY = GameColor(P and P.ENERGY, 1, 1, 0),
+    }
+end
+
 -- Status icon: its own settings plus the shared background and border ones
 local function Element(t)
     t.bg, t.bgColor = false, C(0, 0, 0, 0.6)
@@ -144,6 +173,13 @@ ns.profileDefaults = {
     dispelColors = {
         Magic = C(0.2, 0.6, 1), Curse = C(0.6, 0, 1), Disease = C(0.6, 0.4, 0), Poison = C(0, 0.6, 0),
         none = C(0.85, 0.1, 0.1),
+    },
+    -- Colors page: what "class color", "resource color" and "by health" use
+    colors = {
+        class = ClassDefaults(),
+        pet = C(0, 0.8, 0.2),   -- pets: a fixed green, like Blizzard's raid frames
+        power = PowerDefaults(),
+        gradient = { low = C(1, 0, 0), mid = C(1, 1, 0), high = C(0, 1, 0) },
     },
     -- indicators: created separately (ordered list)
 }

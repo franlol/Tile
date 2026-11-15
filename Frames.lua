@@ -293,11 +293,13 @@ end
 
 local TextColor = ns.ColorText
 
--- Red -> yellow -> green gradient by health percentage (0..1)
+-- Low -> half -> full health gradient (Colors page) by health percentage (0..1)
 local function Gradient(pct)
     pct = math.max(0, math.min(1, pct))
-    if pct < 0.5 then return 1, pct * 2, 0 end
-    return 2 - pct * 2, 1, 0
+    local G = ns.P.colors.gradient
+    local a, b, t = G.low, G.mid, pct * 2
+    if pct >= 0.5 then a, b, t = G.mid, G.high, pct * 2 - 1 end
+    return a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t
 end
 
 -- Readable health percentage, or nil when the game hides it
@@ -522,8 +524,7 @@ function ns.UpdatePower(b)
     ns.UpdatePowerValue(b)
     b.lastPowerUnit = u
     token = R(token)
-    local c = token and PowerBarColor and PowerBarColor[token]
-    if c then PowerColor(b, c.r, c.g, c.b) else PowerColor(b, 0.3, 0.5, 1) end
+    PowerColor(b, ns.PowerColorOf(token))
 end
 
 -- In Forever characters have a surname: UnitName returns (name, surname)
@@ -1163,9 +1164,9 @@ local function FillTest(b)
     AnchorHealth(b, wantPower)
     b.power:SetMinMaxValues(0, 100)
     b.power:SetValue(60)
-    local pc = (class == "WARRIOR" and PowerBarColor and PowerBarColor.RAGE)
-        or (class == "ROGUE" and PowerBarColor and PowerBarColor.ENERGY)
-    if pc then PowerColor(b, pc.r, pc.g, pc.b, class) else PowerColor(b, 0, 0.55, 1, class) end
+    local token = (class == "WARRIOR" and "RAGE") or (class == "ROGUE" and "ENERGY") or "MANA"
+    local pr, pg, pb = ns.PowerColorOf(token)
+    PowerColor(b, pr, pg, pb, class)
 
     -- one example of each state
     local TS = T.status

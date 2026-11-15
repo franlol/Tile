@@ -139,19 +139,30 @@ function ns.ColorText(fs, t, r, g, b)
     end
 end
 
--- Pets get a fixed green, like Blizzard's raid frames (not their owner's class)
-local PET_COLOR = { r = 0, g = 0.8, b = 0.2 }
-
--- Class color of a unit (if the game lets us read it); pets use PET_COLOR
+-- Class color of a unit (if the game lets us read it), from the Colors page.
+-- Pets get their own color, like Blizzard's raid frames (not their owner's class).
 function ns.ClassColorOf(unit, previewClass, isPet)
-    if isPet then return PET_COLOR.r, PET_COLOR.g, PET_COLOR.b end
+    local colors = ns.P and ns.P.colors
+    if isPet then
+        local pc = colors and colors.pet
+        if pc then return pc.r, pc.g, pc.b end
+        return 0, 0.8, 0.2
+    end
     local c = previewClass
     if not c and unit then
         local _, class = UnitClass(unit)
         if ns.R then class = ns.R(class) end
         c = class
     end
-    local cc = c and RAID_CLASS_COLORS and RAID_CLASS_COLORS[c]
+    if not c then return nil end
+    local cc = (colors and colors.class[c]) or (RAID_CLASS_COLORS and RAID_CLASS_COLORS[c])
     if cc then return cc.r, cc.g, cc.b end
     return nil
+end
+
+-- Color of a resource (MANA, RAGE, ENERGY...), from the Colors page
+function ns.PowerColorOf(token)
+    local c = token and ((ns.P and ns.P.colors and ns.P.colors.power[token]) or (PowerBarColor and PowerBarColor[token]))
+    if c then return c.r, c.g, c.b end
+    return 0.3, 0.5, 1
 end

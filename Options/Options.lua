@@ -1012,22 +1012,12 @@ local function BuildIndicators(container)
     end
     table.insert(UI.widgets, posSample)
 
-    -- colors per type (shared by every indicator of the profile)
+    -- the colors per type are shared by every indicator: they live in the Colors page
     local function DispelSwatches()
         local function typed() return ns.IndicatorTyped(Sel()) and (frameT() or iconLike()) end
         local function on() return Sel().dispelColor end
-        local out = {}
-        for _, d in ipairs({
-            { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
-            { "none", L["No type (border and tint)"] },
-        }) do
-            -- the game draws these colors without opacity: no opacity here
-            out[#out + 1] = WE(UI.Attach(Swatch(c, ns.DispelLabel(d[1], d[2]), function() return ns.EP().dispelColors[d[1]] end)),
-                function() return typed() and (d[1] ~= "none" or frameT()) end, on)
-        end
-        out[#out + 1] = WE(UI.Attach(UI.Note(c, L["They are the same for every indicator in the profile. \"No type\" is for debuffs that have no type."])),
+        return WE(UI.Attach(UI.Buttons(c, { { L["Edit type colors"], function() win:Select("colors") end } })),
             typed, on)
-        return out
     end
 
     local function sized() return rect() or iconLike() end
@@ -1604,6 +1594,91 @@ local function BuildInstances(container)
 end
 
 -------------------------------------------------------------------------------
+-- Colors: the ones behind "class color", "resource color", "by health" and
+-- "color by type", for the whole profile
+-------------------------------------------------------------------------------
+local COLOR_CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+
+-- Strip with the health gradient, drawn with the same blend as the bars
+local GRADIENT_STEPS = 40
+local function GradientStrip(parent)
+    local r = UI.Row(parent, 12)
+    local slices = {}
+    for i = 1, GRADIENT_STEPS do
+        slices[i] = r:CreateTexture(nil, "ARTWORK")
+    end
+    local function Mix(a, b, t) return a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t end
+    r.Refresh = function()
+        local G = ns.EP().colors.gradient
+        for i, tex in ipairs(slices) do
+            local pct = (i - 1) / (GRADIENT_STEPS - 1)
+            if pct < 0.5 then tex:SetColorTexture(Mix(G.low, G.mid, pct * 2))
+            else tex:SetColorTexture(Mix(G.mid, G.high, pct * 2 - 1)) end
+        end
+    end
+    r.OnWidth = function(w)
+        local sw = w / GRADIENT_STEPS
+        for i, tex in ipairs(slices) do
+            tex:ClearAllPoints()
+            tex:SetPoint("TOPLEFT", (i - 1) * sw, 0)
+            tex:SetSize(sw + 0.5, 12)   -- a hair of overlap: no seams between slices
+        end
+    end
+    table.insert(UI.widgets, r)
+    return r
+end
+
+local function BuildColors(container)
+    local page = UI.Page(container, 2)
+    local c = page.content
+    local function Col(group, key) return function() return ns.EP().colors[group][key] end end
+
+    local classes = { Header(L["Classes"]) }
+    for _, token in ipairs(COLOR_CLASSES) do
+        classes[#classes + 1] = Swatch(c, L[ns.CLASS_NAMES[token]], Col("class", token))
+    end
+    classes[#classes + 1] = Swatch(c, L["Pets"], function() return ns.EP().colors.pet end)
+
+    Cards(page, 1, {
+        classes,
+        Header(L["Resources"]),
+        Swatch(c, L["Mana"], Col("power", "MANA")),
+        Swatch(c, L["Rage"], Col("power", "RAGE")),
+        Swatch(c, L["Energy"], Col("power", "ENERGY")),
+    })
+
+    -- the game draws the type colors without opacity: no opacity here
+    local dispel = { Header(L["Debuff types"]) }
+    for _, d in ipairs({
+        { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
+        { "none", L["No type (border and tint)"] },
+    }) do
+        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2]), function() return ns.EP().dispelColors[d[1]] end)
+    end
+
+    local reset = UI.Buttons(c, {
+        { L["Reset every color"], function()
+            local P, D = ns.EP(), ns.profileDefaults
+            P.colors = ns.DeepCopy(D.colors)
+            P.dispelColors = ns.DeepCopy(D.dispelColors)
+            Repaint()
+        end, "danger" },
+    })
+    UI.Confirm(reset.buttons[1], L["Sure?"])
+
+    Cards(page, 2, {
+        Header(L["Health gradient"]),
+        GradientStrip(c),
+        Swatch(c, L["Low health"], Col("gradient", "low")),
+        Swatch(c, L["Half health"], Col("gradient", "mid")),
+        Swatch(c, L["Full health"], Col("gradient", "high")),
+        dispel,
+        Header(L["Reset"]),
+        reset,
+    })
+end
+
+-------------------------------------------------------------------------------
 -- Window
 -------------------------------------------------------------------------------
 local function CreateWindow()
@@ -1620,6 +1695,7 @@ local function CreateWindow()
     win:AddNav("bars", L["Bars"], BuildBars)
     win:AddNav("texts", L["Texts"], BuildTexts)
     win:AddNav("elements", L["Status icons"], BuildElements)
+    win:AddNav("colors", L["Colors"], BuildColors)
     win:AddNav("indicators", L["Indicators"], BuildIndicators)
     win:AddNav("catalog", L["Catalog"], BuildCatalog)
     win:AddNav("instances", L["Instances"], BuildInstances)
