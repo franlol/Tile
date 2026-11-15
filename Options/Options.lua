@@ -1599,35 +1599,6 @@ end
 -------------------------------------------------------------------------------
 local COLOR_CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 
--- Strip with the health gradient, drawn with the same blend as the bars
-local GRADIENT_STEPS = 40
-local function GradientStrip(parent)
-    local r = UI.Row(parent, 12)
-    local slices = {}
-    for i = 1, GRADIENT_STEPS do
-        slices[i] = r:CreateTexture(nil, "ARTWORK")
-    end
-    local function Mix(a, b, t) return a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t end
-    r.Refresh = function()
-        local G = ns.EP().colors.gradient
-        for i, tex in ipairs(slices) do
-            local pct = (i - 1) / (GRADIENT_STEPS - 1)
-            if pct < 0.5 then tex:SetColorTexture(Mix(G.low, G.mid, pct * 2))
-            else tex:SetColorTexture(Mix(G.mid, G.high, pct * 2 - 1)) end
-        end
-    end
-    r.OnWidth = function(w)
-        local sw = w / GRADIENT_STEPS
-        for i, tex in ipairs(slices) do
-            tex:ClearAllPoints()
-            tex:SetPoint("TOPLEFT", (i - 1) * sw, 0)
-            tex:SetSize(sw + 0.5, 12)   -- a hair of overlap: no seams between slices
-        end
-    end
-    table.insert(UI.widgets, r)
-    return r
-end
-
 local function BuildColors(container)
     local page = UI.Page(container, 2)
     local c = page.content
@@ -1653,7 +1624,7 @@ local function BuildColors(container)
         { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
         { "none", L["No type (border and tint)"] },
     }) do
-        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2]), function() return ns.EP().dispelColors[d[1]] end)
+        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2], 18), function() return ns.EP().dispelColors[d[1]] end)
     end
 
     local reset = UI.Buttons(c, {
@@ -1668,7 +1639,6 @@ local function BuildColors(container)
 
     Cards(page, 2, {
         Header(L["Health gradient"]),
-        GradientStrip(c),
         Swatch(c, L["Low health"], Col("gradient", "low")),
         Swatch(c, L["Half health"], Col("gradient", "mid")),
         Swatch(c, L["Full health"], Col("gradient", "high")),

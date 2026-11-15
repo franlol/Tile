@@ -40,10 +40,11 @@ ns.DISPEL_ICONS = {
 }
 
 -- Text with the type icon in front (for the options)
-function ns.DispelLabel(t, text)
+function ns.DispelLabel(t, text, size)
     local icon = ns.DISPEL_ICONS[t]
     if not icon then return text end
-    return ("|T%s:14:14:0:0|t %s"):format(icon, text)
+    size = size or 14
+    return ("|T%s:%d:%d:0:0|t %s"):format(icon, size, size, text)
 end
 
 -- Color of a debuff type: the profile one (configurable) or the standard one
