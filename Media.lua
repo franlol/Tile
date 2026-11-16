@@ -17,12 +17,17 @@ local FONTS = {
 -- Textures shipped with the addon (Media folder)
 local DARK = "Interface\\AddOns\\Tile\\Media\\Dark"
 
+-- A value is a file path or the name of one of the game's atlases (the
+-- "Raid frames" ones are what Blizzard's raid frames draw).
 local TEXTURES = {
     { "Tile · Dark", DARK },
     { "Flat", "Interface\\Buttons\\WHITE8X8" },
     { "Blizzard", "Interface\\TargetingFrame\\UI-StatusBar" },
-    { "Blizzard (raid)", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
-    { "Blizzard (resource)", "Interface\\RaidFrame\\Raid-Bar-Resource-Fill" },
+    { "Raid frames", "RaidFrame-Hp-Fill" },
+    { "Raid frames · resource", "_RaidFrame-Resource-Fill" },
+    { "Raid frames · background", "raidframe-hp-bg-white" },
+    { "Arena frames", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
+    { "Pet battles", "Interface\\RaidFrame\\Raid-Bar-Resource-Fill" },
     { "Gloss", "Interface\\TargetingFrame\\BarFill2" },
     { "Smooth", "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar" },
 }
@@ -88,10 +93,14 @@ function ns.SetBarTexture(bar, path)
     if t then t:SetAlpha(none and 0 or 1) end
 end
 
--- Texture of a background (plain texture)
+-- Texture of a background (plain texture): an atlas or a file
 function ns.SetBgTexture(tex, path)
     local none = path == "none" or path == nil or path == ""
-    tex:SetTexture(none and FLAT or path)
+    if not none and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(path) then
+        tex:SetAtlas(path)
+    else
+        tex:SetTexture(none and FLAT or path)
+    end
     tex:SetShown(not none)
 end
 
