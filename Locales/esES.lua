@@ -205,6 +205,7 @@ ns.translations.esES = {
     ["Out of range opacity"] = "Opacidad fuera de rango",
     ["Highlights"] = "Resaltados",
     ["Highlight my target"] = "Resaltar mi objetivo",
+    ["Highlight on mouse over"] = "Resaltar al pasar el ratón",
     ["Mark who has threat (aggro)"] = "Marcar quien tiene amenaza (aggro)",
     ["Name"] = "Nombre",
     ["With surname"] = "Con apellido",

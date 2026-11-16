@@ -133,6 +133,13 @@ function ns.BuildVisuals(b)
     b.hl:SetFrameLevel(overlay:GetFrameLevel() + 2)
     b.hl:SetAlpha(0)
 
+    -- hover border: above the target one so both read when they coincide
+    b.hover = CreateFrame("Frame", nil, b, "BackdropTemplate")
+    b.hover:SetAllPoints()
+    b.hover:SetBackdrop({ edgeFile = FLAT, edgeSize = 1 })
+    b.hover:SetFrameLevel(overlay:GetFrameLevel() + 3)
+    b.hover:SetAlpha(0)
+
     b.aggro = overlay:CreateTexture(nil, "OVERLAY")
     b.aggro:SetPoint("TOPLEFT", 1, -1)
     b.aggro:SetPoint("TOPRIGHT", -1, -1)
@@ -275,8 +282,10 @@ function ns.LayoutButton(b, isPet)
     PlaceElement(b.raidIcon, E.raidIcon, b)
     PlaceElement(b.ready, E.ready, b)
 
-    local tc, gc = B.targetColor, B.aggroColor
+    local tc, gc, oc = B.targetColor, B.aggroColor, B.hoverColor
     b.hl:SetBackdropBorderColor(tc.r, tc.g, tc.b, tc.a)
+    b.hover:SetBackdropBorderColor(oc.r, oc.g, oc.b, oc.a)
+    if not B.hoverHighlight then b.hover:SetAlpha(0) end
     b.aggro:SetColorTexture(gc.r, gc.g, gc.b, gc.a)
 
     ns.BuildIndicators(b)
@@ -764,13 +773,15 @@ local function InitButton(header, name)
     end)
     b:HookScript("OnShow", function(self) if self.unit then ns.UpdateButton(self) end end)
     b:HookScript("OnEnter", function(self)
+        if ns.P.bars.hoverHighlight then self.hover:SetAlpha(1) end
         if self.unit then
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetUnit(self.unit)
             GameTooltip:Show()
         end
     end)
-    b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    b:HookScript("OnLeave", function(self) self.hover:SetAlpha(0) GameTooltip:Hide() end)
+    b:HookScript("OnHide", function(self) self.hover:SetAlpha(0) end)
     table.insert(ns.buttons, b)
     SetButtonUnit(b, b:GetAttribute("unit"))
 end

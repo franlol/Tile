@@ -144,6 +144,8 @@ ns.profileDefaults = {
         rangeAlpha = 0.35,
         targetHighlight = true,
         targetColor = C(1, 1, 1, 1),
+        hoverHighlight = true,
+        hoverColor = C(1, 0.82, 0, 1),
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
     },

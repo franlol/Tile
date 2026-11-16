@@ -491,6 +491,8 @@ local function BuildBars(container)
         Header(L["Highlights"]),
         UI.Check(c, L["Highlight my target"], PB("bars.targetHighlight")),
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.targetColor"), nil, true)), nil, On("bars.targetHighlight")),
+        UI.Check(c, L["Highlight on mouse over"], PB("bars.hoverHighlight")),
+        Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.hoverColor"), nil, true)), nil, On("bars.hoverHighlight")),
         UI.Check(c, L["Mark who has threat (aggro)"], PB("bars.aggro")),
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.aggroColor"), nil, true)), nil, On("bars.aggro")),
     })
