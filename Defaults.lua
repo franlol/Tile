@@ -72,6 +72,11 @@ ns.dbDefaults = {
     chars = {},
     spellIndex = {},     -- name -> IDs index (rebuilt when the client version changes)
     minimap = { angle = 225, hide = false }, -- minimap button: position (degrees), hidden
+    -- what test mode simulates (Profiles page, Preview); health: mixed | full | low
+    preview = {
+        range = true, offline = true, dead = true, threat = true, target = true,
+        ready = true, heals = true, pets = true, health = "mixed",
+    },
 }
 
 -- Profile assigned to each group size (per character)

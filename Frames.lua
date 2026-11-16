@@ -1251,24 +1251,28 @@ local function FillTest(b)
     local P = ns.P
     local B, T = P.bars, P.texts
     local i = b.testIndex
+    -- what the preview simulates (Profiles page, Preview): account settings
+    local PV = ns.db.preview
     -- test pets: alternately a hunter's and a warlock's (their owner's color)
     local class = b.isPet and (i % 2 == 1 and "HUNTER" or "WARLOCK") or TestClass(i)
     b.testClass = class
     -- #5 is the offline player (its look follows Bars, Offline players)
-    b.offline = i == 5 and not b.isPet
+    b.offline = PV.offline and i == 5 and not b.isPet
     ns.UpdateColors(b, class)
 
     b.name:SetText(b.isPet and (L["Pet %d"]):format(i) or TestName(i))
     local hp = 0.35 + ((i * 37) % 65) / 100
     if i == 4 then hp = 1 end
+    if PV.health == "full" then hp = 1 elseif PV.health == "low" then hp = 0.2 end
+    local deadSim = PV.dead and not b.isPet and (i == 7 or i == 8 or i == 12)
     b.health:SetMinMaxValues(0, 10000)
     b.health:SetValue(hp * 10000)
-    ns.UpdateBarColor(b, class, (i == 7 or i == 12) and 0 or hp)   -- for the gradient
+    ns.UpdateBarColor(b, class, (deadSim and i ~= 8) and 0 or hp)   -- for the gradient
     b.pred:SetMinMaxValues(0, 10000)
-    b.pred:SetValue((i % 3 == 0 and B.showHealPred) and 1500 or 0)
+    b.pred:SetValue((PV.heals and i % 3 == 0 and B.showHealPred) and 1500 or 0)
     b.pred:SetShown(B.showHealPred)
     b.absorb:SetMinMaxValues(0, 10000)
-    b.absorb:SetValue((i % 4 == 0 and B.showAbsorb) and 1000 or 0)
+    b.absorb:SetValue((PV.heals and i % 4 == 0 and B.showAbsorb) and 1000 or 0)
     b.absorb:SetShown(B.showAbsorb)
 
     local wantPower = B.showPower and not b.isPet
@@ -1284,10 +1288,10 @@ local function FillTest(b)
     local TS = T.status
     local stext, skey
     -- (the first group has two, so they are seen at any test size)
-    if i == 5 and TS.showOffline then stext, skey = L["Offline"], "offline"
-    elseif i == 7 and TS.showDead then stext, skey = L["Dead"], "dead"
-    elseif i == 8 and TS.showGhost then stext, skey = L["Ghost"], "ghost"
-    elseif i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
+    if b.offline and TS.showOffline then stext, skey = L["Offline"], "offline"
+    elseif deadSim and i == 7 and TS.showDead then stext, skey = L["Dead"], "dead"
+    elseif deadSim and i == 8 and TS.showGhost then stext, skey = L["Ghost"], "ghost"
+    elseif deadSim and i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
     elseif i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
     elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
     elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
@@ -1303,10 +1307,10 @@ local function FillTest(b)
     else
         HealthText(b, nil, math.floor(hp * 10000), 10000)
     end
-    b:SetAlpha(b.offline and P.offline.alpha or (i % 9 == 0 and B.rangeAlpha) or 1)
+    b:SetAlpha(b.offline and P.offline.alpha or (PV.range and i % 9 == 0 and B.rangeAlpha) or 1)
 
-    b.hl:SetAlpha((B.targetHighlight and i == 3) and 1 or 0)
-    b.aggro:SetShown(B.aggro and i == 1)
+    b.hl:SetAlpha((PV.target and B.targetHighlight and i == 3) and 1 or 0)
+    b.aggro:SetShown(PV.threat and B.aggro and i == 1)
 
     local E = P.elements
     b.role:Hide()
@@ -1321,7 +1325,7 @@ local function FillTest(b)
     if SetRaidTargetIconTexture then SetRaidTargetIconTexture(b.raidIcon, 8) end
     -- simulated ready check: almost everyone ready, some waiting and some not
     local rstate = (i % 7 == 0) and "notready" or ((i % 5 == 3) and "waiting" or "ready")
-    b.ready:SetShown(E.ready.show and not b.isPet and SetReadyIcon(b.ready, rstate))
+    b.ready:SetShown(PV.ready and E.ready.show and not b.isPet and SetReadyIcon(b.ready, rstate))
 
     -- in the Indicators preview only the indicator matters: drop what test mode
     -- simulates on the player (threat, target, leader, role, marker and ready).
@@ -1433,7 +1437,7 @@ function ns.LayoutTest()
         FillTest(b)
     end
     for _, b in ipairs(pets) do
-        b:SetShown(ns.testing and P.pets.enabled)
+        b:SetShown(ns.testing and P.pets.enabled and ns.db.preview.pets)
         ns.LayoutButton(b, true)
         FillTest(b)
     end

@@ -219,6 +219,15 @@ local function ProfileOptions()
     return out
 end
 
+-- What test mode simulates (account settings, not saved in profiles):
+-- a change redraws the test frames
+local function PreviewBind(key)
+    return UI.Bind(function() return ns.db.preview end, key, function()
+        if ns.testing and ns.LayoutTest then ns.LayoutTest() end
+    end)
+end
+local function PV(c, key, label) return UI.Check(c, label, PreviewBind(key)) end
+
 local function BuildProfiles(container)
     local page = UI.Page(container, 2)
     local c = page.content
@@ -397,6 +406,17 @@ local function BuildProfiles(container)
             ns.ToggleTest(true, v)
         end),
         UI.Note(c, L["In test mode you always see the profile you are editing, with the number of players chosen here."]),
+        PV(c, "range", L["Out of range"]),
+        PV(c, "offline", L["Offline"]),
+        PV(c, "dead", L["Dead / ghost"]),
+        PV(c, "threat", L["Threat"]),
+        PV(c, "target", L["Target"]),
+        PV(c, "ready", L["Ready check"]),
+        PV(c, "heals", L["Incoming heals and shields"]),
+        PV(c, "pets", L["Pets"]),
+        UI.Segmented(c, L["Missing health"], {
+            { "mixed", L["Mixed"] }, { "full", L["Full"] }, { "low", L["Low"] },
+        }, PreviewBind("health")),
         Header(L["General"]),
         -- hiding applies at once; showing them again needs a reload
         UI.Check(c, L["Hide Blizzard party and raid frames"],
