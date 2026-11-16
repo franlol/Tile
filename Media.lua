@@ -85,10 +85,22 @@ end
 
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 
+-- A texture from another addon's folder (Interface\AddOns\<name>\...) only
+-- exists while that addon is loaded (e.g. one from SharedMedia, in a profile
+-- someone imported): without it, the flat texture. The game's own files and
+-- atlases are always there.
+function ns.ResolveTexture(path)
+    local addon = type(path) == "string" and path:match("^[Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee][\\/][Aa][Dd][Dd][Oo][Nn][Ss][\\/]([^\\/]+)[\\/]")
+    if addon and C_AddOns and C_AddOns.IsAddOnLoaded and not C_AddOns.IsAddOnLoaded(addon) then
+        return FLAT
+    end
+    return path
+end
+
 -- Texture of a bar; with "None" the bar is still there but invisible
 function ns.SetBarTexture(bar, path)
     local none = path == "none" or path == nil or path == ""
-    bar:SetStatusBarTexture(none and FLAT or path)
+    bar:SetStatusBarTexture(none and FLAT or ns.ResolveTexture(path))
     local t = bar:GetStatusBarTexture()
     if t then t:SetAlpha(none and 0 or 1) end
 end
@@ -99,7 +111,7 @@ function ns.SetBgTexture(tex, path)
     if not none and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(path) then
         tex:SetAtlas(path)
     else
-        tex:SetTexture(none and FLAT or path)
+        tex:SetTexture(none and FLAT or ns.ResolveTexture(path))
     end
     tex:SetShown(not none)
 end
