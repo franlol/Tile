@@ -830,7 +830,7 @@ local function BuildIndicators(container)
             end },
             { L["Presets"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
         }),
-        UI.Note(lc, L["Drag a row to change the order. Lower rows are drawn on top."]),
+        UI.Note(lc, L["Drag a row to reorder. When indicators overlap, the higher row is drawn in front."]),
     })
 
     ---------------------------------------------------------------------------

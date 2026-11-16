@@ -919,8 +919,9 @@ function ns.BuildIndicators(b)
         end
         w.cfgRef = cfg
         LayoutWidget(w, cfg, b)
-        -- drawing order = list order (the ones below, on top)
-        w:SetFrameLevel(b.overlay:GetFrameLevel() + (wt == "border" and 1 or (3 + c.index * 3)))
+        -- drawing order = list order, like layers: the higher row, in front
+        local layer = #ns.P.indicators - c.index
+        w:SetFrameLevel(b.overlay:GetFrameLevel() + (wt == "border" and 1 or (3 + layer * 3)))
         b.ind[c.index] = w
         AttachNative(b, w, cfg)
     end
