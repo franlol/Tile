@@ -1149,7 +1149,18 @@ end
 
 local function NewTestButton(parent, isPet, i)
     local b = CreateFrame("Frame", nil, parent)
+    -- above the real (hidden) frames, so the mouse reaches the test ones
+    local header = isPet and ns.petHeader or ns.header
+    if header then b:SetFrameLevel(header:GetFrameLevel() + 5) end
     ns.BuildVisuals(b)
+    -- mouse over as on the real frames (hover border); clicks pass through
+    b:SetMouseMotionEnabled(true)
+    b:SetMouseClickEnabled(false)
+    b:SetScript("OnEnter", function(self)
+        if ns.P.bars.hoverHighlight then self.hover:SetAlpha(1) end
+    end)
+    b:SetScript("OnLeave", function(self) self.hover:SetAlpha(0) end)
+    b:SetScript("OnHide", function(self) self.hover:SetAlpha(0) end)
     b.isPet = isPet
     b.testIndex = i
     table.insert(testButtons, b)
