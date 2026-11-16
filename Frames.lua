@@ -1292,9 +1292,9 @@ local function FillTest(b)
     elseif deadSim and i == 7 and TS.showDead then stext, skey = L["Dead"], "dead"
     elseif deadSim and i == 8 and TS.showGhost then stext, skey = L["Ghost"], "ghost"
     elseif deadSim and i == 12 and TS.showRes then stext, skey = L["Resurrecting"], "res"
-    elseif i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
-    elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
-    elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
+    elseif PV.states and not b.isPet and i == 3 and TS.showAFK then stext, skey = L["AFK"], "afk"
+    elseif PV.states and not b.isPet and i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
+    elseif PV.states and not b.isPet and i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
     local dead = skey == "dead" or skey == "ghost" or skey == "res"
     local down = dead or b.offline
     b.cacheStatus, b.statusKey = stext, skey
@@ -1314,14 +1314,14 @@ local function FillTest(b)
 
     local E = P.elements
     b.role:Hide()
-    if E.role.show and not b.isPet then
+    if PV.icons and E.role.show and not b.isPet then
         local role = TEST_ROLE[class] or "DAMAGER"
         local atlas = role == "TANK" and "roleicon-tiny-tank" or (role == "HEALER" and "roleicon-tiny-healer" or "roleicon-tiny-dps")
         if pcall(b.role.SetAtlas, b.role, atlas) then b.role:Show() end
     end
-    b.leader:SetShown(E.leader.show and i == 1 and not b.isPet)
+    b.leader:SetShown(PV.icons and E.leader.show and i == 1 and not b.isPet)
     b.leader:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-    b.raidIcon:SetShown(E.raidIcon.show and i == 2 and not b.isPet)
+    b.raidIcon:SetShown(PV.icons and E.raidIcon.show and i == 2 and not b.isPet)
     if SetRaidTargetIconTexture then SetRaidTargetIconTexture(b.raidIcon, 8) end
     -- simulated ready check: almost everyone ready, some waiting and some not
     local rstate = (i % 7 == 0) and "notready" or ((i % 5 == 3) and "waiting" or "ready")

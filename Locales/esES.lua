@@ -209,6 +209,7 @@ ns.translations.esES = {
     ["Frame"] = "Marco",
     ["Out of range"] = "Fuera de rango",
     ["Dead / ghost"] = "Muerto / fantasma",
+    ["AFK, charmed, summon"] = "Ausente, controlado, invocación",
     ["Threat"] = "Amenaza",
     ["Target"] = "Objetivo",
     ["Incoming heals and shields"] = "Sanación entrante y escudos",
