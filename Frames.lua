@@ -367,7 +367,18 @@ function ns.UpdateBarColor(b, testClass, testPct)
     if B.healthColor == "gradient" or B.bgColor == "gradient" then pct = HealthPct(b, testPct) end
     b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
     local r, g, bl, a = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
-    b.health.bg:SetVertexColor(r, g, bl, a * B.bgAlpha)
+    b.health.bg:SetVertexColor(r, g, bl, 1)
+    b.bgColorAlpha = a
+    ns.UpdateBgAlpha(b)
+end
+
+-- Background opacity: the option (and the custom color's own opacity),
+-- dimmed to 40% when the unit is dead or offline (like the real frames).
+-- With SetAlpha: the vertex color alpha does not apply to every texture
+-- (the game's raid frame atlas ignores it).
+function ns.UpdateBgAlpha(b, down)
+    if down ~= nil then b.bgDown = down end
+    b.health.bg:SetAlpha(ns.P.bars.bgAlpha * (b.bgColorAlpha or 1) * (b.bgDown and 0.4 or 1))
 end
 
 -- Status text: every state has its own switch and color (ns.STATUS_STATES)
@@ -522,7 +533,7 @@ function ns.UpdateHealth(b, full)
         b.cacheStatus, b.statusKey = text, key
         b.status:SetText(ns.P.texts.status.show and text or "")
         ns.StatusColor(b, key)
-        b.health.bg:SetAlpha(down and 0.4 or 1)
+        ns.UpdateBgAlpha(b, down and true or false)
         if down then b.hpText:SetText("") end
     end
     if not down then HealthText(b, u, cur, max) end
@@ -1233,7 +1244,7 @@ local function FillTest(b)
     b.cacheStatus, b.statusKey = stext, skey
     b.status:SetText((stext and TS.show) and stext or "")
     ns.StatusColor(b, skey)
-    b.health.bg:SetAlpha(down and 0.4 or 1)   -- like the real frames
+    ns.UpdateBgAlpha(b, down and true or false)   -- like the real frames
     if dead then b.health:SetValue(0) end
     if down then
         b.hpText:SetText("")
