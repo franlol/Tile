@@ -106,10 +106,14 @@ local function TextColors()
     return { { "white", L["White"] }, { "class", L["Class color"] }, { "custom", L["Custom"] } }
 end
 -- Look of one part of an offline player's frame: as usual or a chosen color
-local function OfflineColor(c, key, label)
+-- (withClass: also the class color)
+local function OfflineColor(c, key, label, withClass)
     local mode = "offline." .. key
+    local choices = { { "usual", L["As usual"] } }
+    if withClass then choices[#choices + 1] = { "class", L["Class color"] } end
+    choices[#choices + 1] = { "custom", L["Custom"] }
     return {
-        UI.Segmented(c, label, { { "usual", L["As usual"] }, { "custom", L["Custom"] } }, PB(mode)),
+        UI.Segmented(c, label, choices, PB(mode)),
         Cond(UI.Attach(Swatch(c, L["Color"], function() return UI.Bind(ns.EP, mode .. "Color")() end, nil, true)),
             nil, function() return UI.Bind(ns.EP, mode)() == "custom" end),
     }
@@ -525,7 +529,7 @@ local function BuildBars(container)
         Header(L["Offline players"]),
         OfflineColor(c, "health", L["Health"]),
         OfflineColor(c, "power", L["Mana / energy / rage"]),
-        OfflineColor(c, "name", L["Name"]),
+        OfflineColor(c, "name", L["Name"], true),
         Slider(c, L["Frame opacity"], 0.1, 1, 0.05, UI.pct, PB("offline.alpha")),
     })
 end

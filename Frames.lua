@@ -446,6 +446,8 @@ function ns.UpdateColors(b, testClass, testPct)
     if b.offline and O.name == "custom" then
         local c = O.nameColor
         b.name:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    elseif b.offline and O.name == "class" then
+        b.name:SetTextColor(r, g, bl, 1)
     else
         TextColor(b.name, T.name, r, g, bl)
     end
