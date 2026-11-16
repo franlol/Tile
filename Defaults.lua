@@ -75,7 +75,7 @@ ns.dbDefaults = {
     -- what test mode simulates (Profiles page, Preview); health: mixed | full | low
     preview = {
         range = true, offline = true, dead = true, threat = true, target = true,
-        ready = true, heals = true, pets = true, health = "mixed",
+        ready = true, heals = true, pets = true, indicators = true, health = "mixed",
     },
 }
 

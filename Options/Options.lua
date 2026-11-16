@@ -401,8 +401,8 @@ local function BuildProfiles(container)
         UI.Dropdown(c, L["Simulate a group of"], {
             { "party", L["5 (party)"] }, { "raid10", L["10 (raid)"] }, { "raid20", L["20 (raid)"] }, { "raid40", L["40 (raid)"] },
         }, function() return ns.testSize or "raid20" end, function(v)
-            -- simulating a size shows (and edits) the profile assigned to that size
-            ns.SetEditName(ns.CharProfiles()[v])
+            -- the size changes, the profile being edited stays
+            ns.SetEditName(ns.EditedProfileName())
             ns.ToggleTest(true, v)
         end),
         UI.Note(c, L["In test mode you always see the profile you are editing, with the number of players chosen here."]),
@@ -414,6 +414,7 @@ local function BuildProfiles(container)
         PV(c, "ready", L["Ready check"]),
         PV(c, "heals", L["Incoming heals and shields"]),
         PV(c, "pets", L["Pets"]),
+        PV(c, "indicators", L["Indicators"]),
         UI.Segmented(c, L["Missing health"], {
             { "mixed", L["Mixed"] }, { "full", L["Full"] }, { "low", L["Low"] },
         }, PreviewBind("health")),

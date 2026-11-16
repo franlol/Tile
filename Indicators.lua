@@ -1148,7 +1148,9 @@ function ns.TestAuras(b, i, all)
             -- all: the Indicators preview shows the indicator being edited
             -- (b.previewOnly) or, otherwise, all of them at once
             local focus = all
-            local skip = (b.previewOnly and c.index ~= b.previewOnly)
+            -- test mode with "Indicators" off in the Preview: none
+            local off = not all and ns.db.preview and ns.db.preview.indicators == false
+            local skip = off or (b.previewOnly and c.index ~= b.previewOnly)
                 or (cfg.kind == "aura" and Typed(cfg) and not kind)
             if skip then
                 -- nothing
