@@ -319,11 +319,11 @@ function ns.BuiltinIndicators()
         Ind { name = "Debuffs", kind = "debuffs", type = "icons",
             point = "BOTTOMLEFT", x = 2, y = 1, width = 12, height = 12, max = 3, grow = "RIGHT",
             timer = false, stacks = true, mine = false, onlyDispellable = false, dispelColor = true },
+        ns.HealIndicator(),
+        ns.ThreatIndicator(),
         Ind { name = L["Dispellable (border)"], kind = "aura", watch = "dispellable", type = "border",
             width = 2, mine = false, others = false, dispelColor = true },
         ns.RestIndicator(),
-        ns.HealIndicator(),
-        ns.ThreatIndicator(),
     }
 end
 
@@ -461,6 +461,8 @@ ns.PRESET_PROFILES = {
                     swipeColor = C(0, 0, 0, 0.7943), swipeSpark = true,
                     stacksText = { font = "Fonts\\FRIZQT__.TTF", size = 9, outline = "OUTLINE", colorMode = "white",
                         color = C(1, 1, 1), point = "BOTTOMRIGHT", x = 0, y = 0 } },
+                ns.HealIndicator(),
+                ns.ThreatIndicator(),
                 { name = L["Dispellable"], kind = "aura", watch = "dispellable", type = "overlay", mine = false,
                     overlayAlpha = 0.9, typeIconSize = 18, x = -3, width = 15, height = 4 },
                 { name = L["Drinking / eating"], kind = "aura", type = "icons", mine = false,
@@ -471,8 +473,6 @@ ns.PRESET_PROFILES = {
                     spells = { 871, 12975, 2565, 642, 498, 1022, "n:Templar's Bulwark", 6940, 22812, 22842,
                         5277, 19263, 11958, 11426, 1463, 6229, 6346 },
                     point = "RIGHT", x = -2, y = 0, width = 8, height = 20, stacks = false },
-                ns.HealIndicator(),
-                ns.ThreatIndicator(),
             }
         end,
     },
@@ -592,15 +592,20 @@ function ns.FixProfile(p)
         p.bottomRev = 1
     end
     -- profiles from before the incoming heal and threat squares get them,
-    -- turned off (nothing changes on screen until they are turned on)
+    -- turned off (nothing changes on screen until they are turned on), right
+    -- after the built-in ones at the top of the list
     if not hadSquares then
-        local has = {}
-        for _, ind in ipairs(inds) do has[ind.kind] = true end
+        local has, at = {}, 1
+        for i, ind in ipairs(inds) do
+            has[ind.kind] = true
+            if ind.kind ~= "aura" and at == i then at = i + 1 end
+        end
         for _, e in ipairs({ { "heal", ns.HealIndicator }, { "threat", ns.ThreatIndicator } }) do
             if not has[e[1]] then
                 local ind = ns.FixIndicator(e[2]())
                 ind.enabled = false
-                table.insert(inds, ind)
+                table.insert(inds, at, ind)
+                at = at + 1
             end
         end
         p.squaresRev = 1

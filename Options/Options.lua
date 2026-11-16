@@ -830,7 +830,7 @@ local function BuildIndicators(container)
             end },
             { L["Presets"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
         }),
-        UI.Note(lc, L["Drag a row to change the order: the ones below are drawn on top. Built-in ones have no x: turn them off with their box."]),
+        UI.Note(lc, L["Drag a row to change the order. Lower rows are drawn on top."]),
     })
 
     ---------------------------------------------------------------------------
