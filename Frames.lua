@@ -1091,7 +1091,6 @@ end
 
 function ns.SetLocked(locked)
     if not locked and InCombatLockdown() then
-        ns.Print(L["cannot unlock in combat."])
         return
     end
     ns.db.locked = locked

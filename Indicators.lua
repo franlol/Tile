@@ -661,9 +661,6 @@ local function AttachNative(b, w, cfg)
     local ok, result = pcall(NewContainer, w, cfg)
     if ok then
         w.native, w.nativeKey = result, key
-    elseif not ns.nativeWarned then
-        ns.nativeWarned = true
-        ns.Print((L["could not create an indicator: %s"]):format(tostring(result)))
     end
 end
 

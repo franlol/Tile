@@ -24,7 +24,6 @@ native auras, and profiles per group size.
 - `/tile`: open the options
 - `/tile unlock` / `/tile lock`: move the frames
 - `/tile test`: test mode
-- `/tile status`: active profile
 - `/tile reset`: reset the frame positions
 
 ## License

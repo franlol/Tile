@@ -49,10 +49,6 @@ end
 -------------------------------------------------------------------------------
 -- Utilities
 -------------------------------------------------------------------------------
-function ns.Print(...)
-    print(ns.AccentText("Tile") .. ":", ...)
-end
-
 local function CopyDefaults(src, dst)
     if type(dst) ~= "table" then dst = {} end
     for k, v in pairs(src) do
@@ -503,7 +499,6 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         -- test mode is remembered too
         if ns.db.testing then ns.ToggleTest(true, ns.db.testSize) end
         ns.HideBlizzard()
-        ns.Print(L["loaded. Type |cffffff00/tile|r to open the options."])
     elseif event == "PLAYER_ENTERING_WORLD" or event == "GROUP_ROSTER_UPDATE" then
         if ns.header then ns.ActivateProfile() end
     elseif event == "PLAYER_REGEN_DISABLED" then
@@ -511,7 +506,6 @@ ev:SetScript("OnEvent", function(self, event, arg1)
         if ns.db and not ns.db.locked then
             ns.SetLocked(true)
             ns.unlockAfterCombat = true
-            ns.Print(L["frames locked when entering combat."])
         end
         if ns.UpdateAllButtons then ns.UpdateAllButtons() end
     elseif event == "PLAYER_REGEN_ENABLED" then
@@ -542,13 +536,10 @@ SlashCmdList.TILE = function(msg)
         ns.SetLocked(false)
     elseif msg == "test" or msg == "prueba" then
         ns.ToggleTest()
-    elseif msg == "estado" or msg == "status" then
-        ns.Print((L["profile: %s (%s)"]):format(tostring(ns.activeName), L[ns.SIZE_NAMES[ns.SizeKey()] or "?"]))
     elseif msg == "reset" then
         ns.RunOOC("reset", function()
             ns.P.pos = ns.DeepCopy(ns.profileDefaults.pos)
             ns.ApplyPositions()
-            ns.Print(L["positions reset."])
         end)
     else
         ns.ToggleOptions()
