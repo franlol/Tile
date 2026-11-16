@@ -1069,6 +1069,9 @@ end
 function ns.ApplyProfile()
     ns.RunOOC("profile", function()
         ns.CompileIndicators()
+        -- the header attributes below make Blizzard refresh the buttons right
+        -- away: they need the widgets of the new list before that
+        for _, b in ipairs(ns.buttons) do ns.BuildIndicators(b) end
         ns.ApplyPositions()
         local scale = ns.P.layout.scale
         ns.anchor:SetScale(scale)
