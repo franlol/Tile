@@ -11,6 +11,8 @@
 -- There are two exceptions that do not use the container:
 --   · "Missing": out of combat only (reads the unit's auras).
 --   · Shield or incoming heal bars: unit data.
+--   · Unit squares (kind heal / threat): a heal being cast on the player,
+--     and how many enemies are attacking them.
 -- Test mode draws sample auras with the same pieces.
 -------------------------------------------------------------------------------
 
@@ -79,8 +81,17 @@ local function Missing(cfg)
     return cfg.kind == "aura" and cfg.watch == "spells" and cfg.mode == "missing" and not UnitMeasure(cfg)
 end
 
+-- Unit squares: not auras, the unit's own data
+--   heal: lights up while someone casts a heal on the player
+--   threat: how many enemies are attacking the player (the number)
+local function UnitSquare(cfg)
+    return cfg.kind == "heal" or cfg.kind == "threat"
+end
+ns.IndicatorUnitSquare = UnitSquare
+
 -- Shows debuffs with a type (magic, poison...): its color can come from the type
 local function Typed(cfg)
+    if UnitSquare(cfg) then return false end
     return cfg.kind ~= "aura" or cfg.watch == "dispellable" or cfg.watch == "debuffTypes"
 end
 ns.IndicatorTyped = Typed
@@ -88,6 +99,8 @@ ns.IndicatorTyped = Typed
 local function WidgetType(cfg)
     if cfg.kind == "raiddebuff" then return "icon" end
     if cfg.kind == "debuffs" then return "icons" end
+    if cfg.kind == "heal" then return "fill" end
+    if cfg.kind == "threat" then return "square" end
     return cfg.type
 end
 
@@ -630,7 +643,7 @@ end
 
 -- Out of combat only: containers cannot be created in combat
 local function AttachNative(b, w, cfg)
-    if b.testIndex or Missing(cfg) or UnitMeasure(cfg) then
+    if b.testIndex or Missing(cfg) or UnitMeasure(cfg) or UnitSquare(cfg) then
         if w.native then
             w.native:Hide()
             w.native:SetUnit("none")
@@ -708,6 +721,24 @@ creators.bar = function(parent)
     f.top = NewTop(f, f.bar)
     f.timerText = f.top:CreateFontString(nil, "OVERLAY")
     f.count = f.top:CreateFontString(nil, "OVERLAY")
+    f:Hide()
+    return f
+end
+
+-- Incoming heal square. The amount is secret: only a bar can take it. Two
+-- bars from 0 to 1 (the border behind, the color in front): any heal fills
+-- them, none leaves them empty, so the border only shows with the color.
+creators.fill = function(parent)
+    local f = CreateFrame("Frame", nil, parent)
+    f.wtype = "fill"
+    f.edge = CreateFrame("StatusBar", nil, f)
+    f.edge:SetStatusBarTexture(FLAT)
+    f.edge:SetMinMaxValues(0, 1)
+    f.bar = CreateFrame("StatusBar", nil, f)
+    f.bar:SetAllPoints()
+    f.bar:SetStatusBarTexture(FLAT)
+    f.bar:SetMinMaxValues(0, 1)
+    f.bar:SetFrameLevel(f.edge:GetFrameLevel() + 1)
     f:Hide()
     return f
 end
@@ -809,6 +840,17 @@ local function LayoutWidget(w, cfg, b)
         local fw, fh = LY.width, LY.height
         if b.isPet then fw, fh = ns.PetSize() end
         if cfg.span == "width" then w:SetWidth(math.max(1, fw - 2)) else w:SetHeight(math.max(1, fh - 2)) end
+    end
+    if t == "fill" then
+        local s = math.max(1, cfg.borderSize or 1)
+        w.edge:ClearAllPoints()
+        w.edge:SetPoint("TOPLEFT", -s, s)
+        w.edge:SetPoint("BOTTOMRIGHT", s, -s)
+        w.edge:SetStatusBarColor(BorderColor(cfg))
+        w.edge:SetShown(cfg.showBorder ~= false)
+        local c = cfg.color
+        w.bar:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
+        return
     end
     if t == "bar" then
         StyleBorder(w.border, cfg)
@@ -1060,6 +1102,65 @@ local function ShowUnitBar(w, unit, cfg)
     w:Show()
 end
 
+-- Incoming heal square: full with any heal being cast, empty without
+local function ShowHealSquare(w, unit)
+    local v = UnitGetIncomingHeals and UnitGetIncomingHeals(unit)
+    if not S(v) then v = v or 0 end
+    w.edge:SetValue(v)
+    w.bar:SetValue(v)
+    w:Show()
+end
+
+-- Enemies the game gives a unit's threat on: the nameplates, and the
+-- bosses without one (nameplates off or out of their range)
+local enemies = {}
+local PLATE_UNITS, BOSS_UNITS = {}, {}
+for i = 1, 40 do PLATE_UNITS[i] = "nameplate" .. i end
+for i = 1, MAX_BOSS_FRAMES or 5 do BOSS_UNITS[i] = "boss" .. i end
+
+local function CollectEnemies()
+    wipe(enemies)
+    local plates = 0
+    for _, u in ipairs(PLATE_UNITS) do
+        if UnitExists(u) then
+            plates = plates + 1
+            enemies[plates] = u
+        end
+    end
+    for _, u in ipairs(BOSS_UNITS) do
+        if UnitExists(u) then
+            local dup = false
+            for k = 1, plates do
+                local ok, same = pcall(UnitIsUnit, u, enemies[k])
+                -- the game does not say: it counts with its nameplate
+                if not ok or S(same) or same then dup = true break end
+            end
+            if not dup then enemies[#enemies + 1] = u end
+        end
+    end
+end
+
+-- How many of them the unit is tanking (it has their aggro)
+local function ThreatCount(unit)
+    local n = 0
+    for _, e in ipairs(enemies) do
+        local st = R(UnitThreatSituation(unit, e))
+        if st and st >= 2 then n = n + 1 end
+    end
+    return n
+end
+
+local function ShowThreatSquare(w, n)
+    if n > 0 then
+        w.cd:Clear()
+        w.drain:Hide()
+        w.count:SetText(n)
+        w:Show()
+    else
+        HideWidget(w)
+    end
+end
+
 -- After a change of shields, incoming heals or max health
 function ns.UpdateUnitBars(b)
     local unit = b.unit
@@ -1067,11 +1168,56 @@ function ns.UpdateUnitBars(b)
     local inCombat = InCombatLockdown()
     for _, c in ipairs(ns.compiled) do
         local w = b.ind[c.index]
-        if w and UnitMeasure(c.cfg) then
-            if c.cfg.onlyOOC and inCombat then HideWidget(w) else ShowUnitBar(w, unit, c.cfg) end
+        local heal = c.kind == "heal"
+        if w and (heal or UnitMeasure(c.cfg)) then
+            if c.cfg.onlyOOC and inCombat then HideWidget(w)
+            elseif heal then ShowHealSquare(w, unit)
+            else ShowUnitBar(w, unit, c.cfg) end
         end
     end
 end
+
+-- Threat squares of every frame. Threat changes come in bursts (one event
+-- per enemy and per player): they are gathered and counted at most five
+-- times per second.
+local threatDirty, threatElapsed = true, 0
+
+local threatList = {}
+local function UpdateThreatSquares()
+    local list = threatList
+    wipe(list)
+    for _, c in ipairs(ns.compiled) do
+        if c.kind == "threat" then list[#list + 1] = c end
+    end
+    if #list == 0 then return end
+    CollectEnemies()
+    local inCombat = InCombatLockdown()
+    for _, b in ipairs(ns.buttons) do
+        if b.unit and b.ind and b:IsVisible() then
+            local n = #enemies > 0 and ThreatCount(b.unit) or 0
+            for _, c in ipairs(list) do
+                local w = b.ind[c.index]
+                if w then
+                    if c.cfg.onlyOOC and inCombat then HideWidget(w) else ShowThreatSquare(w, n) end
+                end
+            end
+        end
+    end
+end
+
+local threatFrame = CreateFrame("Frame")
+for _, e in ipairs({ "UNIT_THREAT_LIST_UPDATE", "UNIT_THREAT_SITUATION_UPDATE",
+    "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "INSTANCE_ENCOUNTER_ENGAGE_UNIT",
+    "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED" }) do
+    pcall(threatFrame.RegisterEvent, threatFrame, e)
+end
+threatFrame:SetScript("OnEvent", function() threatDirty = true end)
+threatFrame:SetScript("OnUpdate", function(_, elapsed)
+    threatElapsed = threatElapsed + elapsed
+    if not threatDirty or threatElapsed < 0.2 then return end
+    threatElapsed, threatDirty = 0, false
+    if ns.P and ns.header then UpdateThreatSquares() end
+end)
 
 -- Does it have any of the buffs? true / false, or nil if the game does not tell
 local function HasAura(unit, cfg, byID)
@@ -1109,6 +1255,11 @@ function ns.UpdateAuras(b)
             w.native:SetShown(not (cfg.onlyOOC and inCombat))
         elseif UnitMeasure(cfg) then
             if cfg.onlyOOC and inCombat then HideWidget(w) else ShowUnitBar(w, unit, cfg) end
+        elseif c.kind == "heal" then
+            if cfg.onlyOOC and inCombat then HideWidget(w) else ShowHealSquare(w, unit) end
+        elseif c.kind == "threat" then
+            -- counted for every frame at once (it reads every enemy): soon
+            threatDirty = true
         elseif Missing(cfg) and not inCombat and HasAura(unit, cfg, c.byID) == false then
             ShowMissing(w, cfg)
         else
@@ -1154,6 +1305,20 @@ function ns.TestAuras(b, i, all)
                 or (cfg.kind == "aura" and Typed(cfg) and not kind)
             if skip then
                 -- nothing
+            elseif c.kind == "heal" then
+                -- follows "Incoming heals" of the Preview, like the heal bar
+                local on = focus or ((ns.db.preview or {}).heals ~= false and i % 4 == 2)
+                w.edge:SetValue(on and 1 or 0)
+                w.bar:SetValue(on and 1 or 0)
+                w:Show()
+            elseif c.kind == "threat" then
+                -- follows "Threat" of the Preview: the first frame (as the
+                -- threat border) with several enemies, a few others with one
+                if focus or ((ns.db.preview or {}).threat ~= false and (i == 1 or i % 7 == 5)) then
+                    ColorTexts(w, cfg)
+                    w.timerText:SetText("")
+                    ShowThreatSquare(w, (i == 1 or focus) and 3 or 1)
+                end
             elseif UnitMeasure(cfg) then
                 w.bar:SetMinMaxValues(0, 100)
                 w.bar:SetValue((i % 3 == 0 or focus) and (15 + (i * 13) % 40) or 0)

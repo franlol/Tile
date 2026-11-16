@@ -748,7 +748,7 @@ end
 -- Indicators
 -------------------------------------------------------------------------------
 local selInd = 1
-local KIND_LABEL = { aura = "", raiddebuff = "boss", debuffs = "debuffs" }
+local KIND_LABEL = { aura = "", raiddebuff = "boss", debuffs = "debuffs", heal = "", threat = "" }
 local TYPE_LABEL = { icon = "icon", icons = "icons", square = "square", bar = "bar", text = "text",
     border = "border", overlay = "tint" }
 
@@ -763,6 +763,7 @@ end
 local function EffType(ind)
     if ind.kind == "raiddebuff" then return "icon" end
     if ind.kind == "debuffs" then return "icons" end
+    if ns.IndicatorUnitSquare(ind) then return "square" end
     return ind.type
 end
 
@@ -785,7 +786,7 @@ local function BuildIndicators(container)
         onCheck = function(d, v) d.enabled = v IndChanged() end,
         lead = "swatch",
         color = function(d)
-            if d.kind ~= "aura" then return GREY end
+            if d.kind ~= "aura" and not ns.IndicatorUnitSquare(d) then return GREY end
             local col = d.color or { r = 1, g = 1, b = 1 }
             return { col.r, col.g, col.b }
         end,
@@ -845,7 +846,12 @@ local function BuildIndicators(container)
     local function iconLike() local t = T() return t == "icon" or t == "icons" end
     local function rect() local t = T() return t == "square" or t == "bar" end
     local function iconsT() return T() == "icons" end
-    local function colored() local t = T() return isAura() and (t == "square" or t == "bar" or t == "text") end
+    -- incoming heal / threat count squares (unit data, not auras)
+    local function unitSq() local s = Sel() return s and ns.IndicatorUnitSquare(s) end
+    local function colored()
+        local t = T()
+        return unitSq() or (isAura() and (t == "square" or t == "bar" or t == "text"))
+    end
     local function isMissing() local s = Sel() return isAura() and s.mode == "missing" end
     -- bar that measures shields or incoming heals: does not watch auras nor has time
     local function unitBar() return isAura() and ns.IndicatorUnitMeasure(Sel()) end
@@ -855,6 +861,7 @@ local function BuildIndicators(container)
     local function listWatch() return watchAuras() and not dispWatch() end
     -- has a duration (it is not "missing" nor dispellable)
     local function timed()
+        if unitSq() then return false end
         if T() == "bar" and (Sel().barMeasure or "time") ~= "time" then return false end
         if frameT() then return false end
         return notDispel() and not isMissing()
@@ -1245,6 +1252,12 @@ local function BuildIndicators(container)
         HeaderIf(L["What it watches"], function() return K() == "debuffs" end),
         UI.Check(c, L["Only the ones I can dispel"], IB("onlyDispellable")),
 
+        HeaderIf(L["What it watches"], function() return K() == "heal" end),
+        UI.Note(c, L["Lights up while someone casts a heal on the player."]),
+
+        HeaderIf(L["What it watches"], function() return K() == "threat" end),
+        UI.Note(c, L["How many enemies are attacking the player. Counts enemies with a nameplate and bosses."]),
+
         Header(L["Position and size"]),
         posSample,
         PositionBlock(c, Sel, IndChanged, { showIf = function()
@@ -1334,10 +1347,13 @@ local function BuildIndicators(container)
             colorIf = function() return T() ~= "text" end,
             positionIf = function() return T() ~= "text" end,
         }),
-        HeaderIf(L["Stacks text"], hasText),
+        -- threat count: this is its number (always shown)
+        W(Header(L["Stacks text"], function() return K() == "threat" and L["Number"] or L["Stacks text"] end),
+            function() return hasText() or K() == "threat" end),
         TextBlock(c, function() return Sel().stacksText end, IndChanged, {
             show = { IB("stacks") },
-            enableIf = function() return Sel().stacks end,
+            showCheckIf = function() return K() ~= "threat" end,
+            enableIf = function() return Sel().stacks or K() == "threat" end,
             positionIf = function() return T() ~= "text" end,
         }),
     })

@@ -223,6 +223,7 @@ ns.profileDefaults = {
 -------------------------------------------------------------------------------
 -- Indicators
 -- kind: aura (custom) | raiddebuff (boss debuff) | debuffs
+--       | heal (incoming heal square) | threat (threat count square)
 -- type: icon | icons | square | bar | text | border | overlay
 -------------------------------------------------------------------------------
 ns.indicatorDefaults = {
@@ -321,7 +322,25 @@ function ns.BuiltinIndicators()
         Ind { name = L["Dispellable (border)"], kind = "aura", watch = "dispellable", type = "border",
             width = 2, mine = false, others = false, dispelColor = true },
         ns.RestIndicator(),
+        ns.HealIndicator(),
+        ns.ThreatIndicator(),
     }
+end
+
+-- Incoming heal: a square that lights up while someone casts a heal on the player
+function ns.HealIndicator()
+    return Ind { name = L["Incoming heal"], kind = "heal", type = "square", mine = false,
+        point = "BOTTOM", x = 0, y = 2, width = 7, height = 7, color = C(0.2, 1, 0.3),
+        timer = false, stacks = false }
+end
+
+-- Threat count: how many enemies are attacking the player, hidden at 0
+function ns.ThreatIndicator()
+    return Ind { name = L["Threat count"], kind = "threat", type = "square", mine = false,
+        point = "BOTTOMRIGHT", x = -2, y = 2, width = 11, height = 11, color = C(0.75, 0.08, 0.08),
+        timer = false, stacks = true,
+        stacksText = { font = false, size = 9, outline = false, colorMode = "white", color = C(1, 1, 1),
+            point = "CENTER", x = 0, y = 0 } }
 end
 
 -- Drinking / eating: the buff present while drinking or eating (not the
@@ -452,6 +471,8 @@ ns.PRESET_PROFILES = {
                     spells = { 871, 12975, 2565, 642, 498, 1022, "n:Templar's Bulwark", 6940, 22812, 22842,
                         5277, 19263, 11958, 11426, 1463, 6229, 6346 },
                     point = "RIGHT", x = -2, y = 0, width = 8, height = 20, stacks = false },
+                ns.HealIndicator(),
+                ns.ThreatIndicator(),
             }
         end,
     },
@@ -516,6 +537,7 @@ function ns.FixProfile(p)
     end
     local hadGeneral = type(p.general) == "table"
     local hadBottomRev = p.bottomRev ~= nil
+    local hadSquares = p.squaresRev ~= nil
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health
@@ -568,6 +590,20 @@ function ns.FixProfile(p)
             if not whole and not strip then Lower(ind) end
         end
         p.bottomRev = 1
+    end
+    -- profiles from before the incoming heal and threat squares get them,
+    -- turned off (nothing changes on screen until they are turned on)
+    if not hadSquares then
+        local has = {}
+        for _, ind in ipairs(inds) do has[ind.kind] = true end
+        for _, e in ipairs({ { "heal", ns.HealIndicator }, { "threat", ns.ThreatIndicator } }) do
+            if not has[e[1]] then
+                local ind = ns.FixIndicator(e[2]())
+                ind.enabled = false
+                table.insert(inds, ind)
+            end
+        end
+        p.squaresRev = 1
     end
     return p
 end

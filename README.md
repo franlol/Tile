@@ -11,6 +11,7 @@ native auras, and profiles per group size.
 - **Spell presets** per class: add common buffs and debuffs as indicators in a
   few clicks, or as "missing" warnings out of combat.
 - **Dispellable and typed debuffs**, boss debuffs, shields and incoming heals.
+- **Incoming heal square** (lights up while a heal is cast on the player) and **threat count square** (how many enemies are attacking them).
 - **Profiles per group size** (party, 10, 20, 40), with a test mode that
   simulates each size.
 - **Instance guide**: bosses and their debuffs per dungeon and raid.

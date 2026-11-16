@@ -482,4 +482,9 @@ ns.translations.esES = {
     ["Puts the selected profile back to the default settings."] = "Devuelve el perfil seleccionado a los ajustes por defecto.",
     ["Green dot: you are here."] = "Punto verde: estás aquí.",
     ["\"Missing\" adds one warning per buff."] = "\"Le falta\" añade un aviso por cada bufo.",
+    ["Incoming heal"] = "Curación entrante",
+    ["Threat count"] = "Enemigos con amenaza",
+    ["Number"] = "Número",
+    ["Lights up while someone casts a heal on the player."] = "Se enciende mientras alguien lanza una curación sobre el jugador.",
+    ["How many enemies are attacking the player. Counts enemies with a nameplate and bosses."] = "Cuántos enemigos están atacando al jugador. Cuenta los enemigos con placa de nombre y los jefes.",
 }
