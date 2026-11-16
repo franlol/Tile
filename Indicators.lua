@@ -504,9 +504,10 @@ local function BuildAuraButton(button, cfg, wt)
     local border = NewBorder(button)
     StyleBorder(border, cfg)
     if wt == "icon" and Typed(cfg) and cfg.dispelColor and cfg.showBorder ~= false then
-        -- white base: the game paints it with the type color (no type: the border color)
+        -- white base: the game paints it with the type color (no type: the
+        -- "No type" color of the Colors page, as the frame border and tint)
         border:SetColorTexture(1, 1, 1, 1)
-        AddDispelTexture(button, border, DispelColorMap(cfg, BorderColor(cfg)))
+        AddDispelTexture(button, border, DispelColorMap(cfg, ns.DispelColor("none")))
     end
     local above = button
     if wt == "icon" then
@@ -965,8 +966,12 @@ local function PaintAura(w, cfg, a)
     if wt == "icon" then
         w.tex:SetTexture(a.icon)
         w.tex:SetDesaturated(false)
+        -- by type: the type color, or the "No type" one (Colors page)
         local r, g, b
-        if Typed(cfg) and cfg.dispelColor and a.dispelName then r, g, b = ns.DispelColor(a.dispelName) end
+        if Typed(cfg) and cfg.dispelColor then
+            r, g, b = ns.DispelColor(a.dispelName or "none")
+            if not r then r, g, b = ns.DispelColor("none") end
+        end
         if r then w.border:SetColorTexture(r, g, b, 1) else w.border:SetColorTexture(BorderColor(cfg)) end
     end
     if wt == "bar" then

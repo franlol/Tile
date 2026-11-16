@@ -255,7 +255,7 @@ ns.translations.esES = {
     ["Curse"] = "Maldición",
     ["Disease"] = "Enfermedad",
     ["Poison"] = "Veneno",
-    ["No type (border and tint)"] = "Sin tipo (borde y tinte)",
+    ["No type"] = "Sin tipo",
     ["Edit type colors"] = "Editar colores por tipo",
     -- Colors page
     ["Colors"] = "Colores",
@@ -337,7 +337,6 @@ ns.translations.esES = {
     ["Color by type (magic, poison...)"] = "Color según tipo (magia, veneno...)",
     ["Border"] = "Borde",
     ["Border color"] = "Color del borde",
-    ["With \"Color by type\", it is used for debuffs that have no type."] = "Con \"Color según tipo\", se usa para los debuffs sin tipo.",
     ["Border thickness"] = "Grosor del borde",
     ["Time sweep"] = "Barrido del tiempo",
     ["Sweep style"] = "Estilo del barrido",

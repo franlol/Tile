@@ -1052,16 +1052,14 @@ local function BuildIndicators(container)
     table.insert(UI.widgets, posSample)
 
     -- the colors per type are shared by every indicator: they live in the Colors page
-    local function DispelSwatches()
-        local function typed() return ns.IndicatorTyped(Sel()) and (frameT() or iconLike()) end
-        local function on() return Sel().dispelColor end
-        return WE(UI.Attach(UI.Buttons(c, { { L["Edit type colors"], function() win:Select("colors") end } })),
-            typed, on)
+    local function DispelButton()
+        return UI.Buttons(c, { { L["Edit type colors"], function() win:Select("colors") end } })
     end
 
     local function sized() return rect() or iconLike() end
     local function borderT() local t = T() return notDispel() and t ~= "text" end
     local function borderOn() return Sel().showBorder ~= false end
+    local function typedIcon() return iconLike() and ns.IndicatorTyped(Sel()) end
     local function sweepT() local t = T() return timed() and (t == "icon" or t == "icons" or t == "square") end
     local function sweepOn() return Sel().swipe ~= false end
 
@@ -1189,18 +1187,23 @@ local function BuildIndicators(container)
         PositionBlock(c, function() return Sel().typeIconPos end, IndChanged, { enableIf = typeIconOn }),
 
         Header(L["Look"]),
+        -- frame border / tint: the type color takes the place of the color
         W(UI.Check(c, L["Color by type (magic, poison...)"], IB("dispelColor")), function()
-            return ns.IndicatorTyped(Sel()) and (frameT() or iconLike())
+            return frameT() and ns.IndicatorTyped(Sel())
         end),
-        DispelSwatches(),
+        WE(UI.Attach(DispelButton()),
+            function() return frameT() and ns.IndicatorTyped(Sel()) end,
+            function() return Sel().dispelColor end),
         WE(UI.Attach(Swatch(c, L["Color"], function() return Sel().color end, nil, true)),
             function() return colored() or frameT() end,
             function() return colored() or not Sel().dispelColor end),
+        -- icons: the type colors the border, so it needs the border
         W(UI.Check(c, L["Border"], IB("showBorder")), borderT),
+        WE(UI.Attach(UI.Check(c, L["Color by type (magic, poison...)"], IB("dispelColor"))),
+            typedIcon, borderOn),
+        WE(UI.Attach(DispelButton()), typedIcon, function() return borderOn() and Sel().dispelColor end),
         WE(UI.Attach(Swatch(c, L["Border color"], function() return Sel().borderColor end, nil, true)),
-            borderT, borderOn),
-        WE(UI.Attach(UI.Note(c, L["With \"Color by type\", it is used for debuffs that have no type."])),
-            function() return borderT() and iconLike() and ns.IndicatorTyped(Sel()) and Sel().dispelColor end, borderOn),
+            borderT, function() return borderOn() and not (typedIcon() and Sel().dispelColor) end),
         WE(UI.Attach(Slider(c, L["Border thickness"], 1, 4, 1, UI.px, IB("borderSize"))), borderT, borderOn),
         W(UI.Check(c, L["Time sweep"], IB("swipe")), sweepT),
         WE(UI.Attach(UI.Dropdown(c, L["Sweep style"], {
@@ -1661,7 +1664,7 @@ local function BuildColors(container)
     local dispel = { Header(L["Debuff types"]) }
     for _, d in ipairs({
         { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
-        { "none", L["No type (border and tint)"] },
+        { "none", L["No type"] },
     }) do
         dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2], 22), function() return ns.EP().dispelColors[d[1]] end)
     end
