@@ -158,11 +158,23 @@ function ns.BuildVisuals(b)
     b.aggro:SetFrameLevel(overlay:GetFrameLevel() + 1)
     b.aggro:Hide()
 
+    -- the frame above the resource bar and the bottom strips: what the
+    -- bottom positions (Bottom, Bottom left, Bottom right) are measured from
+    b.area = CreateFrame("Frame", nil, b)
+    b.area:SetAllPoints()
+
     b.ind, b.pool = {}, {}
 end
 
+-- What a position is measured from: the bottom ones sit above the resource
+-- bar (and the bottom strips); the rest, on the whole frame
+function ns.PointAnchor(b, point)
+    if point and point:find("BOTTOM") and b.area then return b.area end
+    return b
+end
+
 local function PlaceText(fs, t, b)
-    ns.StyleText(fs, t, b)
+    ns.StyleText(fs, t, ns.PointAnchor(b, t.point))
     fs:SetShown(t.show)
 end
 
@@ -176,7 +188,7 @@ local function PlaceElement(tex, e, b)
     local pad = (e.bg or e.border) and (e.pad or 0) or 0
     local s = e.size + pad * 2
     h:ClearAllPoints()
-    h:SetPoint(e.point, b, e.point, e.x, e.y)
+    h:SetPoint(e.point, ns.PointAnchor(b, e.point), e.point, e.x, e.y)
     h:SetSize(s, s)
     tex:ClearAllPoints()
     tex:SetPoint("TOPLEFT", pad, -pad)
@@ -259,6 +271,9 @@ local function AnchorHealth(b, powerShown)
     b.power:SetShown(powerH > 0)
     b.powerEdge:SetShown(powerH > 0)
     b.powerShown = powerShown
+    b.area:ClearAllPoints()
+    b.area:SetPoint("TOPLEFT")
+    b.area:SetPoint("BOTTOMRIGHT", 0, ins.bottom)
 end
 ns.AnchorHealth = AnchorHealth
 

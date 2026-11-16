@@ -160,6 +160,9 @@ ns.profileDefaults = {
     -- font and outline every text uses unless it has its own
     -- (a text with font = false / outline = false takes these)
     general = { font = FONT, outline = "OUTLINE" },
+    -- bottom positions are measured from above the resource bar (older
+    -- profiles, without this, measured them from the frame's bottom edge)
+    bottomRev = 1,
     texts = {
         name = {
             show = true, font = false, size = 11, outline = false,
@@ -184,7 +187,7 @@ ns.profileDefaults = {
             show = false, format = "deficit", hideFull = true,
             font = false, size = 9, outline = false,
             colorMode = "custom", color = C(1, 1, 1),
-            point = "BOTTOM", x = 0, y = 5,
+            point = "BOTTOM", x = 0, y = 1,
         },
     },
     elements = {
@@ -307,7 +310,7 @@ function ns.BuiltinIndicators()
             point = "CENTER", x = 0, y = -3, width = 20, height = 20,
             timer = true, stacks = true, dispelColor = true, mine = false },
         Ind { name = "Debuffs", kind = "debuffs", type = "icons",
-            point = "BOTTOMLEFT", x = 2, y = 5, width = 12, height = 12, max = 3, grow = "RIGHT",
+            point = "BOTTOMLEFT", x = 2, y = 1, width = 12, height = 12, max = 3, grow = "RIGHT",
             timer = false, stacks = true, mine = false, onlyDispellable = false, dispelColor = true },
         Ind { name = L["Dispellable (border)"], kind = "aura", watch = "dispellable", type = "border",
             width = 2, mine = false, others = false, dispelColor = true },
@@ -415,6 +418,7 @@ function ns.FixProfile(p)
         st.order = order
     end
     local hadGeneral = type(p.general) == "table"
+    local hadBottomRev = p.bottomRev ~= nil
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health
@@ -441,6 +445,32 @@ function ns.FixProfile(p)
             Follow(ind.timerText)
             Follow(ind.stacksText)
         end
+    end
+    -- bottom positions now start above the resource bar and the bottom
+    -- strips: lower their Y by that height once (nothing moves on screen)
+    if not hadBottomRev then
+        local B = p.bars
+        local off = (B.showPower and B.powerHeight > 0) and (B.powerHeight + 1) or 0
+        for _, ind in ipairs(inds) do
+            if ind.enabled and ind.type == "bar" and ind.kind == "aura" and ind.span == "stripBottom" then
+                off = off + math.max(1, ind.height or 1) + 1
+            end
+        end
+        local function Lower(t)
+            if off > 0 and type(t) == "table" and type(t.point) == "string" and t.point:find("BOTTOM") then
+                t.y = math.max(-60, math.min(60, (t.y or 0) - off))
+            end
+        end
+        Lower(p.texts.name)
+        Lower(p.texts.status)
+        Lower(p.texts.health)
+        for _, e in pairs(p.elements) do Lower(e) end
+        for _, ind in ipairs(inds) do
+            local whole = ind.type == "border" or ind.type == "overlay"
+            local strip = ind.type == "bar" and type(ind.span) == "string" and ind.span:find("^strip")
+            if not whole and not strip then Lower(ind) end
+        end
+        p.bottomRev = 1
     end
     return p
 end

@@ -89,7 +89,7 @@ ns.Catalog = {
         auraType = "HELPFUL",
         origin = "any",
         mode = "missing",
-        defaults = { type = "square", point = "BOTTOMRIGHT", x = -2, y = 5, width = 6, height = 6,
+        defaults = { type = "square", point = "BOTTOMRIGHT", x = -2, y = 1, width = 6, height = 6,
             onlyOOC = true },
         spells = {
             S("PRIEST", 1243, "Fortitude", { family = "fort", rec = true }),

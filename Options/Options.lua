@@ -1045,7 +1045,13 @@ local function BuildIndicators(container)
         if h == "LEFT" then x = l
         elseif h == "RIGHT" then x = l + W - PW
         else x = l + W / 2 - PW / 2 end
-        if v == "BOTTOM" then y = b
+        if v == "BOTTOM" then
+            -- measured from above the resource bar (as the frames do)
+            local off = 0
+            if pb.area and pb.area:GetBottom() and pb:GetBottom() then
+                off = pb.area:GetBottom() - pb:GetBottom()
+            end
+            y = b - off
         elseif v == "TOP" then y = b + H - PH
         else y = b + H / 2 - PH / 2 end
         s.point = pt

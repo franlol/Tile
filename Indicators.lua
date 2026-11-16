@@ -794,7 +794,7 @@ local function LayoutWidget(w, cfg, b)
         return
     end
 
-    w:SetPoint(cfg.point, b, cfg.point, cfg.x, cfg.y)
+    w:SetPoint(cfg.point, ns.PointAnchor(b, cfg.point), cfg.point, cfg.x, cfg.y)
     if t == "text" then
         local size = TextCfg(cfg).size or 9
         w:SetSize(math.max(10, size * 2.5), size + 2)
