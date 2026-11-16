@@ -232,17 +232,11 @@ local function BuildProfiles(container)
     local page = UI.Page(container, 2)
     local c = page.content
 
-    -- Uses a profile now: it is edited and shown, and the current group size
-    -- (the simulated one in test mode) uses it from now on
+    -- Edits a profile (in test mode it is the one shown). Which profile each
+    -- group size uses is only changed in "Profile per group size".
     local function Use(n)
         ns.SetEditName(n)
-        ns.CharProfiles()[ns.SizeKey()] = n
         ns.ActivateProfile()
-    end
-    -- A new profile: every group size of this character uses it
-    local function UseEverywhere(n)
-        for _, key in ipairs(ns.SIZE_KEYS) do ns.CharProfiles()[key] = n end
-        Use(n)
     end
     local function Reassign(old, new)
         for _, chars in pairs(ns.db.chars) do
@@ -258,7 +252,7 @@ local function BuildProfiles(container)
         return out
     end
 
-    local HELP = L["\"Create new\" starts with the default settings; \"Duplicate\" copies the selected profile. A new profile is used for every group size. Default cannot be deleted or renamed."]
+    local HELP = L["\"Create new\" starts with the default settings; \"Duplicate\" copies the selected profile. Default cannot be deleted or renamed."]
     local feedback = UI.Note(c, HELP)
     local function Say(text)
         feedback:SetText("|cff66e680" .. text .. "|r")
@@ -325,10 +319,10 @@ local function BuildProfiles(container)
     nameBox:SetPoint("TOPLEFT", 0, -14)
     nameBox:SetPoint("TOPRIGHT", 0, -14)
     local function Name() return nameBox:GetText():trim() end
-    local function Done(n, msg, everywhere)
+    local function Done(n, msg)
         nameBox:SetText("")
         nameBox:ClearFocus()
-        if everywhere then UseEverywhere(n) else Use(n) end
+        Use(n)
         Say(msg)
     end
 
@@ -336,12 +330,12 @@ local function BuildProfiles(container)
         { L["Create new"], function()
             local n = Name()
             ns.db.profiles[n] = ns.NewProfile()
-            Done(n, (L["\"%s\" created with the default settings."]):format(n), true)
+            Done(n, (L["\"%s\" created with the default settings."]):format(n))
         end },
         { L["Duplicate"], function()
             local n, from = Name(), ns.EditedProfileName()
             ns.db.profiles[n] = ns.DeepCopy(ns.EP())
-            Done(n, (L["\"%s\" created as a copy of \"%s\"."]):format(n, from), true)
+            Done(n, (L["\"%s\" created as a copy of \"%s\"."]):format(n, from))
         end },
         { L["Rename"], function()
             local n, old = Name(), ns.EditedProfileName()
