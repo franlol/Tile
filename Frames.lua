@@ -558,7 +558,8 @@ function ns.UpdateHealth(b, full)
     -- when the max (their scale) changes
     if maxChanged then ns.UpdatePrediction(b, max) end
 
-    SetOffline(b, R(UnitIsConnected(u)) == false)
+    -- players only: a pet cannot be offline (it despawns with its owner)
+    SetOffline(b, not b.isPet and R(UnitIsConnected(u)) == false)
     local text, key, down = StatusOf(u)
     -- status and transparency only when they change
     if full or text ~= b.cacheStatus or key ~= b.statusKey then
