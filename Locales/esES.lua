@@ -339,7 +339,6 @@ ns.translations.esES = {
     ["Type icon"] = "Icono del tipo",
     ["Show the type icon"] = "Mostrar el icono del tipo",
     ["Look"] = "Aspecto",
-    ["Color by type (magic, poison...)"] = "Color según tipo (magia, veneno...)",
     ["Border"] = "Borde",
     ["Border color"] = "Color del borde",
     ["Border thickness"] = "Grosor del borde",
