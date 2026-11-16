@@ -84,12 +84,8 @@ local function NewElement(parent)
 end
 
 function ns.BuildVisuals(b)
-    -- base behind the bars: plain black (what a see-through background
-    -- shows). The border color is only the outline of each bar (below).
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(0, 0, 0, 1)
-
+    -- nothing behind the bars: a background below 100% opacity shows what is
+    -- behind the frame. The border color is only the outline of each bar (below).
     b.health = NewBar(b)
     b.health.bg = b.health:CreateTexture(nil, "BACKGROUND")
     b.health.bg:SetAllPoints()
