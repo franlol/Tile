@@ -132,7 +132,8 @@ end
 -- Text. root() returns its style table.
 -- o.show = { get, set } adds "Show"; o.extra, controls right after;
 -- o.showIf / o.enableIf for the whole block (enableIf does not affect "Show");
--- o.showCheckIf, o.colorIf, o.positionIf for specific parts.
+-- o.showCheckIf, o.colorIf, o.positionIf for specific parts;
+-- o.noColor: the text has no color of its own (no color controls at all).
 local function TextBlock(c, root, after, o)
     o = o or {}
     local list = {}
@@ -147,10 +148,12 @@ local function TextBlock(c, root, after, o)
     Add(UI.Dropdown(c, L["Font"], ns.FontList, B("font")))
     Add(Slider(c, L["Size"], 6, 24, 1, UI.px, B("size")))
     Add(UI.Dropdown(c, L["Outline"], ns.OutlineList, B("outline")))
-    Add(UI.Segmented(c, L["Color"], TextColors(), B("colorMode")), o.colorIf)
-    Add(UI.Attach(Swatch(c, L["Custom color"], function() return root().color end,
-        function() if after then after() end UI.RefreshAll() end, true)),
-        o.colorIf, function() return root().colorMode == "custom" end)
+    if not o.noColor then
+        Add(UI.Segmented(c, L["Color"], TextColors(), B("colorMode")), o.colorIf)
+        Add(UI.Attach(Swatch(c, L["Custom color"], function() return root().color end,
+            function() if after then after() end UI.RefreshAll() end, true)),
+            o.colorIf, function() return root().colorMode == "custom" end)
+    end
     for _, w in ipairs(PositionBlock(c, root, after)) do Add(w, o.positionIf) end
     return list
 end
@@ -569,7 +572,7 @@ local function BuildTexts(container)
         TextBlock(c, S, ns.ProfileChanged, {
             show = { PB("texts.status.show") },
             enableIf = statusOn,
-            colorIf = function() return false end,   -- each state has its own color
+            noColor = true,   -- each state has its own color
         }),
         Cond(UI.Note(c, L["States: drag to change the priority. When several apply, the top one shows."]), nil, statusOn),
         Cond(states, nil, statusOn),
