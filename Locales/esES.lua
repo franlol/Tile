@@ -225,6 +225,7 @@ ns.translations.esES = {
     ["Border color"] = "Color del borde",
     ["Out of range opacity"] = "Opacidad fuera de rango",
     ["Offline players"] = "Jugadores desconectados",
+    ["Dead / ghost players"] = "Jugadores muertos / fantasmas",
     ["As usual"] = "Como siempre",
     ["Frame opacity"] = "Opacidad del marco",
     ["Highlights"] = "Resaltados",

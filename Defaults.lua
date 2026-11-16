@@ -163,6 +163,15 @@ ns.profileDefaults = {
         name = "usual", nameColor = C(0.5, 0.5, 0.5),
         alpha = 0.35,
     },
+    -- dead and ghost players: their bar is empty, so the background is what
+    -- shows. bgAlpha is the background's own opacity while they are dead;
+    -- alpha the frame's (range fading still applies on top)
+    dead = {
+        bg = "usual", bgColor = C(0.5, 0.5, 0.5),
+        bgAlpha = 0.3,
+        name = "usual", nameColor = C(0.5, 0.5, 0.5),
+        alpha = 1,
+    },
     -- font and outline every text uses unless it has its own
     -- (a text with font = false / outline = false takes these)
     general = { font = FONT, outline = "OUTLINE" },
@@ -451,6 +460,7 @@ ns.PRESET_PROFILES = {
                 ready = { point = "BOTTOM", x = 0, y = 4, size = 20 },
             },
             offline = { alpha = 1 },
+            dead = { bgAlpha = 0.4 },
         },
         indicators = function()
             return {

@@ -395,18 +395,27 @@ function ns.UpdateBarColor(b, testClass, testPct)
         b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
     end
     local r, g, bl, a = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
+    local D = ns.P.dead
+    if b.dead and D.bg == "custom" then
+        local c = D.bgColor
+        r, g, bl, a = c.r, c.g, c.b, 1
+    elseif b.dead and D.bg == "class" then
+        r, g, bl, a = cr, cg, cb, 1
+    end
     b.health.bg:SetVertexColor(r, g, bl, 1)
     b.bgColorAlpha = a
     ns.UpdateBgAlpha(b)
 end
 
 -- Background opacity: the option (and the custom color's own opacity),
--- dimmed to 40% when the unit is dead or offline (like the real frames).
+-- dimmed to 40% when the unit is offline (like the real frames); dead and
+-- ghost players have their own (Bars, Dead / ghost players).
 -- With SetAlpha: the vertex color alpha does not apply to every texture
 -- (the game's raid frame atlas ignores it).
 function ns.UpdateBgAlpha(b, down)
     if down ~= nil then b.bgDown = down end
-    b.health.bg:SetAlpha(ns.P.bars.bgAlpha * (b.bgColorAlpha or 1) * (b.bgDown and 0.4 or 1))
+    local base = b.dead and ns.P.dead.bgAlpha or ns.P.bars.bgAlpha * (b.bgDown and 0.4 or 1)
+    b.health.bg:SetAlpha(base * (b.bgColorAlpha or 1))
 end
 
 -- Status text: every state has its own switch and color (ns.STATUS_STATES)
@@ -463,6 +472,11 @@ function ns.UpdateColors(b, testClass, testPct)
         b.name:SetTextColor(c.r, c.g, c.b, c.a or 1)
     elseif b.offline and O.name == "class" then
         b.name:SetTextColor(r, g, bl, 1)
+    elseif b.dead and ns.P.dead.name == "custom" then
+        local c = ns.P.dead.nameColor
+        b.name:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    elseif b.dead and ns.P.dead.name == "class" then
+        b.name:SetTextColor(r, g, bl, 1)
     else
         TextColor(b.name, T.name, r, g, bl)
     end
@@ -477,6 +491,14 @@ local function SetOffline(b, offline)
     b.offline = offline
     ns.UpdateColors(b)
     ns.UpdatePower(b)
+    ns.UpdateRange(b)
+end
+
+-- Dead or ghost (and online): the same, with the dead look
+local function SetDead(b, dead)
+    if b.dead == dead then return end
+    b.dead = dead
+    ns.UpdateColors(b)
     ns.UpdateRange(b)
 end
 
@@ -575,6 +597,7 @@ function ns.UpdateHealth(b, full)
 
     -- players only: a pet cannot be offline (it despawns with its owner)
     SetOffline(b, not b.isPet and R(UnitIsConnected(u)) == false)
+    SetDead(b, not b.isPet and not b.offline and (R(UnitIsGhost(u)) or R(UnitIsDead(u))) and true or false)
     local text, key, down = StatusOf(u)
     -- status and transparency only when they change
     if full or text ~= b.cacheStatus or key ~= b.statusKey then
@@ -736,7 +759,10 @@ function ns.UpdateRange(b)
     local alpha = ns.P.bars.rangeAlpha
     -- offline: their own opacity (Bars, Offline players), in range or not
     if b.offline then b:SetAlpha(ns.P.offline.alpha) return end
-    if R(UnitIsUnit("player", u)) == true then b:SetAlpha(1) return end
+    -- dead / ghost: their own opacity in range; out of range, the lower one
+    local full = b.dead and ns.P.dead.alpha or 1
+    alpha = math.min(alpha, full)
+    if R(UnitIsUnit("player", u)) == true then b:SetAlpha(full) return end
     -- too far to be seen at all (another zone, far away): faded
     if R(UnitIsVisible(u)) == false then b:SetAlpha(alpha) return end
     -- pets: UnitInRange does not check them; a friendly spell of the player's
@@ -748,27 +774,27 @@ function ns.UpdateRange(b)
         if spell and C_Spell and C_Spell.IsSpellInRange then
             ok, petInRange = pcall(C_Spell.IsSpellInRange, spell, u)
         end
-        if not ok or petInRange == nil then b:SetAlpha(1) return end
+        if not ok or petInRange == nil then b:SetAlpha(full) return end
         if S(petInRange) then
-            if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, petInRange, 1, alpha) end
+            if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, petInRange, full, alpha) end
             return
         end
-        b:SetAlpha(petInRange and 1 or alpha)
+        b:SetAlpha(petInRange and full or alpha)
         return
     end
     -- like the Blizzard raid frames: only fade when the game checked the range
     -- and the unit is out of it
     local inRange, checked = UnitInRange(u)
     if S(checked) then
-        if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, 1, alpha) end
+        if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, full, alpha) end
         return
     end
-    if not checked then b:SetAlpha(1) return end
+    if not checked then b:SetAlpha(full) return end
     if S(inRange) then
-        if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, 1, alpha) end
+        if b.SetAlphaFromBoolean then pcall(b.SetAlphaFromBoolean, b, inRange, full, alpha) end
         return
     end
-    b:SetAlpha(inRange and 1 or alpha)
+    b:SetAlpha(inRange and full or alpha)
 end
 
 function ns.UpdateButton(b)
@@ -1261,13 +1287,14 @@ local function FillTest(b)
     b.testClass = class
     -- #5 is the offline player (its look follows Bars, Offline players)
     b.offline = PV.offline and i == 5 and not b.isPet
+    local deadSim = PV.dead and not b.isPet and (i == 7 or i == 8 or i == 12)
+    b.dead = deadSim and not b.offline
     ns.UpdateColors(b, class)
 
     b.name:SetText(b.isPet and (L["Pet %d"]):format(i) or TestName(i))
     local hp = 0.35 + ((i * 37) % 65) / 100
     if i == 4 then hp = 1 end
     if PV.health == "full" then hp = 1 elseif PV.health == "low" then hp = 0.2 end
-    local deadSim = PV.dead and not b.isPet and (i == 7 or i == 8 or i == 12)
     b.health:SetMinMaxValues(0, 10000)
     b.health:SetValue(hp * 10000)
     ns.UpdateBarColor(b, class, (deadSim and i ~= 8) and 0 or hp)   -- for the gradient
@@ -1310,7 +1337,8 @@ local function FillTest(b)
     else
         HealthText(b, nil, math.floor(hp * 10000), 10000)
     end
-    b:SetAlpha(b.offline and P.offline.alpha or (PV.range and i % 9 == 0 and B.rangeAlpha) or 1)
+    local full = b.dead and P.dead.alpha or 1
+    b:SetAlpha(b.offline and P.offline.alpha or (PV.range and i % 9 == 0 and math.min(B.rangeAlpha, full)) or full)
 
     b.hl:SetAlpha((PV.target and B.targetHighlight and i == 3) and 1 or 0)
     b.aggro:SetShown(PV.threat and B.aggro and i == 1)

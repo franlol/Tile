@@ -105,10 +105,10 @@ end
 local function TextColors()
     return { { "white", L["White"] }, { "class", L["Class color"] }, { "custom", L["Custom"] } }
 end
--- Look of one part of an offline player's frame: as usual or a chosen color
--- (withClass: also the class color)
-local function OfflineColor(c, key, label, withClass)
-    local mode = "offline." .. key
+-- Look of one part of an offline (group "offline") or dead / ghost ("dead")
+-- player's frame: as usual or a chosen color (withClass: also the class color)
+local function StateColor(c, group, key, label, withClass)
+    local mode = group .. "." .. key
     local choices = { { "usual", L["As usual"] } }
     if withClass then choices[#choices + 1] = { "class", L["Class color"] } end
     choices[#choices + 1] = { "custom", L["Custom"] }
@@ -582,10 +582,16 @@ local function BuildBars(container)
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.aggroColor"), nil, true)), nil, On("bars.aggro")),
 
         Header(L["Offline players"]),
-        OfflineColor(c, "health", L["Health"]),
-        OfflineColor(c, "power", L["Mana / energy / rage"]),
-        OfflineColor(c, "name", L["Name"], true),
+        StateColor(c, "offline", "health", L["Health"]),
+        StateColor(c, "offline", "power", L["Mana / energy / rage"]),
+        StateColor(c, "offline", "name", L["Name"], true),
         Slider(c, L["Frame opacity"], 0.1, 1, 0.05, UI.pct, PB("offline.alpha")),
+
+        Header(L["Dead / ghost players"]),
+        StateColor(c, "dead", "bg", L["Background"], true),
+        Slider(c, L["Background opacity"], 0, 1, 0.05, UI.pct, PB("dead.bgAlpha")),
+        StateColor(c, "dead", "name", L["Name"], true),
+        Slider(c, L["Frame opacity"], 0.1, 1, 0.05, UI.pct, PB("dead.alpha")),
     })
 end
 
