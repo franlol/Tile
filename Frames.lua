@@ -84,6 +84,8 @@ local function NewElement(parent)
 end
 
 function ns.BuildVisuals(b)
+    -- base behind the bars: plain black (what a see-through background
+    -- shows). The border color is only the outline of each bar (below).
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints()
     b.bg:SetColorTexture(0, 0, 0, 1)
@@ -105,6 +107,18 @@ function ns.BuildVisuals(b)
     b.power.bg = b.power:CreateTexture(nil, "BACKGROUND")
     b.power.bg:SetAllPoints()
     b.power.bg:SetColorTexture(0, 0, 0, 0.8)
+
+    -- border color: a 1 px outline around the health bar and one around the
+    -- resource bar (together they also fill the gap between both)
+    local function Outline(bar)
+        local o = CreateFrame("Frame", nil, b, "BackdropTemplate")
+        o:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
+        o:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+        o:SetBackdrop({ edgeFile = FLAT, edgeSize = 1 })
+        return o
+    end
+    b.healthEdge = Outline(b.health)
+    b.powerEdge = Outline(b.power)
 
     local overlay = CreateFrame("Frame", nil, b)
     overlay:SetAllPoints()
@@ -245,6 +259,7 @@ local function AnchorHealth(b, powerShown)
     b.pred:SetWidth(hw)
     b.absorb:SetWidth(hw)
     b.power:SetShown(powerH > 0)
+    b.powerEdge:SetShown(powerH > 0)
     b.powerShown = powerShown
 end
 ns.AnchorHealth = AnchorHealth
@@ -255,7 +270,9 @@ function ns.LayoutButton(b, isPet)
     local w = isPet and (ns.PetSize()) or LY.width
 
     b.isPet = isPet
-    b.bg:SetColorTexture(B.borderColor.r, B.borderColor.g, B.borderColor.b, B.borderColor.a or 1)
+    local bc = B.borderColor
+    b.healthEdge:SetBackdropBorderColor(bc.r, bc.g, bc.b, bc.a or 1)
+    b.powerEdge:SetBackdropBorderColor(bc.r, bc.g, bc.b, bc.a or 1)
     ns.SetBarTexture(b.health, B.healthTex)
     ns.SetBgTexture(b.health.bg, B.bgTex)
     ns.SetBarTexture(b.pred, B.healPredTex or B.healthTex)
