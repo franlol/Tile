@@ -150,10 +150,12 @@ function ns.BuildVisuals(b)
     b.hover:SetFrameLevel(overlay:GetFrameLevel() + 3)
     b.hover:SetAlpha(0)
 
-    b.aggro = overlay:CreateTexture(nil, "OVERLAY")
-    b.aggro:SetPoint("TOPLEFT", 1, -1)
-    b.aggro:SetPoint("TOPRIGHT", -1, -1)
-    b.aggro:SetHeight(2)
+    -- threat border: the whole frame, like the target and hover ones (below
+    -- them, so they read on top when they coincide)
+    b.aggro = CreateFrame("Frame", nil, b, "BackdropTemplate")
+    b.aggro:SetAllPoints()
+    b.aggro:SetBackdrop({ edgeFile = FLAT, edgeSize = 1 })
+    b.aggro:SetFrameLevel(overlay:GetFrameLevel() + 1)
     b.aggro:Hide()
 
     b.ind, b.pool = {}, {}
@@ -299,7 +301,7 @@ function ns.LayoutButton(b, isPet)
     b.hl:SetBackdropBorderColor(tc.r, tc.g, tc.b, tc.a)
     b.hover:SetBackdropBorderColor(oc.r, oc.g, oc.b, oc.a)
     if not B.hoverHighlight then b.hover:SetAlpha(0) end
-    b.aggro:SetColorTexture(gc.r, gc.g, gc.b, gc.a)
+    b.aggro:SetBackdropBorderColor(gc.r, gc.g, gc.b, gc.a)
 
     ns.BuildIndicators(b)
 end
