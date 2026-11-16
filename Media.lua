@@ -114,6 +114,16 @@ function ns.OutlineList()
     }
 end
 
+-- Font and outline of a text style: its own, or the profile's general ones
+-- (font = false / outline = false). An outline of "" is "No outline".
+function ns.FontOf(t)
+    local G = (ns.P and ns.P.general) or ns.profileDefaults.general
+    local font = (t.font and t.font ~= "") and t.font or G.font
+    local outline = t.outline
+    if outline == nil or outline == false then outline = G.outline end
+    return font, outline
+end
+
 -- Applies a font; if the path is not valid, uses the standard one
 function ns.SetFont(fs, font, size, outline)
     outline = outline or ""
@@ -129,7 +139,8 @@ end
 -------------------------------------------------------------------------------
 -- dx, dy: extra offset (e.g. so the text does not stick out of an icon)
 function ns.StyleText(fs, t, anchor, dx, dy)
-    ns.SetFont(fs, t.font, t.size or 10, t.outline or "")
+    local font, outline = ns.FontOf(t)
+    ns.SetFont(fs, font, t.size or 10, outline)
     fs:ClearAllPoints()
     local p = t.point or "CENTER"
     fs:SetPoint(p, anchor, p, (t.x or 0) + (dx or 0), (t.y or 0) + (dy or 0))

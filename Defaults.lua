@@ -149,15 +149,18 @@ ns.profileDefaults = {
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
     },
+    -- font and outline every text uses unless it has its own
+    -- (a text with font = false / outline = false takes these)
+    general = { font = FONT, outline = "OUTLINE" },
     texts = {
         name = {
-            show = true, font = FONT, size = 11, outline = "OUTLINE",
+            show = true, font = false, size = 11, outline = false,
             colorMode = "white", color = C(1, 1, 1),
             point = "TOP", x = 0, y = -5, width = 92,
             surname = true,   -- first name and surname (Forever); false = first name only
         },
         status = {
-            show = true, font = FONT, size = 10, outline = "OUTLINE",
+            show = true, font = false, size = 10, outline = false,
             point = "CENTER", x = 0, y = -3,
             -- states, by priority (the first one that applies shows), each with its color
             order = { "offline", "res", "dead", "ghost", "charm", "summon", "afk" },
@@ -171,7 +174,7 @@ ns.profileDefaults = {
         },
         health = {
             show = false, format = "deficit", hideFull = true,
-            font = FONT, size = 9, outline = "OUTLINE",
+            font = false, size = 9, outline = false,
             colorMode = "custom", color = C(1, 1, 1),
             point = "BOTTOM", x = 0, y = 5,
         },
@@ -243,9 +246,9 @@ ns.indicatorDefaults = {
     dispelColor = true,     -- border by magic type
     onlyDispellable = true,
     -- time and stack texts (same style as every other text)
-    timerText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+    timerText = { font = false, size = 9, outline = false, colorMode = "white", color = C(1, 1, 1),
         point = "CENTER", x = 0, y = 0 },
-    stacksText = { font = FONT, size = 9, outline = "OUTLINE", colorMode = "white", color = C(1, 1, 1),
+    stacksText = { font = false, size = 9, outline = false, colorMode = "white", color = C(1, 1, 1),
         point = "BOTTOMRIGHT", x = 0, y = 0 },
     showBorder = true,       -- border for icons, squares and bars
     borderColor = C(0, 0, 0, 1),
@@ -382,6 +385,7 @@ function ns.FixProfile(p)
         end
         st.order = order
     end
+    local hadGeneral = type(p.general) == "table"
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health
@@ -392,5 +396,22 @@ function ns.FixProfile(p)
     end
     for _, ind in ipairs(inds) do ns.FixIndicator(ind) end
     p.indicators = inds
+    -- before the general font: every text had its own font and outline. The
+    -- ones equal to the general ones now follow it (nothing changes on screen).
+    if not hadGeneral then
+        local G = p.general
+        local function Follow(t)
+            if type(t) ~= "table" then return end
+            if t.font == G.font then t.font = false end
+            if t.outline == G.outline then t.outline = false end
+        end
+        Follow(p.texts.name)
+        Follow(p.texts.status)
+        Follow(p.texts.health)
+        for _, ind in ipairs(inds) do
+            Follow(ind.timerText)
+            Follow(ind.stacksText)
+        end
+    end
     return p
 end

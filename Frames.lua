@@ -1075,8 +1075,9 @@ function ns.RefreshFonts()
             if fs and t then
                 local text = fs:GetText()
                 fs:SetText("")
-                pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, t.size or 10, t.outline or "")
-                ns.SetFont(fs, t.font, t.size or 10, t.outline or "")
+                local font, outline = ns.FontOf(t)
+                pcall(fs.SetFont, fs, STANDARD_TEXT_FONT, t.size or 10, outline)
+                ns.SetFont(fs, font, t.size or 10, outline)
                 fs:SetText(text)
             end
         end

@@ -129,6 +129,19 @@ local function PositionBlock(c, root, after, o)
     }
 end
 
+-- Font and outline lists of a text: "General" first (false = the profile's
+-- general one, set at the top of the Texts page)
+local function GeneralFontList()
+    local list = ns.FontList()
+    table.insert(list, 1, { false, L["General font"], ns.EP().general.font })
+    return list
+end
+local function GeneralOutlineList()
+    local list = ns.OutlineList()
+    table.insert(list, 1, { false, L["General"] })
+    return list
+end
+
 -- Text. root() returns its style table.
 -- o.show = { get, set } adds "Show"; o.extra, controls right after;
 -- o.showIf / o.enableIf for the whole block (enableIf does not affect "Show");
@@ -145,9 +158,9 @@ local function TextBlock(c, root, after, o)
     end
     for _, w in ipairs(o.extra or {}) do Add(w) end
     local function B(k) return UI.Bind(root, k, after) end
-    Add(UI.Dropdown(c, L["Font"], ns.FontList, B("font")))
+    Add(UI.Dropdown(c, L["Font"], GeneralFontList, B("font")))
     Add(Slider(c, L["Size"], 6, 24, 1, UI.px, B("size")))
-    Add(UI.Dropdown(c, L["Outline"], ns.OutlineList, B("outline")))
+    Add(UI.Dropdown(c, L["Outline"], GeneralOutlineList, B("outline")))
     if not o.noColor then
         Add(UI.Segmented(c, L["Color"], TextColors(), B("colorMode")), o.colorIf)
         Add(UI.Attach(Swatch(c, L["Custom color"], function() return root().color end,
@@ -582,6 +595,10 @@ local function BuildTexts(container)
     }
 
     Cards(page, 1, {
+        -- what every text uses unless it picks its own (indicator texts too)
+        Header(L["All texts"]),
+        UI.Dropdown(c, L["Font"], ns.FontList, PB("general.font")),
+        UI.Dropdown(c, L["Outline"], ns.OutlineList, PB("general.outline")),
         TextSection(c, "name", L["Name"], {
             UI.Check(c, L["With surname"], PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
             Slider(c, L["Max width (% of the frame)"], 30, 100, 1, UI.percent, PB("texts.name.width")),

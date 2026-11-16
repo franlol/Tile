@@ -352,7 +352,8 @@ end
 -- The "Text" type: the text itself goes where the indicator is
 local function StyleMainText(fs, cfg, anchor, r, g, b)
     local tt = TextCfg(cfg)
-    ns.SetFont(fs, tt.font, tt.size or 9, tt.outline or "")
+    local font, outline = ns.FontOf(tt)
+    ns.SetFont(fs, font, tt.size or 9, outline)
     fs:ClearAllPoints()
     local p = cfg.point or "CENTER"
     fs:SetPoint(p, anchor, p)
@@ -364,7 +365,8 @@ end
 -- Stacks next to the text ("Text" type)
 local function StyleSideCount(fs, cfg, main)
     local _, st = TextCfg(cfg)
-    ns.SetFont(fs, st.font, st.size or 9, st.outline or "")
+    local font, outline = ns.FontOf(st)
+    ns.SetFont(fs, font, st.size or 9, outline)
     fs:ClearAllPoints()
     fs:SetPoint("LEFT", main, "RIGHT", 1, 0)
     ns.ColorText(fs, st)
@@ -623,7 +625,7 @@ end
 
 local function NativeKey(w, cfg)
     local filter, candidates, sort = Query(cfg)
-    return table.concat(Sig({ cfg, ns.P.dispelColors, filter, candidates, sort, w:GetFrameLevel() }, {}))
+    return table.concat(Sig({ cfg, ns.P.dispelColors, ns.P.general, filter, candidates, sort, w:GetFrameLevel() }, {}))
 end
 
 -- Out of combat only: containers cannot be created in combat
