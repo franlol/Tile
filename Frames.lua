@@ -1204,8 +1204,9 @@ end
 -------------------------------------------------------------------------------
 local TEST_CLASSES = { "WARRIOR", "PRIEST", "MAGE", "ROGUE", "DRUID", "HUNTER", "WARLOCK", "PALADIN", "SHAMAN", "PRIEST" }
 -- first name and surname, as Forever shows them
-local TEST_NAMES = { "Thrall Martillo", "Jaina Valiente", "Uther Luzclara", "Valeera Sangrefría", "Malfurion Tempestira",
-    "Rexxar Colmillo", "Guldan Sombravil", "Tirion Vadín", "Nobundo Marea", "Anduin Lobonegro" }
+local TEST_NAMES = { "Thrall Stonehammer", "Jaina Brightvalor", "Uther Clearlight", "Valeera Coldblood",
+    "Malfurion Stormbrow", "Rexxar Longfang", "Guldan Shadowvile", "Tirion Dawnward", "Nobundo Tidecall",
+    "Anduin Blackwolf" }
 local NUM_TEST_PETS = 10
 -- role of each test class (for "Group by: role")
 local TEST_ROLE = { WARRIOR = "TANK", PRIEST = "HEALER", PALADIN = "HEALER" }
