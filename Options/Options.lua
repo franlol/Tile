@@ -1120,7 +1120,11 @@ local function BuildIndicators(container)
             { "square", L["Color square"] }, { "icon", L["Icon"] }, { "icons", L["Several icons"] },
             { "bar", L["Bar"] }, { "text", L["Text"] },
             { "border", L["Frame border"] }, { "overlay", L["Tint over health"] },
-        }, IB("type")), isAura),
+        }, function() return Sel().type end, function(v)
+            -- each type starts with its own size and settings
+            ns.SetIndicatorType(Sel(), v)
+            IndChanged()
+        end), isAura),
         W(UI.Attach(UI.Dropdown(c, L["What it measures"], {
             { "time", L["Aura time left"] },
             { "stacks", L["Aura stacks"] },

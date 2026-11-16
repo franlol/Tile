@@ -276,6 +276,27 @@ ns.indicatorDefaults = {
     ranks = {},              -- [spell key] = { [id] = true } chosen IDs (empty = all)
 }
 
+-- What each type starts with when an indicator changes to it: its size and
+-- its own settings (position, spells and colors are kept). For a frame
+-- border, width is the thickness.
+ns.TYPE_DEFAULTS = {
+    square  = { width = 9, height = 9 },
+    icon    = { width = 14, height = 14, iconFit = "crop" },
+    icons   = { width = 12, height = 12, iconFit = "crop", max = 3, grow = "LEFT", spacing = 1 },
+    bar     = { width = 30, height = 4, span = "none", barOrient = "HORIZONTAL", barReverse = false,
+                barMeasure = "time" },
+    text    = { textShow = "time" },
+    border  = { width = 2, borderInside = false },
+    overlay = { overlayAlpha = 0.6, tintShape = "up" },
+}
+
+-- Changes the type of an indicator, with that type's defaults
+function ns.SetIndicatorType(ind, t)
+    if ind.type == t then return end
+    ind.type = t
+    for k, v in pairs(ns.TYPE_DEFAULTS[t] or {}) do ind[k] = ns.DeepCopy(v) end
+end
+
 local function Ind(t)
     return t
 end
