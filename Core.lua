@@ -318,7 +318,12 @@ function ns.CharProfiles()
         ns.db.chars[ns.charKey] = c
     end
     for _, k in ipairs(ns.SIZE_KEYS) do
-        if not c[k] or not ns.db.profiles[c[k]] then c[k] = "Default" end
+        if not c[k] then
+            -- a character that never chose: Clear (the look Tile starts with), if it exists
+            c[k] = ns.db.profiles.Clear and "Clear" or "Default"
+        elseif not ns.db.profiles[c[k]] then
+            c[k] = "Default"
+        end
     end
     return c
 end
