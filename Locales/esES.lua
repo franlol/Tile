@@ -81,6 +81,7 @@ ns.translations.esES = {
     ["Indicator"] = "Indicador",
     ["Boss debuff"] = "Debuff de jefe",
     ["Dispellable (border)"] = "Disipable (borde)",
+    ["Dispellable"] = "Disipable",
     ["Drinking / eating"] = "Bebiendo / comiendo",
     ["Priest"] = "Sacerdote",
     ["Druid"] = "Druida",

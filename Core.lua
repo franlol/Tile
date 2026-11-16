@@ -412,6 +412,7 @@ local function LoadDB()
     if not ns.db.profiles.Default then
         ns.db.profiles.Default = ns.NewProfile()
     end
+    ns.AddPresetProfiles(ns.db)
     for _, p in pairs(ns.db.profiles) do ns.FixProfile(p) end
 end
 

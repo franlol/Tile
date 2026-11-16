@@ -392,6 +392,97 @@ function ns.NewProfile()
     return p
 end
 
+-------------------------------------------------------------------------------
+-- Profiles that come with Tile, besides Default: their settings (only what
+-- differs from Default) and their indicators. Each one is added once per
+-- account (ns.AddPresetProfiles) and never replaces a profile with its name.
+-------------------------------------------------------------------------------
+local DARK_TEX = "Interface\\AddOns\\Tile\\Media\\Dark"
+local GRAY = C(0.5, 0.5, 0.5)
+
+ns.PRESET_PROFILES = {
+    -- compact, light text (Arial Narrow without outline), the game's raid bar
+    Clear = {
+        settings = {
+            layout = { width = 85, height = 48, groupSpacing = 2, showSolo = true },
+            pets = { width = 72 },
+            bars = {
+                healthTex = "Interface\\RaidFrame\\Raid-Bar-Hp-Fill",
+                bgTex = DARK_TEX, bgBrightness = 0.9, bgAlpha = 1, bgCustom = C(0.0784, 0.0784, 0.0784),
+                smooth = true, rangeAlpha = 0.6,
+                healPredColor = C(0.1373, 0.5333, 0.2039),
+                targetColor = C(1, 0.898, 0.1373), hoverColor = C(1, 0.9922, 0.9804),
+                aggroColor = C(1, 0, 0),
+            },
+            general = { font = "Fonts\\ARIALN.TTF", outline = "" },
+            texts = {
+                name = { size = 10, y = -3, width = 64 },
+                status = { size = 13, y = -2, offlineColor = GRAY, deadColor = GRAY, ghostColor = GRAY },
+            },
+            elements = {
+                role = { size = 8, x = 3, y = -4, bgColor = C(0.0588, 0.0588, 0.0588) },
+                leader = { point = "LEFT", x = 2, y = 0, size = 13, onTop = true },
+                raidIcon = { point = "CENTER", x = 21, y = -2, size = 20, onTop = true },
+                ready = { point = "BOTTOM", x = 0, y = 4, size = 20 },
+            },
+            offline = { alpha = 1 },
+        },
+        indicators = function()
+            return {
+                { name = L["Boss debuff"], kind = "raiddebuff", type = "icon", mine = false,
+                    point = "CENTER", x = 0, y = 0, width = 16, height = 16, timer = true, dispelColor = false },
+                { name = "Debuffs", kind = "debuffs", type = "icons", mine = false, onlyDispellable = false,
+                    point = "BOTTOMLEFT", x = 2, y = 2, width = 11, height = 11, grow = "RIGHT",
+                    swipeColor = C(0, 0, 0, 0.7943), swipeSpark = true,
+                    stacksText = { font = "Fonts\\FRIZQT__.TTF", size = 9, outline = "OUTLINE", colorMode = "white",
+                        color = C(1, 1, 1), point = "BOTTOMRIGHT", x = 0, y = 0 } },
+                { name = L["Dispellable"], kind = "aura", watch = "dispellable", type = "overlay", mine = false,
+                    overlayAlpha = 0.9, typeIconSize = 18, x = -3, width = 15, height = 4 },
+                { name = L["Drinking / eating"], kind = "aura", type = "icons", mine = false,
+                    spells = { "n:Drink", "n:Food", "n:Refreshment" },
+                    point = "LEFT", x = 1, y = 0, width = 12, height = 12, max = 2, grow = "RIGHT", spacing = 0,
+                    showBorder = false, stacks = false, swipeSpark = true },
+                { name = ("%s · %s"):format(L["Defensives"], L["all"]), kind = "aura", type = "icons", mine = false,
+                    spells = { 871, 12975, 2565, 642, 498, 1022, "n:Templar's Bulwark", 6940, 22812, 22842,
+                        5277, 19263, 11958, 11426, 1463, 6229, 6346 },
+                    point = "RIGHT", x = -2, y = 0, width = 8, height = 20, stacks = false },
+            }
+        end,
+    },
+}
+
+-- Writes the values of src over dst (tables merged, the rest replaced)
+local function Overwrite(src, dst)
+    for k, v in pairs(src) do
+        if type(v) == "table" and type(dst[k]) == "table" and v.r == nil then
+            Overwrite(v, dst[k])
+        else
+            dst[k] = ns.DeepCopy(v)
+        end
+    end
+end
+
+function ns.NewPresetProfile(name)
+    local def = ns.PRESET_PROFILES[name]
+    local p = ns.NewProfile()
+    Overwrite(def.settings, p)
+    p.indicators = {}
+    for _, ind in ipairs(def.indicators()) do table.insert(p.indicators, ns.FixIndicator(ind)) end
+    return p
+end
+
+-- Adds the profiles that come with Tile, once per account (a profile with
+-- the same name is never replaced; one the player deletes does not come back)
+function ns.AddPresetProfiles(db)
+    db.presetsAdded = db.presetsAdded or {}
+    for name in pairs(ns.PRESET_PROFILES) do
+        if not db.presetsAdded[name] then
+            if not db.profiles[name] then db.profiles[name] = ns.NewPresetProfile(name) end
+            db.presetsAdded[name] = true
+        end
+    end
+end
+
 -- Fills a profile (and its indicators) with the defaults it is missing
 function ns.FixProfile(p)
     local inds = p.indicators
