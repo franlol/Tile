@@ -624,21 +624,26 @@ function ns.UpdateRaidIcon(b)
     end
 end
 
-local READY_TEX = {
-    ready = READY_CHECK_READY_TEXTURE or "Interface\\RaidFrame\\ReadyCheck-Ready",
-    notready = READY_CHECK_NOT_READY_TEXTURE or "Interface\\RaidFrame\\ReadyCheck-NotReady",
-    waiting = READY_CHECK_WAITING_TEXTURE or "Interface\\RaidFrame\\ReadyCheck-Waiting",
+-- Ready check marks: the game's atlases (READY_CHECK_*_ATLAS, what its own
+-- ready check uses)
+local READY_ATLAS = {
+    ready = READY_CHECK_READY_ATLAS,
+    notready = READY_CHECK_NOT_READY_ATLAS,
+    waiting = READY_CHECK_WAITING_ATLAS,
 }
+
+-- Puts the mark of a state on the icon; false if there is none
+local function SetReadyIcon(tex, status)
+    local atlas = status and READY_ATLAS[status]
+    if not atlas then return false end
+    tex:SetAtlas(atlas)
+    return true
+end
 
 function ns.UpdateReady(b)
     if not ns.P.elements.ready.show or b.isPet or not ns.readyActive then b.ready:Hide() return end
     local status = GetReadyCheckStatus and R(GetReadyCheckStatus(b.unit))
-    if status and READY_TEX[status] then
-        b.ready:SetTexture(READY_TEX[status])
-        b.ready:Show()
-    else
-        b.ready:Hide()
-    end
+    b.ready:SetShown(SetReadyIcon(b.ready, status))
 end
 
 function ns.UpdateTarget(b)
@@ -1253,8 +1258,7 @@ local function FillTest(b)
     if SetRaidTargetIconTexture then SetRaidTargetIconTexture(b.raidIcon, 8) end
     -- simulated ready check: almost everyone ready, some waiting and some not
     local rstate = (i % 7 == 0) and "notready" or ((i % 5 == 3) and "waiting" or "ready")
-    b.ready:SetShown(E.ready.show and not b.isPet)
-    b.ready:SetTexture(READY_TEX[rstate])
+    b.ready:SetShown(E.ready.show and not b.isPet and SetReadyIcon(b.ready, rstate))
 
     -- in the Indicators preview only the indicator matters: drop what test mode
     -- simulates on the player (threat, target, leader, role, marker and ready).
