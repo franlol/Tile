@@ -772,7 +772,7 @@ local function BuildIndicators(container)
                 selInd = #l
                 Repaint()
             end },
-            { L["Catalog"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
+            { L["Presets"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
         }),
         UI.Note(lc, L["Drag a row to change the order: the ones below are drawn on top. Built-in ones have no x: turn them off with their box."]),
     })
@@ -1752,7 +1752,7 @@ local function CreateWindow()
     win:AddNav("elements", L["Status icons"], BuildElements)
     win:AddNav("colors", L["Colors"], BuildColors)
     win:AddNav("indicators", L["Indicators"], BuildIndicators)
-    win:AddNav("catalog", L["Catalog"], BuildCatalog)
+    win:AddNav("catalog", L["Presets"], BuildCatalog)
     win:AddNav("instances", L["Instances"], BuildInstances)
 
     UI.OnRefresh = function()

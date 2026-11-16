@@ -8,7 +8,7 @@ native auras, and profiles per group size.
 - **Indicators**: icons, squares, bars, texts, borders and tints at any spot of
   the frame. The game draws the auras itself, so they work in combat and in
   instances.
-- **Spell catalog** per class: add common buffs and debuffs as indicators in a
+- **Spell presets** per class: add common buffs and debuffs as indicators in a
   few clicks, or as "missing" warnings out of combat.
 - **Dispellable and typed debuffs**, boss debuffs, shields and incoming heals.
 - **Profiles per group size** (party, 10, 20, 40), with a test mode that
