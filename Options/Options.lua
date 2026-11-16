@@ -395,8 +395,44 @@ local function BuildProfiles(container)
         create,
         feedback,
     })
+    -- share: the profile being edited as text, or a text pasted to import it
+    local box = UI.CodeBox(c, 120)
+    local status = UI.Note(c, "")
+    local share = UI.Buttons(c, {
+        { L["Export"], function()
+            box.edit:SetText(ns.ExportProfile())
+            box.edit:SetFocus()
+            box.edit:HighlightText()
+            status:SetText(L["Copied to the box: press Ctrl+C."])
+            page:Layout()
+        end, "accent" },
+        { L["Import"], function()
+            UI.Dialog(L["This replaces every setting of the profile being edited. Continue?"], L["Import"], function()
+                local ok, err = ns.ImportProfile(box.edit:GetText())
+                status:SetText(ok and ("|cff6bd66b" .. L["Profile imported."] .. "|r") or ("|cffff6b61" .. err .. "|r"))
+                UI.RefreshAll()
+                page:Layout()
+            end)
+        end },
+    })
+
     Cards(page, 2, {
         sizes,
+        Header(L["Share"]),
+        box,
+        share,
+        status,
+    })
+end
+
+-------------------------------------------------------------------------------
+-- General: what test mode simulates and the account settings
+-------------------------------------------------------------------------------
+local function BuildGeneral(container)
+    local page = UI.Page(container, 2)
+    local c = page.content
+
+    Cards(page, 1, {
         Header(L["Preview"]),
         UI.Dropdown(c, L["Simulate a group of"], {
             { "party", L["5 (party)"] }, { "raid10", L["10 (raid)"] }, { "raid20", L["20 (raid)"] }, { "raid40", L["40 (raid)"] },
@@ -420,6 +456,8 @@ local function BuildProfiles(container)
         UI.Segmented(c, L["Missing health"], {
             { "mixed", L["Mixed"] }, { "full", L["Full"] }, { "low", L["Low"] },
         }, PreviewBind("health")),
+    })
+    Cards(page, 2, {
         Header(L["General"]),
         -- hiding applies at once; showing them again needs a reload
         UI.Check(c, L["Hide Blizzard party and raid frames"],
@@ -1774,6 +1812,7 @@ local function CreateWindow()
     win:AddHeaderButton(L["Test mode"], function() ns.ToggleTest() end,
         function() return ns.testing end)
 
+    win:AddNav("general", L["General"], BuildGeneral)
     win:AddNav("profiles", L["Profiles"], BuildProfiles)
     win:AddNav("layout", L["Layout"], BuildLayout)
     win:AddNav("bars", L["Bars"], BuildBars)
@@ -1795,7 +1834,7 @@ local function CreateWindow()
     ns.OnLockChanged = Refresh
     ns.OnTestChanged = Refresh
     ns.OnProfileChanged = Refresh
-    win:Select("profiles")
+    win:Select("general")
 end
 
 -- Open (without closing it if it is already open)

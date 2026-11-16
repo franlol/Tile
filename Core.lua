@@ -376,6 +376,63 @@ function ns.ProfileChanged()
 end
 
 -------------------------------------------------------------------------------
+-- Export / import (as Sigil): the profile as Lua text, read back without any
+-- access to the game (empty environment)
+-------------------------------------------------------------------------------
+local EXPORT_TAG = "TILE1:"
+
+local function Serialize(v, out)
+    local t = type(v)
+    if t == "table" then
+        out[#out + 1] = "{"
+        local keys = {}
+        for k in pairs(v) do keys[#keys + 1] = k end
+        table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+        for _, k in ipairs(keys) do
+            out[#out + 1] = "["
+            Serialize(k, out)
+            out[#out + 1] = "]="
+            Serialize(v[k], out)
+            out[#out + 1] = ","
+        end
+        out[#out + 1] = "}"
+    elseif t == "string" then
+        out[#out + 1] = ("%q"):format(v):gsub("\n", "n")
+    elseif t == "number" or t == "boolean" then
+        out[#out + 1] = tostring(v)
+    else
+        out[#out + 1] = "nil"
+    end
+    return out
+end
+
+-- The profile being edited, as text
+function ns.ExportProfile()
+    return EXPORT_TAG .. table.concat(Serialize(ns.EP(), {}))
+end
+
+-- Replaces every setting of the profile being edited with the text's.
+-- Returns true, or false and the reason.
+function ns.ImportProfile(text)
+    local body = text and text:match("^%s*" .. EXPORT_TAG .. "(.+)$")
+    if not body then return false, L["This is not a Tile profile."] end
+    local chunk = loadstring("return " .. body)
+    if not chunk then return false, L["The text is damaged."] end
+    setfenv(chunk, {})
+    local ok, data = pcall(chunk)
+    if not ok or type(data) ~= "table" or type(data.layout) ~= "table" or type(data.bars) ~= "table" then
+        return false, L["The text is damaged."]
+    end
+    -- missing settings get their defaults (and older exports their updates)
+    ns.FixProfile(data)
+    local p = ns.EP()
+    wipe(p)
+    for k, v in pairs(data) do p[k] = v end
+    ns.ProfileChanged()
+    return true
+end
+
+-------------------------------------------------------------------------------
 -- Hide the Blizzard raid frames
 -------------------------------------------------------------------------------
 local hiddenParent = CreateFrame("Frame")

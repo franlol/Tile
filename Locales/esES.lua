@@ -6,6 +6,16 @@
 local _, ns = ...
 
 ns.translations.esES = {
+    -- Profiles: share
+    ["Share"] = "Compartir",
+    ["Export"] = "Exportar",
+    ["Import"] = "Importar",
+    ["Copied to the box: press Ctrl+C."] = "Copiado en el cuadro: pulsa Ctrl+C.",
+    ["This replaces every setting of the profile being edited. Continue?"] = "Esto sustituye toda la configuración del perfil que editas. ¿Continuar?",
+    ["Profile imported."] = "Perfil importado.",
+    ["This is not a Tile profile."] = "Esto no es un perfil de Tile.",
+    ["The text is damaged."] = "El texto está dañado.",
+
     ["HoTs and shields"] = "HoTs y escudos",
     ["Heals over time and shields on allies."] = "Curaciones en el tiempo y escudos sobre los aliados.",
     ["Shield"] = "Escudo",
