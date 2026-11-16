@@ -149,6 +149,14 @@ ns.profileDefaults = {
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
     },
+    -- offline players: their own look ("usual" = as any other player).
+    -- Gray bars like Blizzard's raid frames; faded like out of range.
+    offline = {
+        health = "custom", healthColor = C(0.5, 0.5, 0.5),
+        power = "custom", powerColor = C(0.5, 0.5, 0.5),
+        name = "usual", nameColor = C(0.5, 0.5, 0.5),
+        alpha = 0.35,
+    },
     -- font and outline every text uses unless it has its own
     -- (a text with font = false / outline = false takes these)
     general = { font = FONT, outline = "OUTLINE" },

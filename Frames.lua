@@ -350,7 +350,12 @@ end
 
 -- Resource bar: resource color, class color or a chosen one (with brightness)
 local function PowerColor(b, pr, pg, pb, testClass)
-    local B = ns.P.bars
+    local B, O = ns.P.bars, ns.P.offline
+    if b.offline and O.power == "custom" then
+        local c = O.powerColor
+        b.power:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
+        return
+    end
     local mode = B.powerColor or "power"
     if mode == "class" then
         local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
@@ -367,7 +372,13 @@ function ns.UpdateBarColor(b, testClass, testPct)
     local cr, cg, cb = UnitColor(b.unit, b.isPet, testClass)
     local pct
     if B.healthColor == "gradient" or B.bgColor == "gradient" then pct = HealthPct(b, testPct) end
-    b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
+    local O = ns.P.offline
+    if b.offline and O.health == "custom" then
+        local c = O.healthColor
+        b.health:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
+    else
+        b.health:SetStatusBarColor(ModeColor(B.healthColor, B.customColor, B.healthBrightness, cr, cg, cb, pct))
+    end
     local r, g, bl, a = ModeColor(B.bgColor, B.bgCustom, B.bgBrightness, cr, cg, cb, pct)
     b.health.bg:SetVertexColor(r, g, bl, 1)
     b.bgColorAlpha = a
@@ -431,9 +442,25 @@ function ns.UpdateColors(b, testClass, testPct)
     local T = ns.P.texts
     local r, g, bl = UnitColor(b.unit, b.isPet, testClass)
     ns.UpdateBarColor(b, testClass, testPct)
-    TextColor(b.name, T.name, r, g, bl)
+    local O = ns.P.offline
+    if b.offline and O.name == "custom" then
+        local c = O.nameColor
+        b.name:SetTextColor(c.r, c.g, c.b, c.a or 1)
+    else
+        TextColor(b.name, T.name, r, g, bl)
+    end
     ns.StatusColor(b, b.statusKey)
     TextColor(b.hpText, T.health, r, g, bl)
+end
+
+-- Offline or not: when it changes, the colors, the resource bar and the
+-- opacity follow (the offline look)
+local function SetOffline(b, offline)
+    if b.offline == offline then return end
+    b.offline = offline
+    ns.UpdateColors(b)
+    ns.UpdatePower(b)
+    ns.UpdateRange(b)
 end
 
 local function Abbrev(n)
@@ -529,6 +556,7 @@ function ns.UpdateHealth(b, full)
     -- when the max (their scale) changes
     if maxChanged then ns.UpdatePrediction(b, max) end
 
+    SetOffline(b, R(UnitIsConnected(u)) == false)
     local text, key, down = StatusOf(u)
     -- status and transparency only when they change
     if full or text ~= b.cacheStatus or key ~= b.statusKey then
@@ -688,6 +716,8 @@ local PET_RANGE_SPELL = {
 function ns.UpdateRange(b)
     local u = b.unit
     local alpha = ns.P.bars.rangeAlpha
+    -- offline: their own opacity (Bars, Offline players), in range or not
+    if b.offline then b:SetAlpha(ns.P.offline.alpha) return end
     if R(UnitIsUnit("player", u)) == true then b:SetAlpha(1) return end
     -- too far to be seen at all (another zone, far away): faded
     if R(UnitIsVisible(u)) == false then b:SetAlpha(alpha) return end
@@ -1206,6 +1236,8 @@ local function FillTest(b)
     -- test pets: alternately a hunter's and a warlock's (their owner's color)
     local class = b.isPet and (i % 2 == 1 and "HUNTER" or "WARLOCK") or TestClass(i)
     b.testClass = class
+    -- #5 is the offline player (its look follows Bars, Offline players)
+    b.offline = i == 5 and not b.isPet
     ns.UpdateColors(b, class)
 
     b.name:SetText(b.isPet and (L["Pet %d"]):format(i) or TestName(i))
@@ -1242,7 +1274,7 @@ local function FillTest(b)
     elseif i == 9 and TS.showCharm then stext, skey = L["Charmed"], "charm"
     elseif i == 11 and TS.showSummon then stext, skey = L["Summon"], "summon" end
     local dead = skey == "dead" or skey == "ghost" or skey == "res"
-    local down = dead or skey == "offline"
+    local down = dead or b.offline
     b.cacheStatus, b.statusKey = stext, skey
     b.status:SetText((stext and TS.show) and stext or "")
     ns.StatusColor(b, skey)
@@ -1253,7 +1285,7 @@ local function FillTest(b)
     else
         HealthText(b, nil, math.floor(hp * 10000), 10000)
     end
-    b:SetAlpha(i % 9 == 0 and B.rangeAlpha or 1)
+    b:SetAlpha(b.offline and P.offline.alpha or (i % 9 == 0 and B.rangeAlpha) or 1)
 
     b.hl:SetAlpha((B.targetHighlight and i == 3) and 1 or 0)
     b.aggro:SetShown(B.aggro and i == 1)
