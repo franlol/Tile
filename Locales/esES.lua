@@ -275,7 +275,6 @@ ns.translations.esES = {
     ["Half health"] = "Media salud",
     ["Full health"] = "Salud completa",
     ["Reset every color"] = "Restablecer todos los colores",
-    ["Enabled"] = "Activo",
     ["Type"] = "Tipo",
     ["Color square"] = "Cuadrado de color",
     ["Icon"] = "Icono",

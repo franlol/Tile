@@ -1115,7 +1115,6 @@ local function BuildIndicators(container)
     Cards(rightPage, 1, {
         Header(L["Indicator"]),
         nameIn,
-        UI.Check(c, L["Enabled"], IB("enabled")),
         W(UI.Dropdown(c, L["Type"], {
             { "square", L["Color square"] }, { "icon", L["Icon"] }, { "icons", L["Several icons"] },
             { "bar", L["Bar"] }, { "text", L["Text"] },
