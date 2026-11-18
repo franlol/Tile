@@ -32,6 +32,8 @@ end
 -------------------------------------------------------------------------------
 -- A card title in a list of controls: the controls after it, up to the next
 -- one, go in its card. titleFn() (optional) changes the title on refresh.
+-- header.buttons = { { icon, onClick, opts }, ... }: icon buttons next to
+-- the title (card:AddHeaderButton)
 local function Header(title, titleFn)
     return { isHeader = true, title = title, titleFn = titleFn }
 end
@@ -56,6 +58,7 @@ local function Cards(page, col, list)
         if w.isHeader then
             card = page:Add(col, UI.Card(page.content, w.title))
             card.showIf = w.showIf
+            for _, b in ipairs(w.buttons or {}) do card:AddHeaderButton(b[1], b[2], b[3]) end
             if w.titleFn then
                 local cd = card
                 table.insert(UI.widgets, { Refresh = function() cd.title:SetText(w.titleFn()) end })
@@ -300,9 +303,8 @@ local function BuildProfiles(container)
             ns.ActivateProfile(true)
             ns.ProfileChanged()
             Say((L["\"%s\" is back to the default settings."]):format(name))
-        end, "danger", L["Puts the selected profile back to the default settings."] },
+        end, "danger", L["Puts the selected profile back to the default settings."], confirm = true },
     })
-    UI.Confirm(actions.buttons[1], L["Sure?"])
 
     ---------------------------------------------------------------------------
     -- Create / duplicate / rename
@@ -824,18 +826,26 @@ local function BuildIndicators(container)
         end,
         rows = 18,
     })
+    -- + in the title: a new empty indicator, or the presets page
+    local function AddIndicator(v)
+        if v == "presets" then
+            if ns.OpenCatalog then ns.OpenCatalog() end
+            return
+        end
+        local l = Inds()
+        table.insert(l, ns.FixIndicator({ name = L["New indicator"] }))
+        selInd = #l
+        Repaint()
+    end
+    local head = Header(L["Indicators"])
+    head.buttons = {
+        { "plus", function(self)
+            UI.Menu(self, { { "new", L["New indicator"] }, { "presets", L["Presets"] .. "..." } }, AddIndicator)
+        end, { tip = L["New"] } },
+    }
     Cards(leftPage, 1, {
-        Header(L["Indicators"]),
+        head,
         list,
-        UI.Buttons(lc, {
-            { L["New"], function()
-                local l = Inds()
-                table.insert(l, ns.FixIndicator({ name = L["New indicator"] }))
-                selInd = #l
-                Repaint()
-            end },
-            { L["Presets"] .. "...", function() if ns.OpenCatalog then ns.OpenCatalog() end end },
-        }),
         UI.Note(lc, L["Drag a row to reorder. When indicators overlap, the higher row is drawn in front."]),
     })
 
@@ -1770,20 +1780,29 @@ local COLOR_CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAM
 local function BuildColors(container)
     local page = UI.Page(container, 2)
     local c = page.content
-    local function Col(group, key) return function() return ns.EP().colors[group][key] end end
+    local D = ns.profileDefaults
+    -- every color can go back to its default on its own (a red Reset shows
+    -- while it differs, and asks first)
+    local function ColorSwatch(label, getColor, getDefault)
+        return UI.Swatch(c, label, getColor, Repaint, { default = getDefault })
+    end
+    local function Col(group, key)
+        return function() return ns.EP().colors[group][key] end, function() return D.colors[group][key] end
+    end
 
     local classes = { Header(L["Classes"]) }
     for _, token in ipairs(COLOR_CLASSES) do
-        classes[#classes + 1] = Swatch(c, L[ns.CLASS_NAMES[token]], Col("class", token))
+        classes[#classes + 1] = ColorSwatch(L[ns.CLASS_NAMES[token]], Col("class", token))
     end
-    classes[#classes + 1] = Swatch(c, L["Pets"], function() return ns.EP().colors.pet end)
+    classes[#classes + 1] = ColorSwatch(L["Pets"], function() return ns.EP().colors.pet end,
+        function() return D.colors.pet end)
 
     Cards(page, 1, {
         classes,
         Header(L["Resources"]),
-        Swatch(c, L["Mana"], Col("power", "MANA")),
-        Swatch(c, L["Rage"], Col("power", "RAGE")),
-        Swatch(c, L["Energy"], Col("power", "ENERGY")),
+        ColorSwatch(L["Mana"], Col("power", "MANA")),
+        ColorSwatch(L["Rage"], Col("power", "RAGE")),
+        ColorSwatch(L["Energy"], Col("power", "ENERGY")),
     })
 
     -- the game draws the type colors without opacity: no opacity here
@@ -1792,24 +1811,24 @@ local function BuildColors(container)
         { "Magic", L["Magic"] }, { "Curse", L["Curse"] }, { "Disease", L["Disease"] }, { "Poison", L["Poison"] },
         { "none", L["No type"] },
     }) do
-        dispel[#dispel + 1] = Swatch(c, ns.DispelLabel(d[1], d[2], 22), function() return ns.EP().dispelColors[d[1]] end)
+        dispel[#dispel + 1] = ColorSwatch(ns.DispelLabel(d[1], d[2], 22), function() return ns.EP().dispelColors[d[1]] end,
+            function() return D.dispelColors[d[1]] end)
     end
 
     local reset = UI.Buttons(c, {
         { L["Reset every color"], function()
-            local P, D = ns.EP(), ns.profileDefaults
+            local P = ns.EP()
             P.colors = ns.DeepCopy(D.colors)
             P.dispelColors = ns.DeepCopy(D.dispelColors)
             Repaint()
-        end, "danger" },
+        end, "danger", confirm = true },
     })
-    UI.Confirm(reset.buttons[1], L["Sure?"])
 
     Cards(page, 2, {
         Header(L["Health gradient"]),
-        Swatch(c, L["Low health"], Col("gradient", "low")),
-        Swatch(c, L["Half health"], Col("gradient", "mid")),
-        Swatch(c, L["Full health"], Col("gradient", "high")),
+        ColorSwatch(L["Low health"], Col("gradient", "low")),
+        ColorSwatch(L["Half health"], Col("gradient", "mid")),
+        ColorSwatch(L["Full health"], Col("gradient", "high")),
         dispel,
         Header(L["Reset"]),
         reset,

@@ -17,6 +17,7 @@ local STRINGS = {
     search = "Search...",
     accept = "Accept",
     cancel = "Cancel",
+    reset = "Reset",
 }
 UI.strings = setmetatable({}, { __index = function(_, key) return L[STRINGS[key]] end })
 
