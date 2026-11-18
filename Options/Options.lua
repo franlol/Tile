@@ -1143,7 +1143,8 @@ local function BuildIndicators(container)
     end)
 
     posSample.Refresh = function()
-        if not ns.P then return end
+        -- while its page is hidden it has no real size: OnShow redraws it
+        if not ns.P or not posSample:IsVisible() then return end
         -- the preview frame always shows the profile being edited
         local LY = ns.EP().layout
         local W, H = LY.width, LY.height
@@ -1177,6 +1178,7 @@ local function BuildIndicators(container)
             posSample.Refresh()
         end
     end
+    posSample:HookScript("OnShow", function() posSample.Refresh() end)
     table.insert(UI.widgets, posSample)
 
     -- the colors per type are shared by every indicator: they live in the Colors page
