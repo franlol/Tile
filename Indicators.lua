@@ -62,8 +62,8 @@ end
 -- because the game changes the vertex color when drawing the type)
 function ns.DispelTintAsset(shape)
     if shape == "solid" then return FLAT end
-    return "Interface\\AddOns\\Tile\\Media\\"
-        .. (shape == "down" and "DispelGradientDown" or "DispelGradientUp")
+    return LibStub("LibFlatyUI-1.0").Media("background",
+        shape == "down" and "Flaty: Gradient down" or "Flaty: Gradient up")
 end
 
 -------------------------------------------------------------------------------

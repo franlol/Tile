@@ -431,7 +431,7 @@ end
 -- differs from Default) and their indicators. Each one is added once per
 -- account (ns.AddPresetProfiles) and never replaces a profile with its name.
 -------------------------------------------------------------------------------
-local DARK_TEX = "Interface\\AddOns\\Tile\\Media\\Dark"
+local DARK_TEX = LibStub("LibFlatyUI-1.0").Media("statusbar", "Flaty: Dark")
 local GRAY = C(0.5, 0.5, 0.5)
 
 ns.PRESET_PROFILES = {

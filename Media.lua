@@ -1,117 +1,80 @@
 -------------------------------------------------------------------------------
 -- Tile - Fonts and textures
--- Blizzard's are always there; if another addon loads LibSharedMedia-3.0,
--- all of its ones are added too.
+-- From LibFlatyUI: its own ("Flaty: ..."), the game's, and LibSharedMedia's
+-- when another addon loads it.
 -------------------------------------------------------------------------------
 
 local _, ns = ...
 local L = ns.L
-
-local FONTS = {
-    { "Friz Quadrata", "Fonts\\FRIZQT__.TTF" },
-    { "Arial Narrow", "Fonts\\ARIALN.TTF" },
-    { "Skurri", "Fonts\\skurri.ttf" },
-    { "Morpheus", "Fonts\\MORPHEUS.ttf" },
-}
-
--- Textures shipped with the addon (Media folder)
-local DARK = "Interface\\AddOns\\Tile\\Media\\Dark"
-
--- A value is a file path or the name of one of the game's atlases (the
--- "Raid frames" ones are what Blizzard's raid frames draw).
-local TEXTURES = {
-    { "Tile · Dark", DARK },
-    { "Flat", "Interface\\Buttons\\WHITE8X8" },
-    { "Blizzard", "Interface\\TargetingFrame\\UI-StatusBar" },
-    { "Raid frames", "RaidFrame-Hp-Fill" },
-    { "Raid frames · resource", "_RaidFrame-Resource-Fill" },
-    { "Raid frames · background", "raidframe-hp-bg-white" },
-    { "Arena frames", "Interface\\RaidFrame\\Raid-Bar-Hp-Fill" },
-    { "Pet battles", "Interface\\RaidFrame\\Raid-Bar-Resource-Fill" },
-    { "Gloss", "Interface\\TargetingFrame\\BarFill2" },
-    { "Smooth", "Interface\\PaperDollInfoFrame\\UI-Character-Skills-Bar" },
-}
-
-local function LSM()
-    return LibStub and LibStub("LibSharedMedia-3.0", true)
-end
-
-local function Merge(base, mediaType)
-    local out, seen = {}, {}
-    for _, e in ipairs(base) do
-        out[#out + 1] = { e[2], L[e[1]] }
-        seen[e[2]:lower()] = true
-    end
-    local lsm = LSM()
-    if lsm then
-        local extra = {}
-        for name, path in pairs(lsm:HashTable(mediaType)) do
-            if type(path) == "string" and not seen[path:lower()] then
-                seen[path:lower()] = true
-                extra[#extra + 1] = { path, name }
-            end
-        end
-        table.sort(extra, function(a, b) return a[2] < b[2] end)
-        for _, e in ipairs(extra) do out[#out + 1] = e end
-    end
-    return out
-end
-
--- Register our textures in LibSharedMedia so other addons can use them
-local function RegisterMedia()
-    local lsm = LSM()
-    if lsm then lsm:Register("statusbar", "Tile Dark", DARK) end
-end
-RegisterMedia()
-local regFrame = CreateFrame("Frame")
-regFrame:RegisterEvent("PLAYER_LOGIN")
-regFrame:SetScript("OnEvent", RegisterMedia)
-
--- { value, label } lists for the dropdowns.
--- For fonts, the 3rd field is the font used to draw the label.
-function ns.FontList()
-    local list = Merge(FONTS, "font")
-    for _, o in ipairs(list) do o[3] = o[1] end
-    return list
-end
--- For textures, the 4th field is the texture shown as a sample behind it
--- "None" (value "none"): that part is not drawn
-function ns.TextureList()
-    local list = Merge(TEXTURES, "statusbar")
-    for _, o in ipairs(list) do o[4] = o[1] end
-    table.insert(list, 1, { "none", L["None"] })
-    return list
-end
+local Flaty = LibStub("LibFlatyUI-1.0")
 
 local FLAT = "Interface\\Buttons\\WHITE8X8"
 
--- A texture from another addon's folder (Interface\AddOns\<name>\...) only
--- exists while that addon is loaded (e.g. one from SharedMedia, in a profile
--- someone imported): without it, the flat texture. The game's own files and
--- atlases are always there.
+-- Tile's own dark texture moved to the lib ("Flaty: Dark"): old profiles
+-- still point to it
+local OLD_DARK = "interface\\addons\\tile\\media\\dark"
+
+-- A saved path ready to use; nil when the file's addon is not loaded (e.g.
+-- a SharedMedia texture in a profile someone imported). Atlases pass through.
 function ns.ResolveTexture(path)
-    local addon = type(path) == "string" and path:match("^[Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee][\\/][Aa][Dd][Dd][Oo][Nn][Ss][\\/]([^\\/]+)[\\/]")
-    if addon and C_AddOns and C_AddOns.IsAddOnLoaded and not C_AddOns.IsAddOnLoaded(addon) then
-        return FLAT
+    if type(path) == "string" and path:lower():gsub("/", "\\") == OLD_DARK then
+        return Flaty.Media("statusbar", "Flaty: Dark")
     end
-    return path
+    return Flaty.ResolveMedia(path)
 end
+
+-- For dropdown getters: the saved value as the list knows it.
+-- Takes and returns a getter, setter pair.
+function ns.MediaPair(get, set)
+    return function()
+        local v = get()
+        return v and ns.ResolveTexture(v) or v
+    end, set
+end
+
+-- The game's names are translated here (the lib's are brand names)
+local function Translated(list)
+    for _, o in ipairs(list) do
+        if not o[2]:find("^Flaty: ") then o[2] = L[o[2]] end
+    end
+    return list
+end
+
+-- { value, label, font } for the dropdowns
+function ns.FontList()
+    return Translated(Flaty.MediaList("font"))
+end
+
+-- { value, label, nil, sample }: bar textures, then backgrounds (a bar's
+-- background can use either). "None" (value "none"): that part is not drawn.
+function ns.TextureList()
+    local list = Flaty.MediaList("statusbar", { none = true, noneLabel = "None" })
+    local seen = {}
+    for _, o in ipairs(list) do seen[o[1]] = true end
+    for _, o in ipairs(Flaty.MediaList("background")) do
+        if not seen[o[1]] then list[#list + 1] = o end
+    end
+    return Translated(list)
+end
+
+local function IsNone(path) return path == "none" or path == nil or path == "" end
 
 -- Texture of a bar; with "None" the bar is still there but invisible
 function ns.SetBarTexture(bar, path)
-    local none = path == "none" or path == nil or path == ""
-    bar:SetStatusBarTexture(none and FLAT or ns.ResolveTexture(path))
+    local none = IsNone(path)
+    bar:SetStatusBarTexture(not none and ns.ResolveTexture(path) or FLAT)
     local t = bar:GetStatusBarTexture()
     if t then t:SetAlpha(none and 0 or 1) end
 end
 
 -- Texture of a background (plain texture): an atlas or a file
 function ns.SetBgTexture(tex, path)
-    local none = path == "none" or path == nil or path == ""
-    if not none and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(path) then
-        tex:SetAtlas(path)
+    local none = IsNone(path)
+    local p = not none and ns.ResolveTexture(path) or FLAT
+    if not none and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(p) then
+        tex:SetAtlas(p)
     else
-        tex:SetTexture(none and FLAT or ns.ResolveTexture(path))
+        tex:SetTexture(p)
     end
     tex:SetShown(not none)
 end
@@ -139,7 +102,7 @@ end
 -- Applies a font; if the path is not valid, uses the standard one
 function ns.SetFont(fs, font, size, outline)
     outline = outline or ""
-    local ok = pcall(fs.SetFont, fs, font or ns.FONT, size, outline)
+    local ok = pcall(fs.SetFont, fs, ns.ResolveTexture(font) or ns.FONT, size, outline)
     if not ok or not fs:GetFont() then
         fs:SetFont(STANDARD_TEXT_FONT, size, outline)
     end

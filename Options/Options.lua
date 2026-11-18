@@ -150,7 +150,7 @@ end
 -- general one, set at the top of the Texts page)
 local function GeneralFontList()
     local list = ns.FontList()
-    table.insert(list, 1, { false, L["General font"], ns.EP().general.font })
+    table.insert(list, 1, { false, L["General font"], ns.ResolveTexture(ns.EP().general.font) })
     return list
 end
 local function GeneralOutlineList()
@@ -175,7 +175,7 @@ local function TextBlock(c, root, after, o)
     end
     for _, w in ipairs(o.extra or {}) do Add(w) end
     local function B(k) return UI.Bind(root, k, after) end
-    Add(UI.Dropdown(c, L["Font"], GeneralFontList, B("font")))
+    Add(UI.Dropdown(c, L["Font"], GeneralFontList, ns.MediaPair(B("font"))))
     Add(Slider(c, L["Size"], 6, 24, 1, UI.px, B("size")))
     Add(UI.Dropdown(c, L["Outline"], GeneralOutlineList, B("outline")))
     if not o.noColor then
@@ -543,21 +543,21 @@ local function BuildBars(container)
 
     Cards(page, 1, {
         Header(L["Health"]),
-        UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.healthTex")),
+        UI.Dropdown(c, L["Texture"], ns.TextureList, ns.MediaPair(PB("bars.healthTex"))),
         Smooth("bars.smooth"),
         BarColorBlock(c, BarColors, "bars.healthColor", "bars.customColor", "bars.healthBrightness"),
 
         Header(L["Background (missing health)"]),
-        UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.bgTex")),
+        UI.Dropdown(c, L["Texture"], ns.TextureList, ns.MediaPair(PB("bars.bgTex"))),
         BarColorBlock(c, BarColors, "bars.bgColor", "bars.bgCustom", "bars.bgBrightness"),
         Slider(c, L["Opacity"], 0, 1, 0.05, UI.pct, PB("bars.bgAlpha")),
 
         Header(L["Heals and shields"]),
         UI.Check(c, L["Incoming heals"], PB("bars.showHealPred")),
-        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.healPredTex"))), nil, On("bars.showHealPred")),
+        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, ns.MediaPair(PB("bars.healPredTex")))), nil, On("bars.showHealPred")),
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.healPredColor"), nil, true)), nil, On("bars.showHealPred")),
         UI.Check(c, L["Shields (absorb)"], PB("bars.showAbsorb")),
-        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.absorbTex"))), nil, On("bars.showAbsorb")),
+        Cond(UI.Attach(UI.Dropdown(c, L["Texture"], ns.TextureList, ns.MediaPair(PB("bars.absorbTex")))), nil, On("bars.showAbsorb")),
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.absorbColor"), nil, true)), nil, On("bars.showAbsorb")),
     })
 
@@ -565,7 +565,7 @@ local function BuildBars(container)
         Header(L["Mana / energy / rage"]),
         UI.Check(c, L["Show"], PB("bars.showPower")),
         Cond(UI.Attach(UI.Check(c, L["Only for mana users"], PB("bars.powerOnlyMana"))), nil, power),
-        Cond(UI.Dropdown(c, L["Texture"], ns.TextureList, PB("bars.powerTex")), nil, power),
+        Cond(UI.Dropdown(c, L["Texture"], ns.TextureList, ns.MediaPair(PB("bars.powerTex"))), nil, power),
         Cond(Smooth("bars.powerSmooth"), nil, power),
         All(BarColorBlock(c, PowerColors, "bars.powerColor", "bars.powerCustom", "bars.powerBrightness"), nil, power),
         Cond(Slider(c, L["Background opacity"], 0, 1, 0.05, UI.pct, PB("bars.powerBgAlpha")), nil, power),
@@ -680,7 +680,7 @@ local function BuildTexts(container)
     Cards(page, 1, {
         -- what every text uses unless it picks its own (indicator texts too)
         Header(L["All texts"]),
-        UI.Dropdown(c, L["Font"], ns.FontList, PB("general.font")),
+        UI.Dropdown(c, L["Font"], ns.FontList, ns.MediaPair(PB("general.font"))),
         UI.Dropdown(c, L["Outline"], ns.OutlineList, PB("general.outline")),
         TextSection(c, "name", L["Name"], {
             UI.Check(c, L["With surname"], PB("texts.name.surname", function() ns.UpdateAllButtons() end)),
