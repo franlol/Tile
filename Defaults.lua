@@ -152,7 +152,7 @@ ns.profileDefaults = {
         targetColor = C(1, 1, 1, 1),
         hoverHighlight = true,
         hoverColor = C(1, 0.82, 0, 1),
-        showTooltip = true,
+        showTooltip = false,
         tooltipNoCombat = false,      -- hide the unit tooltip while in combat
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
@@ -180,6 +180,9 @@ ns.profileDefaults = {
     -- bottom positions are measured from above the resource bar (older
     -- profiles, without this, measured them from the frame's bottom edge)
     bottomRev = 1,
+    -- the unit tooltip on mouse over is now off by default (profiles from
+    -- before, which had it on, are turned off once)
+    tooltipRev = 1,
     texts = {
         name = {
             show = true, font = false, size = 11, outline = false,
@@ -550,6 +553,7 @@ function ns.FixProfile(p)
     local hadGeneral = type(p.general) == "table"
     local hadBottomRev = p.bottomRev ~= nil
     local hadSquares = p.squaresRev ~= nil
+    local hadTooltipRev = p.tooltipRev ~= nil
     ns.CopyDefaults(ns.profileDefaults, p)
     -- the old "No text" health format is now the Show box turned off
     local ht = p.texts.health
@@ -621,6 +625,10 @@ function ns.FixProfile(p)
             end
         end
         p.squaresRev = 1
+    end
+    if not hadTooltipRev then
+        p.bars.showTooltip = false
+        p.tooltipRev = 1
     end
     return p
 end
