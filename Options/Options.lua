@@ -583,6 +583,10 @@ local function BuildBars(container)
         UI.Check(c, L["Mark who has threat (aggro)"], PB("bars.aggro")),
         Cond(UI.Attach(Swatch(c, L["Color"], Col("bars.aggroColor"), nil, true)), nil, On("bars.aggro")),
 
+        Header(L["Tooltip"]),
+        UI.Check(c, L["Show"], PB("bars.showTooltip")),
+        Cond(UI.Attach(UI.Check(c, L["Only out of combat"], PB("bars.tooltipNoCombat"))), nil, On("bars.showTooltip")),
+
         Header(L["Offline players"]),
         StateColor(c, "offline", "health", L["Health"]),
         StateColor(c, "offline", "power", L["Mana / energy / rage"]),

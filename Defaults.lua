@@ -152,6 +152,8 @@ ns.profileDefaults = {
         targetColor = C(1, 1, 1, 1),
         hoverHighlight = true,
         hoverColor = C(1, 0.82, 0, 1),
+        showTooltip = true,
+        tooltipNoCombat = false,      -- hide the unit tooltip while in combat
         aggro = true,
         aggroColor = C(1, 0.1, 0.1, 1),
     },

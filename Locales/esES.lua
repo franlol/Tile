@@ -229,6 +229,7 @@ ns.translations.esES = {
     ["As usual"] = "Como siempre",
     ["Frame opacity"] = "Opacidad del marco",
     ["Highlights"] = "Resaltados",
+    ["Tooltip"] = "Tooltip",
     ["Highlight my target"] = "Resaltar mi objetivo",
     ["Highlight on mouse over"] = "Resaltar al pasar el ratón",
     ["Mark who has threat (aggro)"] = "Marcar quien tiene amenaza (aggro)",

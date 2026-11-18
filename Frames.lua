@@ -878,8 +878,9 @@ local function InitButton(header, name)
     end)
     b:HookScript("OnShow", function(self) if self.unit then ns.UpdateButton(self) end end)
     b:HookScript("OnEnter", function(self)
-        if ns.P.bars.hoverHighlight then self.hover:SetAlpha(1) end
-        if self.unit then
+        local B = ns.P.bars
+        if B.hoverHighlight then self.hover:SetAlpha(1) end
+        if self.unit and B.showTooltip and not (B.tooltipNoCombat and InCombatLockdown()) then
             GameTooltip_SetDefaultAnchor(GameTooltip, self)
             GameTooltip:SetUnit(self.unit)
             GameTooltip:Show()
