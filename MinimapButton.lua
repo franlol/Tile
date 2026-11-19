@@ -17,6 +17,8 @@ local function Settings()
         m.minimapPos = m.angle
         m.angle = nil
     end
+    -- the addon menu entry comes from the TOC; LibDBIcon's would be a second one
+    m.showInCompartment = nil
     return m
 end
 
