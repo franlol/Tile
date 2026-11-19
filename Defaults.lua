@@ -71,7 +71,7 @@ ns.dbDefaults = {
     profiles = {},
     chars = {},
     spellIndex = {},     -- name -> IDs index (rebuilt when the client version changes)
-    minimap = { angle = 225, hide = false }, -- minimap button: position (degrees), hidden
+    minimap = { minimapPos = 225, hide = false }, -- minimap button (LibDBIcon): position (degrees), hidden
     -- what test mode simulates (Profiles page, Preview); health: mixed | full | low
     preview = {
         range = true, offline = true, dead = true, threat = true, target = true,

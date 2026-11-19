@@ -1,86 +1,62 @@
 -------------------------------------------------------------------------------
--- Tile - Minimap button: click opens the options, drag moves it around the
--- minimap (the angle is saved)
+-- Tile - Minimap button (LibDBIcon): click opens the options, drag moves it
+-- around the minimap (saved for the whole account). Also the addon
+-- compartment entry, named in the TOC.
 -------------------------------------------------------------------------------
 
-local _, ns = ...
+local ADDON, ns = ...
 local L = ns.L
 
-local btn = CreateFrame("Button", "TileMinimapButton", Minimap)
-btn:SetSize(31, 31)
-btn:SetFrameStrata("MEDIUM")
-btn:SetFrameLevel(8)
-btn:RegisterForClicks("AnyUp")
-btn:RegisterForDrag("LeftButton")
-btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+local DBI = LibStub("LibDBIcon-1.0")
 
-local icon = btn:CreateTexture(nil, "ARTWORK")
-icon:SetSize(20, 20)
-icon:SetPoint("TOPLEFT", 7, -5)
-icon:SetTexture("Interface\\AddOns\\Tile\\Media\\IconRound")
-
-local border = btn:CreateTexture(nil, "OVERLAY")
-border:SetSize(53, 53)
-border:SetPoint("TOPLEFT")
-border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-
-local atan2 = math.atan2 or atan2
-
--- Place the button on the edge of the minimap at the saved angle
-local function Place()
-    local a = math.rad(ns.db.minimap.angle)
-    local r = Minimap:GetWidth() / 2 + 5
-    btn:ClearAllPoints()
-    btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
-end
-
--- While dragging, follow the cursor around the minimap
-local function FollowCursor()
-    local mx, my = Minimap:GetCenter()
-    local scale = Minimap:GetEffectiveScale()
-    local cx, cy = GetCursorPosition()
-    ns.db.minimap.angle = math.deg(atan2(cy / scale - my, cx / scale - mx))
-    Place()
-end
-
-btn:SetScript("OnDragStart", function(self)
-    self:SetScript("OnUpdate", FollowCursor)
-    GameTooltip:Hide()
-end)
-btn:SetScript("OnDragStop", function(self)
-    self:SetScript("OnUpdate", nil)
-end)
--- compartment = opened from the addon compartment (no drag there)
-local function ShowTooltip(owner, compartment)
-    GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-    GameTooltip:AddDoubleLine("Tile", "v" .. ns.version, ns.ACCENT[1], ns.ACCENT[2], ns.ACCENT[3], 0.5, 0.5, 0.5)
-    GameTooltip:AddDoubleLine(L["Active profile"], ns.activeName or "?", 0.7, 0.7, 0.7, 1, 1, 1)
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine(L["Click"], L["Open the options"], 1, 0.82, 0, 1, 1, 1)
-    if not compartment then
-        GameTooltip:AddDoubleLine(L["Drag"], L["Move this button"], 1, 0.82, 0, 1, 1, 1)
+-- LibDBIcon's settings (minimapPos, hide, lock). Older versions saved the
+-- position as "angle": same degrees, so it carries over as it is.
+local function Settings()
+    local m = ns.db.minimap
+    if m.angle then
+        m.minimapPos = m.angle
+        m.angle = nil
     end
-    GameTooltip:Show()
+    return m
 end
 
-btn:SetScript("OnClick", function() ns.ToggleOptions() end)
-btn:SetScript("OnEnter", function(self) ShowTooltip(self) end)
-btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+-- compartment = shown for the addon compartment (no drag there)
+local function FillTooltip(tt, compartment)
+    tt:AddDoubleLine("Tile", "v" .. ns.version, ns.ACCENT[1], ns.ACCENT[2], ns.ACCENT[3], 0.5, 0.5, 0.5)
+    tt:AddDoubleLine(L["Active profile"], ns.activeName or "?", 0.7, 0.7, 0.7, 1, 1, 1)
+    tt:AddLine(" ")
+    tt:AddDoubleLine(L["Click"], L["Open the options"], 1, 0.82, 0, 1, 1, 1)
+    if not compartment and not Settings().lock then
+        tt:AddDoubleLine(L["Drag"], L["Move this button"], 1, 0.82, 0, 1, 1, 1)
+    end
+end
 
--- Named in the TOC (AddonCompartmentFunc...)
-function Tile_OnCompartmentClick() ns.ToggleOptions() end
-function Tile_OnCompartmentEnter(_, owner) ShowTooltip(owner, true) end
-function Tile_OnCompartmentLeave() GameTooltip:Hide() end
+local broker = LibStub("LibDataBroker-1.1"):NewDataObject(ADDON, {
+    type = "launcher",
+    icon = "Interface\\AddOns\\Tile\\Media\\IconRound",
+    OnClick = function() ns.ToggleOptions() end,
+    OnTooltipShow = function(tt) FillTooltip(tt) end,
+})
 
 -- Show or hide it as the options say
 function ns.UpdateMinimapButton()
-    btn:SetShown(not ns.db.minimap.hide)
+    DBI:Refresh(ADDON, Settings())
 end
 
--- the saved angle is only known after the saved variables load
-btn:RegisterEvent("PLAYER_LOGIN")
-btn:SetScript("OnEvent", function(self)
+local ev = CreateFrame("Frame")
+ev:RegisterEvent("PLAYER_LOGIN")
+ev:SetScript("OnEvent", function(self)
     self:UnregisterEvent("PLAYER_LOGIN")
-    Place()
-    ns.UpdateMinimapButton()
+    if broker and not DBI:IsRegistered(ADDON) then
+        DBI:Register(ADDON, broker, Settings())
+    end
 end)
+
+-- Named in the TOC (AddonCompartmentFunc...)
+function Tile_OnCompartmentClick() ns.ToggleOptions() end
+function Tile_OnCompartmentEnter(_, owner)
+    GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+    FillTooltip(GameTooltip, true)
+    GameTooltip:Show()
+end
+function Tile_OnCompartmentLeave() GameTooltip:Hide() end
