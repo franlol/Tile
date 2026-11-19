@@ -50,19 +50,27 @@ end)
 btn:SetScript("OnDragStop", function(self)
     self:SetScript("OnUpdate", nil)
 end)
-btn:SetScript("OnClick", function()
-    ns.ToggleOptions()
-end)
-btn:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+-- compartment = opened from the addon compartment (no drag there)
+local function ShowTooltip(owner, compartment)
+    GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
     GameTooltip:AddDoubleLine("Tile", "v" .. ns.version, ns.ACCENT[1], ns.ACCENT[2], ns.ACCENT[3], 0.5, 0.5, 0.5)
     GameTooltip:AddDoubleLine(L["Active profile"], ns.activeName or "?", 0.7, 0.7, 0.7, 1, 1, 1)
     GameTooltip:AddLine(" ")
     GameTooltip:AddDoubleLine(L["Click"], L["Open the options"], 1, 0.82, 0, 1, 1, 1)
-    GameTooltip:AddDoubleLine(L["Drag"], L["Move this button"], 1, 0.82, 0, 1, 1, 1)
+    if not compartment then
+        GameTooltip:AddDoubleLine(L["Drag"], L["Move this button"], 1, 0.82, 0, 1, 1, 1)
+    end
     GameTooltip:Show()
-end)
+end
+
+btn:SetScript("OnClick", function() ns.ToggleOptions() end)
+btn:SetScript("OnEnter", function(self) ShowTooltip(self) end)
 btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+-- Named in the TOC (AddonCompartmentFunc...)
+function Tile_OnCompartmentClick() ns.ToggleOptions() end
+function Tile_OnCompartmentEnter(_, owner) ShowTooltip(owner, true) end
+function Tile_OnCompartmentLeave() GameTooltip:Hide() end
 
 -- Show or hide it as the options say
 function ns.UpdateMinimapButton()
