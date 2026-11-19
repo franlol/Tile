@@ -8,9 +8,6 @@
 ## X-Curse-Project-ID: 1799499
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\Tile\Media\Icon
-## AddonCompartmentFunc: Tile_OnCompartmentClick
-## AddonCompartmentFuncOnEnter: Tile_OnCompartmentEnter
-## AddonCompartmentFuncOnLeave: Tile_OnCompartmentLeave
 ## SavedVariables: TileDB
 ## OptionalDeps: LibSharedMedia-3.0, SharedMedia, Blizzard_AuraContainer
 
